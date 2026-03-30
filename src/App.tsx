@@ -3,6 +3,8 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import AppLayout from "@/components/AppLayout";
 import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
@@ -34,31 +36,33 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<Login />} />
-          <Route element={<AppLayout />}>
-            <Route path="/dashboard" element={<Index />} />
-            <Route path="/contabil" element={<Contabil />} />
-            <Route path="/fiscal" element={<Fiscal />} />
-            <Route path="/folha" element={<Folha />} />
-            <Route path="/xml" element={<ImportacaoXML />} />
-            <Route path="/automacao" element={<Automacao />} />
-            <Route path="/crm" element={<CRM />} />
-            <Route path="/tarefas" element={<Tarefas />} />
-            <Route path="/documentos" element={<Documentos />} />
-            <Route path="/financeiro" element={<Financeiro />} />
-            <Route path="/bi" element={<BI />} />
-            <Route path="/ia" element={<IAContabil />} />
-            <Route path="/ia-chat" element={<IAChat />} />
-            <Route path="/portal" element={<Portal />} />
-            <Route path="/assinatura" element={<Assinatura />} />
-            <Route path="/sefaz" element={<Sefaz />} />
-            <Route path="/bancos" element={<Bancos />} />
-            <Route path="/admin" element={<Admin />} />
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<Login />} />
+            <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+              <Route path="/dashboard" element={<Index />} />
+              <Route path="/contabil" element={<Contabil />} />
+              <Route path="/fiscal" element={<Fiscal />} />
+              <Route path="/folha" element={<Folha />} />
+              <Route path="/xml" element={<ImportacaoXML />} />
+              <Route path="/automacao" element={<Automacao />} />
+              <Route path="/crm" element={<CRM />} />
+              <Route path="/tarefas" element={<Tarefas />} />
+              <Route path="/documentos" element={<Documentos />} />
+              <Route path="/financeiro" element={<Financeiro />} />
+              <Route path="/bi" element={<BI />} />
+              <Route path="/ia" element={<IAContabil />} />
+              <Route path="/ia-chat" element={<IAChat />} />
+              <Route path="/portal" element={<Portal />} />
+              <Route path="/assinatura" element={<Assinatura />} />
+              <Route path="/sefaz" element={<Sefaz />} />
+              <Route path="/bancos" element={<Bancos />} />
+              <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
