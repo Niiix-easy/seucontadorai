@@ -27,6 +27,7 @@ const modules = [
   { path: "/assinatura", icon: PenTool, label: "Assinatura Digital", section: "Integrações" },
   { path: "/sefaz", icon: Building2, label: "Integração SEFAZ", section: "Integrações" },
   { path: "/bancos", icon: Landmark, label: "Integração Bancos", section: "Integrações" },
+  { path: "/certificados", icon: FileKey, label: "Certificados Digitais", section: "Integrações" },
   { path: "/admin", icon: Shield, label: "Administração", section: "Sistema" },
 ];
 

@@ -63,6 +63,7 @@ const App = () => (
               <Route path="/assinatura" element={<Assinatura />} />
               <Route path="/sefaz" element={<Sefaz />} />
               <Route path="/bancos" element={<Bancos />} />
+              <Route path="/certificados" element={<Certificados />} />
               <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<NotFound />} />
