@@ -5,7 +5,7 @@ import { lovable } from "@/integrations/lovable/index";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Bot, Mail, Lock, Eye, EyeOff, Chrome } from "lucide-react";
+import { Bot, Mail, Lock, Eye, EyeOff, Chrome, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Login() {
@@ -14,6 +14,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [crc, setCrc] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -35,9 +36,21 @@ export default function Login() {
         if (error) throw error;
         toast.success("Login realizado com sucesso!");
       } else {
-        const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
+        if (!crc.trim()) {
+          toast.error("CRC é obrigatório para criar conta");
+          setLoading(false);
+          return;
+        }
+        const { error, data: signUpData } = await supabase.auth.signUp({ 
+          email, password, 
+          options: { emailRedirectTo: window.location.origin, data: { crc: crc.trim() } } 
+        });
         if (error) throw error;
-        toast.success("Conta criada! Verifique seu email.");
+        // Update profile with CRC
+        if (signUpData.user) {
+          await supabase.from("profiles").update({ crc: crc.trim() }).eq("user_id", signUpData.user.id);
+        }
+        toast.success("Conta criada com sucesso!");
       }
     } catch (err: any) {
       toast.error(err.message || "Erro na autenticação");
@@ -118,6 +131,15 @@ export default function Login() {
                 <Input id="email" type="email" placeholder="seu@email.com" value={email} onChange={e => setEmail(e.target.value)} className="pl-10 h-11" required />
               </div>
             </div>
+            {!isLogin && (
+              <div className="space-y-2">
+                <Label htmlFor="crc">CRC (Registro no Conselho) *</Label>
+                <div className="relative">
+                  <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input id="crc" placeholder="Ex: SP-123456/O" value={crc} onChange={e => setCrc(e.target.value)} className="pl-10 h-11" required />
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="password">Senha</Label>
               <div className="relative">
