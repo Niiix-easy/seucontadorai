@@ -5,7 +5,7 @@ import { lovable } from "@/integrations/lovable/index";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Bot, Mail, Lock, Eye, EyeOff, Chrome } from "lucide-react";
+import { Bot, Mail, Lock, Eye, EyeOff, Chrome, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Login() {
