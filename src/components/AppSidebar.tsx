@@ -1,14 +1,16 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, BookOpen, Receipt, FileText, Users, ClipboardList,
   FolderOpen, DollarSign, BarChart3, Bot, Globe, PenTool, Building2,
-  Landmark, ChevronLeft, ChevronRight, Zap
+  Landmark, ChevronLeft, ChevronRight, Zap, Shield, MessageSquare, LogOut
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const modules = [
-  { path: "/", icon: LayoutDashboard, label: "Dashboard", section: "" },
+  { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard", section: "" },
   { path: "/contabil", icon: BookOpen, label: "Contábil", section: "Core" },
   { path: "/fiscal", icon: Receipt, label: "Fiscal", section: "Core" },
   { path: "/folha", icon: Users, label: "Folha de Pagamento", section: "Core" },
@@ -20,17 +22,26 @@ const modules = [
   { path: "/financeiro", icon: DollarSign, label: "Financeiro", section: "Gestão" },
   { path: "/bi", icon: BarChart3, label: "BI & Relatórios", section: "Análise" },
   { path: "/ia", icon: Bot, label: "IA Contábil", section: "Análise" },
+  { path: "/ia-chat", icon: MessageSquare, label: "Chat IA", section: "Análise" },
   { path: "/portal", icon: Globe, label: "Portal do Cliente", section: "Integrações" },
   { path: "/assinatura", icon: PenTool, label: "Assinatura Digital", section: "Integrações" },
   { path: "/sefaz", icon: Building2, label: "Integração SEFAZ", section: "Integrações" },
   { path: "/bancos", icon: Landmark, label: "Integração Bancos", section: "Integrações" },
+  { path: "/admin", icon: Shield, label: "Administração", section: "Sistema" },
 ];
 
 export default function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   const sections = [...new Set(modules.map(m => m.section))];
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    toast.success("Logout realizado!");
+    navigate("/");
+  };
 
   return (
     <aside
@@ -43,14 +54,14 @@ export default function AppSidebar() {
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 h-16 border-b border-sidebar-border shrink-0">
         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-          <BookOpen className="w-4 h-4 text-primary-foreground" />
+          <Bot className="w-4 h-4 text-primary-foreground" />
         </div>
         {!collapsed && (
           <div className="overflow-hidden">
-            <h1 className="text-sm font-bold text-sidebar-primary-foreground tracking-tight font-[Space_Grotesk]">
-              ContaPro ERP
+            <h1 className="text-sm font-bold text-sidebar-primary-foreground tracking-tight font-display">
+              Seu Contador IA
             </h1>
-            <p className="text-[10px] text-sidebar-foreground/60">Sistema Contábil 2026</p>
+            <p className="text-[10px] text-sidebar-foreground/60">ERP Contábil 2026</p>
           </div>
         )}
       </div>
@@ -87,13 +98,23 @@ export default function AppSidebar() {
         ))}
       </nav>
 
-      {/* Collapse toggle */}
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="flex items-center justify-center h-10 border-t border-sidebar-border text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors"
-      >
-        {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-      </button>
+      {/* Logout + Collapse */}
+      <div className="border-t border-sidebar-border">
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-5 py-3 w-full text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors"
+          title="Sair"
+        >
+          <LogOut className="w-4 h-4" />
+          {!collapsed && <span>Sair</span>}
+        </button>
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="flex items-center justify-center h-10 w-full border-t border-sidebar-border text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors"
+        >
+          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
+      </div>
     </aside>
   );
 }
