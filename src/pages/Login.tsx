@@ -36,9 +36,21 @@ export default function Login() {
         if (error) throw error;
         toast.success("Login realizado com sucesso!");
       } else {
-        const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
+        if (!crc.trim()) {
+          toast.error("CRC é obrigatório para criar conta");
+          setLoading(false);
+          return;
+        }
+        const { error, data: signUpData } = await supabase.auth.signUp({ 
+          email, password, 
+          options: { emailRedirectTo: window.location.origin, data: { crc: crc.trim() } } 
+        });
         if (error) throw error;
-        toast.success("Conta criada! Verifique seu email.");
+        // Update profile with CRC
+        if (signUpData.user) {
+          await supabase.from("profiles").update({ crc: crc.trim() }).eq("user_id", signUpData.user.id);
+        }
+        toast.success("Conta criada com sucesso!");
       }
     } catch (err: any) {
       toast.error(err.message || "Erro na autenticação");
