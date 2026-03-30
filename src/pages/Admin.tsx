@@ -340,7 +340,7 @@ export default function Admin() {
           <Card>
             <CardHeader>
               <CardTitle className="font-display">Modelos de IA Disponíveis</CardTitle>
-              <CardDescription>Integrados via Lovable AI — sem chave API própria</CardDescription>
+              <CardDescription>As chaves de IA são gerenciadas automaticamente via Lovable AI. Você também pode adicionar chaves manuais abaixo.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {aiModels.map(ai => (
@@ -354,12 +354,51 @@ export default function Admin() {
                   </div>
                   <div className="flex items-center gap-3">
                     <code className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded font-mono">{ai.key}</code>
-                    <Badge className="text-[10px]">Disponível</Badge>
+                    <Badge className="text-[10px] border-green-500 text-green-600" variant="outline">✓ Automático</Badge>
                   </div>
                 </div>
               ))}
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-display">Chaves de API (Automáticas)</CardTitle>
+              <CardDescription>Pré-configuradas pelo sistema — não é necessário alterar</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {[
+                { label: "LOVABLE_API_KEY", desc: "Chave do gateway Lovable AI (GPT-5 + Gemini)", value: "lov_ai_*****_auto_configured", auto: true },
+                { label: "OpenAI API Key", desc: "Opcional — use para endpoint direto da OpenAI", value: "", auto: false },
+                { label: "Google AI API Key", desc: "Opcional — use para Vertex AI direto", value: "", auto: false },
+              ].map(k => (
+                <div key={k.label} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm">{k.label}</Label>
+                      <p className="text-[10px] text-muted-foreground">{k.desc}</p>
+                    </div>
+                    {k.auto && <Badge className="text-[10px] border-green-500 text-green-600" variant="outline">✓ Auto</Badge>}
+                  </div>
+                  <div className="relative">
+                    <Input
+                      type="password"
+                      placeholder={k.auto ? "Configurada automaticamente pelo sistema" : "Cole sua chave API aqui (opcional)"}
+                      value={k.value}
+                      disabled={k.auto}
+                      className="font-mono text-xs pr-10"
+                    />
+                    {k.auto && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <Badge variant="outline" className="text-[8px] border-green-500 text-green-600">ATIVO</Badge>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="font-display">Configurações de IA</CardTitle>
