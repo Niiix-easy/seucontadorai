@@ -131,6 +131,15 @@ export default function Login() {
                 <Input id="email" type="email" placeholder="seu@email.com" value={email} onChange={e => setEmail(e.target.value)} className="pl-10 h-11" required />
               </div>
             </div>
+            {!isLogin && (
+              <div className="space-y-2">
+                <Label htmlFor="crc">CRC (Registro no Conselho) *</Label>
+                <div className="relative">
+                  <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input id="crc" placeholder="Ex: SP-123456/O" value={crc} onChange={e => setCrc(e.target.value)} className="pl-10 h-11" required />
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="password">Senha</Label>
               <div className="relative">
