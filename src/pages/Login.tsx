@@ -131,6 +131,11 @@ export default function Login() {
             <Button type="submit" className="w-full h-11" disabled={loading}>
               {loading ? "Carregando..." : isLogin ? "Entrar" : "Criar conta"}
             </Button>
+            {isLogin && (
+              <div className="text-right">
+                <Link to="/reset-password" className="text-xs text-primary hover:underline">Esqueceu a senha?</Link>
+              </div>
+            )}
           </form>
 
           <p className="text-center text-sm text-muted-foreground">
