@@ -15,7 +15,7 @@ const features = [
 const plans = [
   { name: "Starter", price: "R$ 197", period: "/mês", features: ["Até 50 clientes", "5 módulos", "1 usuário", "Suporte por email", "IA básica"], highlighted: false },
   { name: "Professional", price: "R$ 497", period: "/mês", features: ["Até 200 clientes", "Todos os módulos", "5 usuários", "Suporte prioritário", "IA avançada", "Portal do cliente"], highlighted: true },
-  { name: "Enterprise", price: "R$ 997", period: "/mês", features: ["Clientes ilimitados", "Todos os módulos", "Usuários ilimitados", "Suporte 24/7", "IA premium", "API completa", "White-label"], highlighted: false },
+  { name: "Enterprise", price: "R$ 997", period: "/mês", features: ["Até 437 clientes", "Todos os módulos", "Usuários ilimitados", "Suporte 24/7", "IA premium", "API completa", "White-label"], highlighted: false },
 ];
 
 const stats = [
