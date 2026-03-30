@@ -26,6 +26,8 @@ import Assinatura from "./pages/Assinatura";
 import Sefaz from "./pages/Sefaz";
 import Bancos from "./pages/Bancos";
 import Admin from "./pages/Admin";
+import ResetPassword from "./pages/ResetPassword";
+import UpdatePassword from "./pages/UpdatePassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
