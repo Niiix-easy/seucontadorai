@@ -2,7 +2,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, BookOpen, Receipt, FileText, Users, ClipboardList,
   FolderOpen, DollarSign, BarChart3, Bot, Globe, PenTool, Building2,
-  Landmark, ChevronLeft, ChevronRight, Zap, Shield, MessageSquare, LogOut
+  Landmark, ChevronLeft, ChevronRight, Zap, Shield, MessageSquare, LogOut, FileKey
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,7 @@ const modules = [
   { path: "/assinatura", icon: PenTool, label: "Assinatura Digital", section: "Integrações" },
   { path: "/sefaz", icon: Building2, label: "Integração SEFAZ", section: "Integrações" },
   { path: "/bancos", icon: Landmark, label: "Integração Bancos", section: "Integrações" },
+  { path: "/certificados", icon: FileKey, label: "Certificados Digitais", section: "Integrações" },
   { path: "/admin", icon: Shield, label: "Administração", section: "Sistema" },
 ];
 
