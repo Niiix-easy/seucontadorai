@@ -1,9 +1,15 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Landmark, RefreshCw, CheckCircle2, Building2, ArrowUpDown, DollarSign } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+  Landmark, RefreshCw, CheckCircle2, Building2, DollarSign, 
+  Link2, Settings, ExternalLink, Loader2, ArrowUpDown
+} from "lucide-react";
 import { toast } from "sonner";
 
 const bancos = [
@@ -25,10 +31,37 @@ const transacoes = [
   { data: "28/03/2026", desc: "Rendimento Aplicação", banco: "Itaú", valor: 156.45, tipo: "credito", classificado: false },
 ];
 
+const agregadores = [
+  { 
+    nome: "Pluggy", desc: "Infraestrutura Open Finance líder no Brasil. Conexão com 200+ instituições.",
+    url: "pluggy.ai", features: ["Open Finance", "Extratos", "Saldos", "Investimentos", "Cartões"],
+    status: "recomendado"
+  },
+  { 
+    nome: "Belvo", desc: "Plataforma Open Finance para América Latina. API unificada.",
+    url: "belvo.com", features: ["Open Banking", "Extratos", "Identidade", "Pagamentos"],
+    status: "disponível"
+  },
+  { 
+    nome: "Quanto", desc: "Solução brasileira de Open Banking com suporte a OFX.",
+    url: "quanto.app", features: ["Open Banking", "OFX", "Conciliação"],
+    status: "disponível"
+  },
+];
+
 export default function Bancos() {
+  const [conectando, setConectando] = useState(false);
   const conectados = bancos.filter(b => b.status === "conectado").length;
   const saldoTotal = bancos.reduce((s, b) => s + b.saldo, 0);
   const classificadas = transacoes.filter(t => t.classificado).length;
+
+  const handleConectar = () => {
+    setConectando(true);
+    setTimeout(() => {
+      setConectando(false);
+      toast.success("Conta bancária conectada via Open Banking!");
+    }, 2000);
+  };
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl space-y-6">
@@ -55,6 +88,8 @@ export default function Bancos() {
         <TabsList>
           <TabsTrigger value="bancos">Contas Bancárias</TabsTrigger>
           <TabsTrigger value="transacoes">Transações Recentes</TabsTrigger>
+          <TabsTrigger value="openbanking">Open Banking</TabsTrigger>
+          <TabsTrigger value="conciliacao">Conciliação</TabsTrigger>
         </TabsList>
 
         <TabsContent value="bancos">
@@ -106,6 +141,115 @@ export default function Bancos() {
                   </tr>
                 ))}</tbody>
               </table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="openbanking">
+          <div className="space-y-4">
+            <Card className="border-primary/30 bg-primary/5">
+              <CardHeader>
+                <CardTitle className="font-display flex items-center gap-2">
+                  <Link2 className="w-5 h-5 text-primary" /> Conectar via Open Banking
+                </CardTitle>
+                <CardDescription>
+                  Conecte contas bancárias automaticamente via Open Finance Brasil (Resolução BCB nº 32/2020)
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div><Label>Agregador</Label>
+                      <Select defaultValue="pluggy">
+                        <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pluggy">Pluggy</SelectItem>
+                          <SelectItem value="belvo">Belvo</SelectItem>
+                          <SelectItem value="quanto">Quanto</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div><Label>Instituição Bancária</Label>
+                      <Select>
+                        <SelectTrigger className="mt-1.5"><SelectValue placeholder="Selecione o banco" /></SelectTrigger>
+                        <SelectContent>
+                          {bancos.map(b => <SelectItem key={b.codigo} value={b.codigo}>{b.nome}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button onClick={handleConectar} disabled={conectando} className="gap-2 w-full">
+                      {conectando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+                      {conectando ? "Conectando..." : "Conectar Conta"}
+                    </Button>
+                  </div>
+                  <div className="space-y-2 text-xs text-muted-foreground p-4 rounded-lg border bg-background">
+                    <p className="font-medium text-sm text-foreground mb-2">Como funciona?</p>
+                    <p>1. Selecione o agregador e o banco</p>
+                    <p>2. Você será redirecionado para o internet banking</p>
+                    <p>3. Autorize o compartilhamento de dados (extratos e saldos)</p>
+                    <p>4. Os dados são sincronizados automaticamente</p>
+                    <p className="mt-2 text-[10px]">Regulamentado pelo Banco Central do Brasil — seus dados estão protegidos pela LGPD</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="space-y-3">
+              <p className="text-sm font-medium">Agregadores Open Finance Disponíveis</p>
+              {agregadores.map(ag => (
+                <Card key={ag.nome}>
+                  <CardContent className="p-5">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm font-display">{ag.nome}</p>
+                          {ag.status === "recomendado" && <Badge className="text-[10px]">Recomendado</Badge>}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">{ag.desc}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono mt-1">{ag.url}</p>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {ag.features.map(f => <Badge key={f} variant="outline" className="text-[10px]">{f}</Badge>)}
+                        </div>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => toast.info(`Configure a chave API da ${ag.nome} no painel Admin > APIs`)}>
+                        Configurar
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="conciliacao">
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-display flex items-center gap-2"><ArrowUpDown className="w-5 h-5 text-primary" /> Conciliação Bancária</CardTitle>
+              <CardDescription>Concilie transações bancárias com lançamentos contábeis automaticamente</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid md:grid-cols-3 gap-4">
+                <Card><CardContent className="pt-6 text-center"><p className="text-xs text-muted-foreground mb-1">Transações no Período</p><p className="text-2xl font-bold font-display text-primary">{transacoes.length}</p></CardContent></Card>
+                <Card><CardContent className="pt-6 text-center"><p className="text-xs text-muted-foreground mb-1">Conciliadas</p><p className="text-2xl font-bold font-display text-primary">{classificadas}</p></CardContent></Card>
+                <Card><CardContent className="pt-6 text-center"><p className="text-xs text-muted-foreground mb-1">Pendentes</p><p className="text-2xl font-bold font-display text-destructive">{transacoes.length - classificadas}</p></CardContent></Card>
+              </div>
+              <div className="space-y-2">
+                {transacoes.filter(t => !t.classificado).map((t, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-lg border bg-amber-500/5 border-amber-500/20">
+                    <div>
+                      <p className="text-sm font-medium">{t.desc}</p>
+                      <p className="text-xs text-muted-foreground">{t.data} • {t.banco} • R$ {Math.abs(t.valor).toLocaleString("pt-BR")}</p>
+                    </div>
+                    <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => toast.success("Transação conciliada!")}>
+                      <CheckCircle2 className="w-3 h-3" /> Conciliar
+                    </Button>
+                  </div>
+                ))}
+                {classificadas === transacoes.length && (
+                  <p className="text-center text-sm text-muted-foreground py-8">Todas as transações foram conciliadas! ✅</p>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
