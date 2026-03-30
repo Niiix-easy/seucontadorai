@@ -166,6 +166,12 @@ export default function Login() {
               {isLogin ? "Criar conta" : "Entrar"}
             </button>
           </p>
+
+          <div className="text-center">
+            <Link to="/" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+              ← Voltar para a página inicial
+            </Link>
+          </div>
         </div>
       </div>
     </div>
