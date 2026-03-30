@@ -367,6 +367,45 @@ export type Database = {
           },
         ]
       }
+      token_usage: {
+        Row: {
+          action_type: string
+          cost_estimate: number
+          created_at: string
+          description: string | null
+          id: string
+          model: string | null
+          tokens_input: number
+          tokens_output: number
+          total_tokens: number
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          cost_estimate?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          model?: string | null
+          tokens_input?: number
+          tokens_output?: number
+          total_tokens?: number
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          cost_estimate?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          model?: string | null
+          tokens_input?: number
+          tokens_output?: number
+          total_tokens?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
