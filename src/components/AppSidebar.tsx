@@ -32,7 +32,7 @@ const modules = [
   { path: "/admin", icon: Shield, label: "Administração", section: "Sistema" },
 ];
 
-export default function AppSidebar() {
+export default function AppSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -83,6 +83,7 @@ export default function AppSidebar() {
                 <NavLink
                   key={mod.path}
                   to={mod.path}
+                  onClick={onNavigate}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150",
                     isActive
