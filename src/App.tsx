@@ -26,6 +26,7 @@ import Assinatura from "./pages/Assinatura";
 import Sefaz from "./pages/Sefaz";
 import Bancos from "./pages/Bancos";
 import Certificados from "./pages/Certificados";
+import CalculadoraICMSST from "./pages/CalculadoraICMSST";
 import Admin from "./pages/Admin";
 import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
@@ -64,6 +65,7 @@ const App = () => (
               <Route path="/sefaz" element={<Sefaz />} />
               <Route path="/bancos" element={<Bancos />} />
               <Route path="/certificados" element={<Certificados />} />
+              <Route path="/calculadora-icms-st" element={<CalculadoraICMSST />} />
               <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<NotFound />} />

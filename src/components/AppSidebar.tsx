@@ -2,7 +2,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, BookOpen, Receipt, FileText, Users, ClipboardList,
   FolderOpen, DollarSign, BarChart3, Bot, Globe, PenTool, Building2,
-  Landmark, ChevronLeft, ChevronRight, Zap, Shield, MessageSquare, LogOut, FileKey
+  Landmark, ChevronLeft, ChevronRight, Zap, Shield, MessageSquare, LogOut, FileKey, Calculator
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ const modules = [
   { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard", section: "" },
   { path: "/contabil", icon: BookOpen, label: "Contábil", section: "Core" },
   { path: "/fiscal", icon: Receipt, label: "Fiscal", section: "Core" },
+  { path: "/calculadora-icms-st", icon: Calculator, label: "Calculadora ICMS-ST", section: "Core" },
   { path: "/folha", icon: Users, label: "Folha de Pagamento", section: "Core" },
   { path: "/xml", icon: FileText, label: "Importação XML", section: "Automação" },
   { path: "/automacao", icon: Zap, label: "Automação Contábil", section: "Automação" },
