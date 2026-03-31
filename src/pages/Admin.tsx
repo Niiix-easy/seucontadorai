@@ -450,9 +450,9 @@ export default function Admin() {
             </CardHeader>
             <CardContent className="space-y-4">
               {[
-                { label: "LOVABLE_API_KEY", desc: "Chave do gateway Lovable AI (GPT-5 + Gemini)", value: "lov_ai_*****_auto_configured", auto: true },
-                { label: "OpenAI API Key", desc: "Opcional — use para endpoint direto da OpenAI", value: "", auto: false },
-                { label: "Google AI API Key", desc: "Opcional — use para Vertex AI direto", value: "", auto: false },
+                { label: "LOVABLE_API_KEY", desc: "Chave do gateway Lovable AI — múltiplos modelos", value: "lov_ai_*****_auto_configured", auto: true },
+                { label: "Chave IA Premium", desc: "Opcional — endpoint direto para IA Premium", value: "", auto: false },
+                { label: "Chave IA Multimodal", desc: "Opcional — endpoint direto para IA Multimodal", value: "", auto: false },
               ].map(k => (
                 <div key={k.label} className="space-y-2">
                   <div className="flex items-center justify-between">
