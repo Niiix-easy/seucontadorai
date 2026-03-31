@@ -1,12 +1,14 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bot, Send, User, Loader2, Settings2 } from "lucide-react";
+import { Bot, Send, User, Loader2, Settings2, Plus, History, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Msg = { role: "user" | "assistant"; content: string; id?: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
@@ -20,16 +22,70 @@ const MODELS = [
 ];
 
 export default function IAChat() {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState("google/gemini-3-flash-preview");
   const [showSettings, setShowSettings] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [chatHistory, setChatHistory] = useState<{ content: string; role: string; created_at: string; model: string | null }[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Load chat history on mount
+  useEffect(() => {
+    if (user) loadHistory();
+  }, [user]);
+
+  const loadHistory = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("ai_chat_history")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true })
+      .limit(200);
+    if (data && data.length > 0) {
+      setChatHistory(data);
+      // Load last conversation messages
+      setMessages(data.map(d => ({ role: d.role as "user" | "assistant", content: d.content })));
+    }
+  };
+
+  const saveMessage = async (role: string, content: string, model?: string) => {
+    if (!user) return;
+    await supabase.from("ai_chat_history").insert({
+      user_id: user.id,
+      role,
+      content,
+      model: model || selectedModel,
+    });
+  };
+
+  const clearHistory = async () => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("ai_chat_history")
+      .delete()
+      .eq("user_id", user.id);
+    if (error) {
+      toast.error("Erro ao limpar histórico");
+      return;
+    }
+    setMessages([]);
+    setChatHistory([]);
+    toast.success("Histórico limpo!");
+  };
+
+  const newChat = async () => {
+    // Save current conversation is already done per-message
+    setMessages([]);
+    toast.success("Nova conversa iniciada!");
+  };
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,8 +96,11 @@ export default function IAChat() {
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
 
+    // Persist user message
+    await saveMessage("user", userMsg.content);
+
     let assistantSoFar = "";
-    const allMessages = [...messages, userMsg];
+    const allMessages = [...messages, userMsg].map(m => ({ role: m.role, content: m.content }));
 
     try {
       const resp = await fetch(CHAT_URL, {
@@ -105,6 +164,11 @@ export default function IAChat() {
           }
         }
       }
+
+      // Persist assistant response
+      if (assistantSoFar) {
+        await saveMessage("assistant", assistantSoFar, selectedModel);
+      }
     } catch (err: any) {
       toast.error(err.message || "Erro ao processar mensagem");
     } finally {
@@ -126,9 +190,17 @@ export default function IAChat() {
             <p className="text-xs text-muted-foreground">Modelo: {currentModel?.label || selectedModel}</p>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => setShowSettings(!showSettings)} title="Configurações">
-          <Settings2 className="w-4 h-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={newChat} title="Nova conversa">
+            <Plus className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setShowSettings(!showSettings)} title="Configurações">
+            <Settings2 className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={clearHistory} title="Limpar histórico">
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Model selector */}
@@ -148,6 +220,9 @@ export default function IAChat() {
               ))}
             </SelectContent>
           </Select>
+          <p className="text-[10px] text-muted-foreground">
+            {messages.length} mensagens na conversa atual • Histórico salvo automaticamente
+          </p>
         </div>
       )}
 
