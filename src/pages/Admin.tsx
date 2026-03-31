@@ -182,15 +182,25 @@ export default function Admin() {
   const totalCost = tokenUsage.reduce((s: number, t: any) => s + (Number(t.cost_estimate) || 0), 0);
   const tokensByAction: Record<string, number> = {};
   const tokensByModel: Record<string, number> = {};
+  const tokensByUser: Record<string, { tokens: number; cost: number; count: number }> = {};
   tokenUsage.forEach((t: any) => {
     tokensByAction[t.action_type] = (tokensByAction[t.action_type] || 0) + (t.total_tokens || 0);
     const modelShort = (t.model || "unknown").split("/").pop() || t.model;
     tokensByModel[modelShort] = (tokensByModel[modelShort] || 0) + (t.total_tokens || 0);
+    const uid = t.user_id || "unknown";
+    if (!tokensByUser[uid]) tokensByUser[uid] = { tokens: 0, cost: 0, count: 0 };
+    tokensByUser[uid].tokens += (t.total_tokens || 0);
+    tokensByUser[uid].cost += Number(t.cost_estimate || 0);
+    tokensByUser[uid].count += 1;
   });
   const actionPieData = Object.entries(tokensByAction).map(([name, value]) => ({
     name: actionLabels[name] || name, value, color: actionColors[name] || "hsl(200,20%,60%)",
   }));
   const modelBarData = Object.entries(tokensByModel).map(([model, tokens]) => ({ model, tokens }));
+  const userTokenData = Object.entries(tokensByUser).map(([uid, data]) => {
+    const u = users.find(u => u.user_id === uid);
+    return { name: u?.full_name || uid.slice(0, 8) + "...", ...data };
+  }).sort((a, b) => b.tokens - a.tokens);
 
   const categories = [...new Set(apis.map(a => a.category))];
 
