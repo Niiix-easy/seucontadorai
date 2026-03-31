@@ -488,7 +488,7 @@ export default function Admin() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div><Label>Modelo padrão</Label><p className="text-xs text-muted-foreground">Assistente de IA</p></div>
-                <Badge>Gemini 3 Flash</Badge>
+                <Badge>IA Rápida</Badge>
               </div>
               <div className="flex items-center justify-between">
                 <div><Label>Auto-classificação</Label><p className="text-xs text-muted-foreground">Classificar documentos com IA</p></div>
