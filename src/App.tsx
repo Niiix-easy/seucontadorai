@@ -65,6 +65,7 @@ const App = () => (
               <Route path="/sefaz" element={<Sefaz />} />
               <Route path="/bancos" element={<Bancos />} />
               <Route path="/certificados" element={<Certificados />} />
+              <Route path="/calculadora-icms-st" element={<CalculadoraICMSST />} />
               <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<NotFound />} />
