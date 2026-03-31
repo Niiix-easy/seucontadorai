@@ -87,7 +87,7 @@ export default function Login() {
             O sistema contábil mais inteligente do Brasil. Automatize seu escritório com as melhores IAs do mercado.
           </p>
           <div className="mt-12 space-y-4">
-            {["GPT-5 & Gemini integrados", "15+ módulos contábeis", "100% na nuvem"].map(f => (
+            {["IA de última geração integrada", "15+ módulos contábeis", "100% na nuvem"].map(f => (
               <div key={f} className="flex items-center gap-3 text-sm opacity-80">
                 <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />
                 {f}
