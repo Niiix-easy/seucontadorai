@@ -13,6 +13,7 @@ const modules = [
   { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard", section: "" },
   { path: "/contabil", icon: BookOpen, label: "Contábil", section: "Core" },
   { path: "/fiscal", icon: Receipt, label: "Fiscal", section: "Core" },
+  { path: "/calculadora-icms-st", icon: Calculator, label: "Calculadora ICMS-ST", section: "Core" },
   { path: "/folha", icon: Users, label: "Folha de Pagamento", section: "Core" },
   { path: "/xml", icon: FileText, label: "Importação XML", section: "Automação" },
   { path: "/automacao", icon: Zap, label: "Automação Contábil", section: "Automação" },
