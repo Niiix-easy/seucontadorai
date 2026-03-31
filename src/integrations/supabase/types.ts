@@ -77,6 +77,126 @@ export type Database = {
         }
         Relationships: []
       }
+      bank_accounts: {
+        Row: {
+          codigo: string
+          created_at: string
+          id: string
+          nome: string
+          saldo: number
+          status: string
+          tipo: string
+          ultima_sinc: string | null
+          user_id: string
+        }
+        Insert: {
+          codigo: string
+          created_at?: string
+          id?: string
+          nome: string
+          saldo?: number
+          status?: string
+          tipo?: string
+          ultima_sinc?: string | null
+          user_id: string
+        }
+        Update: {
+          codigo?: string
+          created_at?: string
+          id?: string
+          nome?: string
+          saldo?: number
+          status?: string
+          tipo?: string
+          ultima_sinc?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      bank_transactions: {
+        Row: {
+          banco: string | null
+          classificado: boolean
+          conta_contabil: string | null
+          created_at: string
+          data: string
+          descricao: string
+          id: string
+          tipo: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          banco?: string | null
+          classificado?: boolean
+          conta_contabil?: string | null
+          created_at?: string
+          data?: string
+          descricao: string
+          id?: string
+          tipo?: string
+          user_id: string
+          valor?: number
+        }
+        Update: {
+          banco?: string | null
+          classificado?: boolean
+          conta_contabil?: string | null
+          created_at?: string
+          data?: string
+          descricao?: string
+          id?: string
+          tipo?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: []
+      }
+      certificados_digitais: {
+        Row: {
+          cnpj: string | null
+          created_at: string
+          emissor: string | null
+          file_path: string | null
+          id: string
+          nome_arquivo: string
+          razao_social: string | null
+          status: string
+          tipo: string
+          updated_at: string
+          user_id: string
+          validade: string | null
+        }
+        Insert: {
+          cnpj?: string | null
+          created_at?: string
+          emissor?: string | null
+          file_path?: string | null
+          id?: string
+          nome_arquivo: string
+          razao_social?: string | null
+          status?: string
+          tipo?: string
+          updated_at?: string
+          user_id: string
+          validade?: string | null
+        }
+        Update: {
+          cnpj?: string | null
+          created_at?: string
+          emissor?: string | null
+          file_path?: string | null
+          id?: string
+          nome_arquivo?: string
+          razao_social?: string | null
+          status?: string
+          tipo?: string
+          updated_at?: string
+          user_id?: string
+          validade?: string | null
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           address_city: string | null
@@ -224,6 +344,125 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nfe_emitidas: {
+        Row: {
+          chave_acesso: string | null
+          cnpj_destinatario: string | null
+          cnpj_emitente: string | null
+          created_at: string
+          id: string
+          info_complementares: string | null
+          integrador: string | null
+          natureza_operacao: string | null
+          numero: string
+          razao_destinatario: string | null
+          serie: string
+          status: string
+          uf_destino: string | null
+          user_id: string
+          valor_icms: number
+          valor_ipi: number
+          valor_produtos: number
+          valor_total: number
+        }
+        Insert: {
+          chave_acesso?: string | null
+          cnpj_destinatario?: string | null
+          cnpj_emitente?: string | null
+          created_at?: string
+          id?: string
+          info_complementares?: string | null
+          integrador?: string | null
+          natureza_operacao?: string | null
+          numero: string
+          razao_destinatario?: string | null
+          serie?: string
+          status?: string
+          uf_destino?: string | null
+          user_id: string
+          valor_icms?: number
+          valor_ipi?: number
+          valor_produtos?: number
+          valor_total?: number
+        }
+        Update: {
+          chave_acesso?: string | null
+          cnpj_destinatario?: string | null
+          cnpj_emitente?: string | null
+          created_at?: string
+          id?: string
+          info_complementares?: string | null
+          integrador?: string | null
+          natureza_operacao?: string | null
+          numero?: string
+          razao_destinatario?: string | null
+          serie?: string
+          status?: string
+          uf_destino?: string | null
+          user_id?: string
+          valor_icms?: number
+          valor_ipi?: number
+          valor_produtos?: number
+          valor_total?: number
+        }
+        Relationships: []
+      }
+      nfe_itens: {
+        Row: {
+          cfop: string | null
+          cofins_aliquota: number
+          descricao: string
+          icms_aliquota: number
+          id: string
+          ipi_aliquota: number
+          ncm: string | null
+          nfe_id: string
+          numero_item: number
+          pis_aliquota: number
+          quantidade: number
+          unidade: string
+          valor_unitario: number
+        }
+        Insert: {
+          cfop?: string | null
+          cofins_aliquota?: number
+          descricao: string
+          icms_aliquota?: number
+          id?: string
+          ipi_aliquota?: number
+          ncm?: string | null
+          nfe_id: string
+          numero_item?: number
+          pis_aliquota?: number
+          quantidade?: number
+          unidade?: string
+          valor_unitario?: number
+        }
+        Update: {
+          cfop?: string | null
+          cofins_aliquota?: number
+          descricao?: string
+          icms_aliquota?: number
+          id?: string
+          ipi_aliquota?: number
+          ncm?: string | null
+          nfe_id?: string
+          numero_item?: number
+          pis_aliquota?: number
+          quantidade?: number
+          unidade?: string
+          valor_unitario?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nfe_itens_nfe_id_fkey"
+            columns: ["nfe_id"]
+            isOneToOne: false
+            referencedRelation: "nfe_emitidas"
             referencedColumns: ["id"]
           },
         ]
