@@ -33,13 +33,13 @@ type UserWithRole = {
 };
 
 const aiModels = [
-  { model: "GPT-5 (OpenAI)", key: "openai/gpt-5", desc: "Raciocínio avançado, análise fiscal complexa" },
-  { model: "GPT-5 Mini", key: "openai/gpt-5-mini", desc: "Equilíbrio custo x performance" },
-  { model: "GPT-5.2", key: "openai/gpt-5.2", desc: "Último modelo OpenAI" },
-  { model: "Gemini 2.5 Pro", key: "google/gemini-2.5-pro", desc: "Multimodal, contexto grande" },
-  { model: "Gemini 3 Flash", key: "google/gemini-3-flash-preview", desc: "Rápido e eficiente" },
-  { model: "Gemini 3.1 Pro", key: "google/gemini-3.1-pro-preview", desc: "Última geração Google" },
-  { model: "Gemini 2.5 Flash Lite", key: "google/gemini-2.5-flash-lite", desc: "Mais rápido e barato" },
+  { model: "IA Premium", key: "openai/gpt-5", desc: "Raciocínio avançado, análise fiscal complexa" },
+  { model: "IA Equilibrada", key: "openai/gpt-5-mini", desc: "Equilíbrio custo x performance" },
+  { model: "IA Ultra", key: "openai/gpt-5.2", desc: "Última geração em raciocínio" },
+  { model: "IA Multimodal", key: "google/gemini-2.5-pro", desc: "Multimodal, contexto grande" },
+  { model: "IA Rápida", key: "google/gemini-3-flash-preview", desc: "Rápido e eficiente" },
+  { model: "IA Avançada", key: "google/gemini-3.1-pro-preview", desc: "Última geração avançada" },
+  { model: "IA Lite", key: "google/gemini-2.5-flash-lite", desc: "Mais rápido e barato" },
 ];
 
 const actionColors: Record<string, string> = {
