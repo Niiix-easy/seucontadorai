@@ -83,6 +83,32 @@ export default function Admin() {
     setLoading(false);
   };
 
+  const defaultApis: ApiConfig[] = [
+    // Integradores Fiscais
+    { api_name: "Oobj / Avalara Brasil", api_key_encrypted: "", is_enabled: false, description: "Emissão NF-e, NFS-e, CT-e, MDF-e via Oobj", category: "Integradores Fiscais" },
+    { api_name: "Focus NFe", api_key_encrypted: "", is_enabled: false, description: "API REST para emissão de documentos fiscais", category: "Integradores Fiscais" },
+    { api_name: "Tecnospeed", api_key_encrypted: "", is_enabled: false, description: "Plataforma completa de automação fiscal", category: "Integradores Fiscais" },
+    { api_name: "Webmania", api_key_encrypted: "", is_enabled: false, description: "API de emissão de notas fiscais", category: "Integradores Fiscais" },
+    // Governo / SEFAZ
+    { api_name: "Certificado Digital A1 (senha)", api_key_encrypted: "", is_enabled: false, description: "Senha do certificado digital .pfx/.p12", category: "Governo / SEFAZ" },
+    { api_name: "SEFAZ WebService Token", api_key_encrypted: "", is_enabled: false, description: "Token de acesso direto SEFAZ (se aplicável)", category: "Governo / SEFAZ" },
+    { api_name: "Gov.br OAuth Client ID", api_key_encrypted: "", is_enabled: false, description: "Client ID do Gov.br para assinatura digital", category: "Governo / SEFAZ" },
+    { api_name: "Gov.br OAuth Secret", api_key_encrypted: "", is_enabled: false, description: "Client Secret do Gov.br", category: "Governo / SEFAZ" },
+    { api_name: "eSocial Token", api_key_encrypted: "", is_enabled: false, description: "Token para envio de eventos eSocial", category: "Governo / SEFAZ" },
+    { api_name: "ReceitaWS API Key", api_key_encrypted: "", is_enabled: false, description: "Consulta CNPJ via ReceitaWS", category: "Governo / SEFAZ" },
+    // Open Banking / Bancos
+    { api_name: "Pluggy API Key", api_key_encrypted: "", is_enabled: false, description: "Agregador bancário Open Finance — Client ID", category: "Open Banking" },
+    { api_name: "Pluggy Secret", api_key_encrypted: "", is_enabled: false, description: "Agregador bancário Open Finance — Secret", category: "Open Banking" },
+    { api_name: "Belvo API Key", api_key_encrypted: "", is_enabled: false, description: "Alternativa de agregação bancária", category: "Open Banking" },
+    { api_name: "Belvo Secret", api_key_encrypted: "", is_enabled: false, description: "Secret do Belvo", category: "Open Banking" },
+    // IA (opcionais)
+    { api_name: "OpenAI API Key", api_key_encrypted: "", is_enabled: false, description: "Opcional — endpoint direto OpenAI (GPT-5)", category: "IA (Opcional)" },
+    { api_name: "Google AI API Key", api_key_encrypted: "", is_enabled: false, description: "Opcional — Vertex AI / Gemini direto", category: "IA (Opcional)" },
+    // Outros
+    { api_name: "SendGrid API Key", api_key_encrypted: "", is_enabled: false, description: "Envio de e-mails transacionais", category: "E-mail / Notificações" },
+    { api_name: "WhatsApp Business Token", api_key_encrypted: "", is_enabled: false, description: "API oficial WhatsApp Business", category: "E-mail / Notificações" },
+  ];
+
   const loadApis = async () => {
     const { data } = await supabase.from("api_configurations").select("*").order("category");
     if (data && data.length > 0) {
@@ -90,6 +116,9 @@ export default function Admin() {
         id: d.id, api_name: d.api_name, api_key_encrypted: d.api_key_encrypted || "",
         is_enabled: d.is_enabled, description: d.description || "", category: d.category,
       })));
+    } else {
+      // Seed defaults so user sees all fields ready
+      setApis(defaultApis);
     }
   };
 
