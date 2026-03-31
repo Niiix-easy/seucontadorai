@@ -103,16 +103,12 @@ export default function LandingPage() {
               Múltiplos modelos de IA — tudo integrado em uma única plataforma.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4 animate-fade-in-up" style={{ animationDelay: "0.5s" }}>
-              <Link to="/login">
-                <Button size="lg" className="text-base px-8 gap-2 h-12 hover-lift">
-                  Começar agora <ChevronRight className="w-4 h-4" />
-                </Button>
-              </Link>
-              <a href="#features">
-                <Button variant="outline" size="lg" className="text-base px-8 h-12 hover-lift">
-                  Conhecer recursos
-                </Button>
-              </a>
+              <Button size="lg" className="text-base px-8 gap-2 h-12 hover-lift" asChild>
+                <Link to="/login">Começar agora <ChevronRight className="w-4 h-4" /></Link>
+              </Button>
+              <Button variant="outline" size="lg" className="text-base px-8 h-12 hover-lift" asChild>
+                <a href="#features">Conhecer recursos</a>
+              </Button>
             </div>
           </div>
         </div>
