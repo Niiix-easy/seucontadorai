@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,9 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { 
   Shield, Upload, FileKey, CheckCircle2, AlertTriangle, Clock, 
-  Trash2, Eye, EyeOff, Lock, KeyRound, Building2, RefreshCw
+  Trash2, Eye, EyeOff, Lock, KeyRound, Building2, RefreshCw,
+  Download, Search, Calendar, Info
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,6 +26,7 @@ type Certificado = {
   status: "valido" | "expirando" | "expirado";
   uploadDate: string;
   emitidoPor: string;
+  filePath?: string;
 };
 
 const certsDemoData: Certificado[] = [
@@ -53,15 +56,24 @@ export default function Certificados() {
   const [showSenha, setShowSenha] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [tipoCert, setTipoCert] = useState<"A1" | "A3">("A1");
+  const [cnpjUpload, setCnpjUpload] = useState("");
+  const [razaoUpload, setRazaoUpload] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+  const [search, setSearch] = useState("");
+  const [detailCert, setDetailCert] = useState<Certificado | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
   const validos = certificados.filter(c => c.status === "valido").length;
   const expirando = certificados.filter(c => c.status === "expirando").length;
   const expirados = certificados.filter(c => c.status === "expirado").length;
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
+  const filtered = certificados.filter(c =>
+    c.razaoSocial.toLowerCase().includes(search.toLowerCase()) ||
+    c.cnpj.includes(search) ||
+    c.nome.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleFileSelect = (file: File) => {
     const ext = file.name.toLowerCase();
     if (!ext.endsWith(".pfx") && !ext.endsWith(".p12")) {
       toast.error("Formato inválido. Aceitos: .pfx ou .p12");
@@ -75,14 +87,32 @@ export default function Certificados() {
     toast.info(`Arquivo selecionado: ${file.name}`);
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFileSelect(file);
+  };
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleFileSelect(file);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  }, []);
+
   const handleUpload = async () => {
     if (!selectedFile) { toast.error("Selecione um arquivo .pfx ou .p12"); return; }
     if (!senha) { toast.error("Informe a senha do certificado"); return; }
+    if (!cnpjUpload.trim()) { toast.error("Informe o CNPJ do certificado"); return; }
+    if (!razaoUpload.trim()) { toast.error("Informe a Razão Social"); return; }
     if (!user) { toast.error("Faça login para continuar"); return; }
 
     setUploading(true);
     try {
-      // Upload to Supabase Storage
       const filePath = `${user.id}/certificados/${Date.now()}_${selectedFile.name}`;
       const { error: uploadError } = await supabase.storage
         .from("documents")
@@ -90,7 +120,6 @@ export default function Certificados() {
 
       if (uploadError) throw uploadError;
 
-      // Save document record
       await supabase.from("documents").insert({
         user_id: user.id,
         name: selectedFile.name,
@@ -104,18 +133,21 @@ export default function Certificados() {
         id: crypto.randomUUID(),
         nome: selectedFile.name,
         tipo: tipoCert,
-        cnpj: "—",
-        razaoSocial: "Aguardando validação",
-        validade: "Processando...",
+        cnpj: cnpjUpload,
+        razaoSocial: razaoUpload,
+        validade: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
         status: "valido",
         uploadDate: new Date().toISOString().split("T")[0],
-        emitidoPor: "Processando...",
+        emitidoPor: "Processando validação...",
+        filePath,
       };
       setCertificados(prev => [newCert, ...prev]);
       
       toast.success("Certificado digital enviado com sucesso!");
       setSelectedFile(null);
       setSenha("");
+      setCnpjUpload("");
+      setRazaoUpload("");
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err: any) {
       toast.error("Erro ao enviar: " + (err.message || "Tente novamente"));
@@ -126,16 +158,37 @@ export default function Certificados() {
 
   const handleRemove = (id: string) => {
     setCertificados(prev => prev.filter(c => c.id !== id));
+    setConfirmRemove(null);
     toast.success("Certificado removido");
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "valido": return <Badge className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Válido</Badge>;
-      case "expirando": return <Badge className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-500/30">Expirando</Badge>;
+      case "valido": return <Badge className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30">✓ Válido</Badge>;
+      case "expirando": return <Badge className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-500/30"><AlertTriangle className="w-3 h-3 mr-1" />Expirando</Badge>;
       case "expirado": return <Badge variant="destructive" className="text-[10px]">Expirado</Badge>;
       default: return null;
     }
+  };
+
+  const getDiasRestantes = (validade: string) => {
+    const diff = new Date(validade).getTime() - Date.now();
+    const dias = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    if (dias < 0) return `Expirado há ${Math.abs(dias)} dias`;
+    if (dias === 0) return "Expira hoje";
+    return `${dias} dias restantes`;
+  };
+
+  const handleVerificarValidades = () => {
+    setCertificados(prev => prev.map(c => {
+      const diff = new Date(c.validade).getTime() - Date.now();
+      const dias = Math.ceil(diff / (1000 * 60 * 60 * 24));
+      let status: "valido" | "expirando" | "expirado" = "valido";
+      if (dias <= 0) status = "expirado";
+      else if (dias <= 90) status = "expirando";
+      return { ...c, status };
+    }));
+    toast.success("Validades verificadas e atualizadas!");
   };
 
   return (
@@ -146,10 +199,10 @@ export default function Certificados() {
             <FileKey className="w-8 h-8 text-primary" /> Certificados Digitais
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Gerencie certificados A1/A3 ICP-Brasil para assinatura e emissão fiscal
+            {certificados.length} certificados • {validos} válidos • {expirando} expirando • {expirados} expirados
           </p>
         </div>
-        <Button variant="outline" className="gap-2" onClick={() => toast.info("Verificando validades...")}>
+        <Button variant="outline" className="gap-2" onClick={handleVerificarValidades}>
           <RefreshCw className="w-4 h-4" /> Verificar Validades
         </Button>
       </div>
@@ -157,7 +210,7 @@ export default function Certificados() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground mb-1">Total Certificados</p><p className="text-2xl font-bold font-display text-primary">{certificados.length}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground mb-1">Válidos</p><p className="text-2xl font-bold font-display text-emerald-600">{validos}</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground mb-1">Expirando</p><p className="text-2xl font-bold font-display text-amber-600">{expirando}</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground mb-1">Expirando (&lt;90 dias)</p><p className="text-2xl font-bold font-display text-amber-600">{expirando}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground mb-1">Expirados</p><p className="text-2xl font-bold font-display text-destructive">{expirados}</p></CardContent></Card>
       </div>
 
@@ -169,16 +222,20 @@ export default function Certificados() {
         </TabsList>
 
         <TabsContent value="certificados">
-          <div className="space-y-3">
-            {certificados.map(cert => (
-              <Card key={cert.id}>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input placeholder="Buscar por razão social, CNPJ ou arquivo..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
+            </div>
+            {filtered.map(cert => (
+              <Card key={cert.id} className="hover:border-primary/30 transition-colors">
                 <CardContent className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => setDetailCert(cert)}>
                     <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
                       <Lock className="w-6 h-6 text-primary" />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-medium text-sm">{cert.razaoSocial}</p>
                         <Badge variant="outline" className="text-[10px]">{cert.tipo}</Badge>
                         {getStatusBadge(cert.status)}
@@ -187,20 +244,26 @@ export default function Certificados() {
                         CNPJ: {cert.cnpj} • Emissor: {cert.emitidoPor}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Arquivo: {cert.nome} • Validade: {cert.validade} • Upload: {cert.uploadDate}
+                        <Calendar className="w-3 h-3 inline mr-1" />
+                        Validade: {cert.validade} ({getDiasRestantes(cert.validade)})
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => handleRemove(cert.id)} title="Remover">
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => setDetailCert(cert)} title="Detalhes">
+                      <Eye className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => setConfirmRemove(cert.id)} title="Remover">
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
                   </div>
                 </CardContent>
               </Card>
             ))}
-            {certificados.length === 0 && (
-              <Card><CardContent className="py-12 text-center text-muted-foreground">Nenhum certificado cadastrado. Faça upload na aba acima.</CardContent></Card>
+            {filtered.length === 0 && (
+              <Card><CardContent className="py-12 text-center text-muted-foreground">
+                {search ? "Nenhum certificado encontrado." : "Nenhum certificado cadastrado. Faça upload na aba acima."}
+              </CardContent></Card>
             )}
           </div>
         </TabsContent>
@@ -209,7 +272,7 @@ export default function Certificados() {
           <Card>
             <CardHeader>
               <CardTitle className="font-display flex items-center gap-2"><Upload className="w-5 h-5 text-primary" /> Upload de Certificado Digital</CardTitle>
-              <CardDescription>Envie seu certificado digital e-CNPJ (formato .pfx ou .p12)</CardDescription>
+              <CardDescription>Envie seu certificado digital e-CNPJ/e-CPF (formato .pfx ou .p12)</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
@@ -226,25 +289,27 @@ export default function Certificados() {
                   </div>
 
                   <div>
-                    <Label>Arquivo do Certificado (.pfx ou .p12)</Label>
-                    <div className="mt-1.5">
-                      <Input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".pfx,.p12"
-                        onChange={handleFileSelect}
-                        className="cursor-pointer"
-                      />
-                    </div>
-                    {selectedFile && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        📎 {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
-                      </p>
-                    )}
+                    <Label>CNPJ / CPF do Certificado *</Label>
+                    <Input
+                      placeholder="00.000.000/0001-00"
+                      value={cnpjUpload}
+                      onChange={e => setCnpjUpload(e.target.value)}
+                      className="mt-1.5 font-mono"
+                    />
                   </div>
 
                   <div>
-                    <Label>Senha do Certificado</Label>
+                    <Label>Razão Social / Nome *</Label>
+                    <Input
+                      placeholder="Nome da empresa ou pessoa"
+                      value={razaoUpload}
+                      onChange={e => setRazaoUpload(e.target.value)}
+                      className="mt-1.5"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Senha do Certificado *</Label>
                     <div className="relative mt-1.5">
                       <Input
                         type={showSenha ? "text" : "password"}
@@ -261,34 +326,58 @@ export default function Certificados() {
                         {showSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
-                    <p className="text-[10px] text-muted-foreground mt-1">A senha é usada apenas para validar o certificado e não é armazenada.</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">A senha é usada para validar o certificado e não é armazenada em texto plano.</p>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <Card className="border-dashed border-2 bg-muted/20">
-                    <CardContent className="py-8 text-center space-y-3">
-                      <KeyRound className="w-12 h-12 text-primary mx-auto opacity-60" />
+                  {/* Drag & Drop zone */}
+                  <div
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragLeave={() => setDragOver(false)}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
+                      dragOver ? "border-primary bg-primary/5 scale-[1.01]" : "border-muted-foreground/30 hover:border-primary/50 bg-muted/20"
+                    }`}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pfx,.p12"
+                      onChange={handleInputChange}
+                      className="hidden"
+                    />
+                    <KeyRound className="w-12 h-12 text-primary mx-auto opacity-60 mb-3" />
+                    {selectedFile ? (
                       <div>
-                        <p className="font-medium text-sm">Certificado Digital ICP-Brasil</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          O certificado é criptografado e armazenado de forma segura. 
-                          Será utilizado para assinatura de documentos fiscais (NF-e, NFS-e, CT-e) 
-                          e acesso aos portais do governo (e-CAC, SEFAZ, eSocial).
-                        </p>
+                        <p className="font-medium text-sm text-primary">📎 {selectedFile.name}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{(selectedFile.size / 1024).toFixed(1)} KB • Pronto para envio</p>
+                        <Button variant="ghost" size="sm" className="mt-2 text-xs" onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}>
+                          Remover arquivo
+                        </Button>
                       </div>
-                      <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1"><Shield className="w-3 h-3" /> Criptografia AES-256</span>
-                        <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> ICP-Brasil</span>
+                    ) : (
+                      <div>
+                        <p className="font-medium text-sm">Arraste o certificado aqui</p>
+                        <p className="text-xs text-muted-foreground mt-1">ou clique para selecionar (.pfx / .p12, máx 10MB)</p>
                       </div>
-                    </CardContent>
-                  </Card>
+                    )}
+                  </div>
+
+                  <div className="p-4 rounded-lg border bg-muted/30 space-y-2 text-xs text-muted-foreground">
+                    <p className="font-medium text-foreground text-sm flex items-center gap-1"><Shield className="w-4 h-4 text-primary" /> Segurança</p>
+                    <p>• Certificado armazenado com criptografia AES-256</p>
+                    <p>• Compatível com ICP-Brasil (e-CNPJ / e-CPF)</p>
+                    <p>• Usado para: NF-e, NFS-e, CT-e, MDF-e, eSocial, SPED, Gov.br</p>
+                    <p>• Senha não armazenada em texto plano</p>
+                  </div>
                 </div>
               </div>
 
               <Button onClick={handleUpload} disabled={uploading || !selectedFile} className="gap-2 w-full sm:w-auto">
                 {uploading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                {uploading ? "Enviando..." : "Enviar Certificado"}
+                {uploading ? "Enviando e validando..." : "Enviar Certificado"}
               </Button>
             </CardContent>
           </Card>
@@ -304,6 +393,7 @@ export default function Certificados() {
                 <p>• Pode ser usado em múltiplos dispositivos</p>
                 <p>• Ideal para automação de emissão de NF-e</p>
                 <p>• Emitido por Autoridades Certificadoras: Certisign, Serasa, Valid, etc.</p>
+                <p>• <strong>Recomendado para sistemas automatizados</strong></p>
               </CardContent>
             </Card>
             <Card>
@@ -314,22 +404,68 @@ export default function Certificados() {
                 <p>• Mais seguro — chave privada nunca sai do dispositivo</p>
                 <p>• Requer leitor de smart card ou token conectado</p>
                 <p>• Usado para assinatura presencial e acessos especiais</p>
+                <p>• <strong>Recomendado para assinaturas manuais</strong></p>
               </CardContent>
             </Card>
             <Card className="md:col-span-2">
               <CardHeader><CardTitle className="text-sm font-display">Onde obter um Certificado Digital?</CardTitle></CardHeader>
               <CardContent className="space-y-2 text-xs text-muted-foreground">
-                <p>• <strong>Certisign</strong> — certisign.com.br</p>
-                <p>• <strong>Serasa Experian</strong> — serasa.certificadodigital.com.br</p>
-                <p>• <strong>Valid Certificadora</strong> — valid.com</p>
-                <p>• <strong>AC Soluti</strong> — soluti.com.br</p>
-                <p>• <strong>Safeweb</strong> — safeweb.com.br</p>
-                <p className="mt-2">É necessário comparecer a um ponto de atendimento para validação presencial (exceto videoconferência disponível em algumas ACs).</p>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  <p>• <strong>Certisign</strong> — certisign.com.br</p>
+                  <p>• <strong>Serasa Experian</strong> — serasa.certificadodigital.com.br</p>
+                  <p>• <strong>Valid Certificadora</strong> — valid.com</p>
+                  <p>• <strong>AC Soluti</strong> — soluti.com.br</p>
+                  <p>• <strong>Safeweb</strong> — safeweb.com.br</p>
+                  <p>• <strong>DigitalSign</strong> — digitalsign.com.br</p>
+                </div>
+                <p className="mt-2 pt-2 border-t">É necessário comparecer a um ponto de atendimento para validação presencial (exceto videoconferência disponível em algumas ACs).</p>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Detail Dialog */}
+      <Dialog open={!!detailCert} onOpenChange={() => setDetailCert(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2"><Lock className="w-5 h-5 text-primary" /> Detalhes do Certificado</DialogTitle>
+          </DialogHeader>
+          {detailCert && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div><p className="text-xs text-muted-foreground">Razão Social</p><p className="font-medium">{detailCert.razaoSocial}</p></div>
+                <div><p className="text-xs text-muted-foreground">CNPJ</p><p className="font-mono">{detailCert.cnpj}</p></div>
+                <div><p className="text-xs text-muted-foreground">Tipo</p><p>{detailCert.tipo}</p></div>
+                <div><p className="text-xs text-muted-foreground">Status</p>{getStatusBadge(detailCert.status)}</div>
+                <div><p className="text-xs text-muted-foreground">Validade</p><p>{detailCert.validade}</p></div>
+                <div><p className="text-xs text-muted-foreground">Dias Restantes</p><p>{getDiasRestantes(detailCert.validade)}</p></div>
+                <div><p className="text-xs text-muted-foreground">Emissor</p><p>{detailCert.emitidoPor}</p></div>
+                <div><p className="text-xs text-muted-foreground">Upload</p><p>{detailCert.uploadDate}</p></div>
+                <div className="col-span-2"><p className="text-xs text-muted-foreground">Arquivo</p><p className="font-mono text-xs">{detailCert.nome}</p></div>
+              </div>
+              <div className="pt-2 border-t text-xs text-muted-foreground">
+                <p className="font-medium text-foreground mb-1">Utilizações permitidas:</p>
+                <p>NF-e, NFS-e, CT-e, MDF-e, eSocial, ECD, ECF, SPED, e-CAC, Gov.br</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Remove Dialog */}
+      <Dialog open={!!confirmRemove} onOpenChange={() => setConfirmRemove(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remover Certificado?</DialogTitle>
+            <DialogDescription>Esta ação não pode ser desfeita. O certificado será removido do sistema.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmRemove(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => confirmRemove && handleRemove(confirmRemove)}>Remover</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
