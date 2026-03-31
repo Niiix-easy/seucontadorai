@@ -70,12 +70,12 @@ export default function LandingPage() {
           </nav>
           <div className="flex items-center gap-2 sm:gap-3">
             <PWAInstallButton />
-            <Link to="/login">
-              <Button variant="ghost" size="sm" className="text-xs sm:text-sm">Entrar</Button>
-            </Link>
-            <Link to="/login" className="hidden sm:block">
-              <Button size="sm" className="gap-1">Começar grátis <ArrowRight className="w-3.5 h-3.5" /></Button>
-            </Link>
+            <Button variant="ghost" size="sm" className="text-xs sm:text-sm" asChild>
+              <Link to="/login">Entrar</Link>
+            </Button>
+            <Button size="sm" className="gap-1 hidden sm:inline-flex" asChild>
+              <Link to="/login">Começar grátis <ArrowRight className="w-3.5 h-3.5" /></Link>
+            </Button>
           </div>
         </div>
       </header>
