@@ -16,15 +16,15 @@ const iaTools = [
 ];
 
 const modelosDisp = [
-  { nome: "GPT-5 (OpenAI)", key: "openai/gpt-5", desc: "Raciocínio avançado para cálculos complexos", status: "Automático", tier: "Premium" },
-  { nome: "GPT-5 Mini", key: "openai/gpt-5-mini", desc: "Equilíbrio performance x custo", status: "Automático", tier: "Standard" },
-  { nome: "GPT-5.2", key: "openai/gpt-5.2", desc: "Último modelo OpenAI", status: "Automático", tier: "Premium" },
-  { nome: "Gemini 2.5 Pro", key: "google/gemini-2.5-pro", desc: "Multimodal, ideal para documentos", status: "Automático", tier: "Premium" },
-  { nome: "Gemini 2.5 Flash", key: "google/gemini-2.5-flash", desc: "Multimodal equilibrado", status: "Automático", tier: "Standard" },
-  { nome: "Gemini 3 Flash", key: "google/gemini-3-flash-preview", desc: "Rápido para classificações", status: "Automático", tier: "Fast" },
-  { nome: "Gemini 3.1 Pro", key: "google/gemini-3.1-pro-preview", desc: "Última geração Google", status: "Automático", tier: "Premium" },
-  { nome: "GPT-5 Nano", key: "openai/gpt-5-nano", desc: "Ultra rápido e econômico", status: "Automático", tier: "Fast" },
-  { nome: "Gemini 2.5 Flash Lite", key: "google/gemini-2.5-flash-lite", desc: "Mais rápido e barato", status: "Automático", tier: "Fast" },
+  { nome: "IA Premium", key: "openai/gpt-5", desc: "Raciocínio avançado para cálculos complexos", status: "Automático", tier: "Premium" },
+  { nome: "IA Equilibrada", key: "openai/gpt-5-mini", desc: "Equilíbrio performance x custo", status: "Automático", tier: "Standard" },
+  { nome: "IA Ultra", key: "openai/gpt-5.2", desc: "Última geração em raciocínio", status: "Automático", tier: "Premium" },
+  { nome: "IA Multimodal Pro", key: "google/gemini-2.5-pro", desc: "Multimodal, ideal para documentos", status: "Automático", tier: "Premium" },
+  { nome: "IA Multimodal", key: "google/gemini-2.5-flash", desc: "Multimodal equilibrado", status: "Automático", tier: "Standard" },
+  { nome: "IA Rápida", key: "google/gemini-3-flash-preview", desc: "Rápido para classificações", status: "Automático", tier: "Fast" },
+  { nome: "IA Avançada", key: "google/gemini-3.1-pro-preview", desc: "Última geração avançada", status: "Automático", tier: "Premium" },
+  { nome: "IA Express", key: "openai/gpt-5-nano", desc: "Ultra rápido e econômico", status: "Automático", tier: "Fast" },
+  { nome: "IA Lite", key: "google/gemini-2.5-flash-lite", desc: "Mais rápido e barato", status: "Automático", tier: "Fast" },
 ];
 
 const integrations = [
