@@ -1,18 +1,30 @@
 import { useState, useRef, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Bot, Send, User, Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Bot, Send, User, Loader2, Settings2 } from "lucide-react";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
+const MODELS = [
+  { key: "google/gemini-3-flash-preview", label: "Gemini 3 Flash", desc: "Rápido" },
+  { key: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", desc: "Avançado" },
+  { key: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", desc: "Multimodal" },
+  { key: "openai/gpt-5", label: "GPT-5", desc: "Precisão" },
+  { key: "openai/gpt-5-mini", label: "GPT-5 Mini", desc: "Equilibrado" },
+  { key: "openai/gpt-5.2", label: "GPT-5.2", desc: "Último OpenAI" },
+];
+
 export default function IAChat() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("google/gemini-3-flash-preview");
+  const [showSettings, setShowSettings] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -38,7 +50,7 @@ export default function IAChat() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: allMessages }),
+        body: JSON.stringify({ messages: allMessages, model: selectedModel }),
       });
 
       if (resp.status === 429) {
@@ -100,17 +112,44 @@ export default function IAChat() {
     }
   };
 
+  const currentModel = MODELS.find(m => m.key === selectedModel);
+
   return (
     <div className="flex flex-col h-[calc(100vh-2rem)] max-w-4xl mx-auto p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-          <Bot className="w-5 h-5 text-primary-foreground" />
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+            <Bot className="w-5 h-5 text-primary-foreground" />
+          </div>
+          <div>
+            <h1 className="font-display text-xl font-bold">Assistente IA Contábil</h1>
+            <p className="text-xs text-muted-foreground">Modelo: {currentModel?.label || selectedModel}</p>
+          </div>
         </div>
-        <div>
-          <h1 className="font-display text-xl font-bold">Assistente IA Contábil</h1>
-          <p className="text-xs text-muted-foreground">Powered by GPT-5 & Gemini</p>
-        </div>
+        <Button variant="ghost" size="icon" onClick={() => setShowSettings(!showSettings)} title="Configurações">
+          <Settings2 className="w-4 h-4" />
+        </Button>
       </div>
+
+      {/* Model selector */}
+      {showSettings && (
+        <div className="mb-4 p-4 rounded-lg border bg-card space-y-3 animate-in fade-in slide-in-from-top-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Modelo de IA</p>
+          <Select value={selectedModel} onValueChange={setSelectedModel}>
+            <SelectTrigger className="h-9 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MODELS.map(m => (
+                <SelectItem key={m.key} value={m.key}>
+                  <span className="font-medium">{m.label}</span>
+                  <span className="text-muted-foreground ml-2">— {m.desc}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto space-y-4 pb-4">
@@ -130,7 +169,7 @@ export default function IAChat() {
               ].map(q => (
                 <button
                   key={q}
-                  onClick={() => { setInput(q); }}
+                  onClick={() => setInput(q)}
                   className="text-xs text-left p-3 rounded-lg border bg-card hover:bg-muted transition-colors"
                 >
                   {q}
@@ -152,7 +191,13 @@ export default function IAChat() {
                 ? "bg-primary text-primary-foreground rounded-br-md"
                 : "bg-muted rounded-bl-md"
             }`}>
-              <p className="whitespace-pre-wrap">{msg.content}</p>
+              {msg.role === "assistant" ? (
+                <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>ul]:mb-2 [&>ol]:mb-2">
+                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                </div>
+              ) : (
+                <p className="whitespace-pre-wrap">{msg.content}</p>
+              )}
             </div>
             {msg.role === "user" && (
               <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 mt-1">
