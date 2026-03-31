@@ -42,12 +42,12 @@ export default function LandingPage() {
             <a href="#pricing" className="hover:text-foreground transition-colors">Planos</a>
             <a href="#ai" className="hover:text-foreground transition-colors">IA</a>
           </nav>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <PWAInstallButton />
             <Link to="/login">
-              <Button variant="ghost" size="sm">Entrar</Button>
+              <Button variant="ghost" size="sm" className="text-xs sm:text-sm">Entrar</Button>
             </Link>
-            <Link to="/login">
+            <Link to="/login" className="hidden sm:block">
               <Button size="sm" className="gap-1">Começar grátis <ArrowRight className="w-3.5 h-3.5" /></Button>
             </Link>
           </div>
