@@ -1,10 +1,15 @@
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  Building2, FileText, DollarSign, AlertTriangle, Loader2
+  Building2, FileText, DollarSign, AlertTriangle,
+  BookOpen, Receipt, Users, ClipboardList, FolderOpen,
+  BarChart3, Bot, Globe, PenTool, Landmark, Zap,
+  MessageSquare, FileKey, Calculator, ChevronRight
 } from "lucide-react";
 import StatCard from "@/components/StatCard";
+import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
 const regimeColors: Record<string, string> = {
@@ -27,6 +32,21 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   done: { label: "Concluído", color: "bg-[hsl(160,72%,40%)] text-white" },
   completed: { label: "Concluído", color: "bg-[hsl(160,72%,40%)] text-white" },
 };
+
+const quickLinks = [
+  { path: "/contabil", icon: BookOpen, label: "Contábil", desc: "Plano de contas e balancete" },
+  { path: "/fiscal", icon: Receipt, label: "Fiscal", desc: "Impostos e obrigações" },
+  { path: "/folha", icon: Users, label: "Folha de Pagamento", desc: "Funcionários e encargos" },
+  { path: "/financeiro", icon: DollarSign, label: "Financeiro", desc: "Receitas e despesas" },
+  { path: "/crm", icon: Building2, label: "CRM Clientes", desc: "Gestão de clientes" },
+  { path: "/tarefas", icon: ClipboardList, label: "Tarefas", desc: "Gerenciar tarefas" },
+  { path: "/documentos", icon: FolderOpen, label: "Documentos", desc: "Arquivos e anexos" },
+  { path: "/bi", icon: BarChart3, label: "BI & Relatórios", desc: "Análise de dados" },
+  { path: "/ia-chat", icon: MessageSquare, label: "Chat IA", desc: "Assistente inteligente" },
+  { path: "/sefaz", icon: Receipt, label: "SEFAZ", desc: "Emissão de NF-e" },
+  { path: "/bancos", icon: Landmark, label: "Bancos", desc: "Conciliação bancária" },
+  { path: "/certificados", icon: FileKey, label: "Certificados", desc: "Certificados digitais" },
+];
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -73,7 +93,6 @@ export default function Dashboard() {
   const totalObligations = obligations.length;
   const deliveredPct = totalObligations > 0 ? Math.round(((totalObligations - pendingObligations) / totalObligations) * 100) : 0;
 
-  // Regime distribution
   const regimeCounts: Record<string, number> = {};
   clients.forEach((c: any) => {
     const r = c.tax_regime || "outros";
@@ -85,7 +104,6 @@ export default function Dashboard() {
     color: regimeColors[name] || "hsl(200, 20%, 60%)",
   }));
 
-  // Monthly revenue from financials
   const monthlyRevenue: Record<string, number> = {};
   financials.forEach((f: any) => {
     if (f.type === "receita") {
@@ -94,39 +112,70 @@ export default function Dashboard() {
     }
   });
   const barData = Object.entries(monthlyRevenue).slice(-6).map(([month, valor]) => ({ month, valor }));
-  // If no financial data, show fee-based estimate
   const displayBarData = barData.length > 0 ? barData : [{ month: "Atual", valor: totalFee }];
 
   return (
     <div className="p-6 lg:p-8 space-y-8 max-w-7xl">
       <div>
-        <h1 className="text-3xl font-bold font-[Space_Grotesk] tracking-tight">Painel de Controle</h1>
+        <h1 className="text-3xl font-bold font-display tracking-tight">Painel de Controle</h1>
         <p className="text-muted-foreground text-sm mt-1">Visão geral do escritório — dados reais</p>
       </div>
 
+      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Building2} title="Clientes Ativos" value={String(activeClients)} change={`${clients.length} total`} changeType="up" />
-        <StatCard icon={FileText} title="Obrigações" value={String(totalObligations)} change={`${deliveredPct}% entregues`} changeType="up" />
-        <StatCard icon={DollarSign} title="Faturamento Mensal" value={`R$ ${totalFee.toLocaleString("pt-BR")}`} change="Honorários ativos" changeType="up" />
-        <StatCard icon={AlertTriangle} title="Pendentes" value={String(pendingObligations)} change={`${tasks.filter((t: any) => t.status === "todo").length} tarefas`} changeType={pendingObligations > 5 ? "down" : "up"} />
+        <Link to="/crm"><StatCard icon={Building2} title="Clientes Ativos" value={String(activeClients)} change={`${clients.length} total`} changeType="up" /></Link>
+        <Link to="/fiscal"><StatCard icon={FileText} title="Obrigações" value={String(totalObligations)} change={`${deliveredPct}% entregues`} changeType="up" /></Link>
+        <Link to="/financeiro"><StatCard icon={DollarSign} title="Faturamento Mensal" value={`R$ ${totalFee.toLocaleString("pt-BR")}`} change="Honorários ativos" changeType="up" /></Link>
+        <Link to="/tarefas"><StatCard icon={AlertTriangle} title="Pendentes" value={String(pendingObligations)} change={`${tasks.filter((t: any) => t.status === "todo").length} tarefas`} changeType={pendingObligations > 5 ? "down" : "up"} /></Link>
       </div>
 
+      {/* Quick access modules */}
+      <div>
+        <h2 className="text-lg font-semibold font-display mb-4">Acesso Rápido aos Módulos</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+          {quickLinks.map((link) => (
+            <Link
+              key={link.path}
+              to={link.path}
+              className="group bg-card border rounded-xl p-4 hover:border-primary/40 hover:shadow-md transition-all duration-200"
+            >
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 group-hover:scale-110 transition-all duration-200">
+                <link.icon className="w-5 h-5 text-primary" />
+              </div>
+              <p className="text-sm font-medium truncate">{link.label}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{link.desc}</p>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Charts */}
       <div className="grid md:grid-cols-3 gap-6">
         <div className="md:col-span-2 bg-card rounded-xl border p-6">
-          <h2 className="text-lg font-semibold font-[Space_Grotesk] mb-4">Faturamento</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold font-display">Faturamento</h2>
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/financeiro" className="text-xs gap-1">Ver tudo <ChevronRight className="w-3 h-3" /></Link>
+            </Button>
+          </div>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={displayBarData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 14%, 90%)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="month" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${v / 1000}k`} />
               <Tooltip formatter={(v: number) => `R$ ${v.toLocaleString("pt-BR")}`} />
-              <Bar dataKey="valor" fill="hsl(217, 91%, 50%)" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="valor" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
         <div className="bg-card rounded-xl border p-6">
-          <h2 className="text-lg font-semibold font-[Space_Grotesk] mb-4">Clientes por Regime</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold font-display">Clientes por Regime</h2>
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/crm" className="text-xs gap-1">Ver tudo <ChevronRight className="w-3 h-3" /></Link>
+            </Button>
+          </div>
           {pieData.length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={180}>
@@ -155,9 +204,13 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Tasks */}
       <div className="bg-card rounded-xl border overflow-hidden">
-        <div className="p-6 border-b">
-          <h2 className="text-lg font-semibold font-[Space_Grotesk]">Tarefas Recentes</h2>
+        <div className="p-6 border-b flex items-center justify-between">
+          <h2 className="text-lg font-semibold font-display">Tarefas Recentes</h2>
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/tarefas" className="text-xs gap-1">Ver todas <ChevronRight className="w-3 h-3" /></Link>
+          </Button>
         </div>
         {tasks.length > 0 ? (
           <div className="overflow-x-auto">
