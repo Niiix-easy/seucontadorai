@@ -26,12 +26,12 @@ type Msg = {
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
 const MODELS = [
-  { key: "google/gemini-3-flash-preview", label: "Gemini 3 Flash", desc: "Rápido" },
-  { key: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", desc: "Avançado" },
-  { key: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", desc: "Multimodal" },
-  { key: "openai/gpt-5", label: "GPT-5", desc: "Precisão" },
-  { key: "openai/gpt-5-mini", label: "GPT-5 Mini", desc: "Equilibrado" },
-  { key: "openai/gpt-5.2", label: "GPT-5.2", desc: "Último OpenAI" },
+  { key: "google/gemini-3-flash-preview", label: "IA Rápida", desc: "Rápido" },
+  { key: "google/gemini-3.1-pro-preview", label: "IA Avançada", desc: "Avançado" },
+  { key: "google/gemini-2.5-pro", label: "IA Multimodal", desc: "Multimodal" },
+  { key: "openai/gpt-5", label: "IA Premium", desc: "Precisão" },
+  { key: "openai/gpt-5-mini", label: "IA Equilibrada", desc: "Equilibrado" },
+  { key: "openai/gpt-5.2", label: "IA Ultra", desc: "Última geração" },
 ];
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB

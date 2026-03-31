@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import PWAInstallButton from "@/components/PWAInstallButton";
 
 const features = [
-  { icon: Bot, title: "IA Contábil Avançada", desc: "GPT-5, Gemini Pro e mais integrados para automatizar lançamentos, classificações e consultas fiscais." },
+  { icon: Bot, title: "IA Contábil Avançada", desc: "Modelos de IA de última geração integrados para automatizar lançamentos, classificações e consultas fiscais." },
   { icon: Zap, title: "Automação Total", desc: "Importação de XML, conciliação bancária e geração de obrigações acessórias 100% automatizadas." },
   { icon: Shield, title: "Segurança & Compliance", desc: "Dados criptografados, backup automático e conformidade com LGPD e normas contábeis." },
   { icon: BarChart3, title: "BI & Relatórios", desc: "Dashboards inteligentes com insights em tempo real sobre o seu escritório." },
@@ -99,8 +99,8 @@ export default function LandingPage() {
               </span>
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed animate-fade-in-up" style={{ animationDelay: "0.35s" }}>
-              Automatize seu escritório contábil com as melhores IAs do mercado. 
-              GPT-5, Gemini Pro e mais — tudo integrado em uma única plataforma.
+              Automatize seu escritório contábil com inteligência artificial de última geração. 
+              Múltiplos modelos de IA — tudo integrado em uma única plataforma.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4 animate-fade-in-up" style={{ animationDelay: "0.5s" }}>
               <Link to="/login">
@@ -161,9 +161,9 @@ export default function LandingPage() {
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              { name: "GPT-5 (OpenAI)", desc: "Raciocínio avançado para análise fiscal complexa, pareceres e consultoria tributária.", badge: "Premium" },
-              { name: "Gemini Pro (Google)", desc: "Processamento multimodal: analisa documentos, imagens de notas fiscais e extratos.", badge: "Recomendado" },
-              { name: "Gemini Flash", desc: "Respostas ultrarrápidas para classificação automática, resumos e tarefas do dia-a-dia.", badge: "Rápido" },
+              { name: "IA Premium", desc: "Raciocínio avançado para análise fiscal complexa, pareceres e consultoria tributária.", badge: "Premium" },
+              { name: "IA Multimodal", desc: "Processamento multimodal: analisa documentos, imagens de notas fiscais e extratos.", badge: "Recomendado" },
+              { name: "IA Rápida", desc: "Respostas ultrarrápidas para classificação automática, resumos e tarefas do dia-a-dia.", badge: "Rápido" },
             ].map((ai, i) => (
               <div key={ai.name} className={`animate-on-scroll delay-${i + 1} bg-card border rounded-2xl p-6 relative hover-lift`}>
                 <span className="absolute top-4 right-4 text-[10px] px-2.5 py-1 rounded-full bg-primary/10 text-primary font-semibold">{ai.badge}</span>

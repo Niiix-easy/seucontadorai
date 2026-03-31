@@ -7,31 +7,31 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Bot, Send, Sparkles, FileText, Calculator, Brain, Network, Plug, Cpu, Workflow } from "lucide-react";
 
 const iaTools = [
-  { nome: "Classificação Contábil", desc: "Classifica automaticamente lançamentos contábeis usando padrões e histórico", modelo: "Gemini 3 Flash", tipo: "Classificação", icon: FileText, endpoint: "ai-structured" },
-  { nome: "Análise de Notas Fiscais", desc: "Lê e extrai dados de notas fiscais via OCR inteligente", modelo: "Gemini 2.5 Pro", tipo: "OCR", icon: FileText, endpoint: "ai-structured" },
-  { nome: "Cálculo Inteligente de Impostos", desc: "Calcula impostos considerando regime tributário e benefícios fiscais", modelo: "GPT-5", tipo: "Cálculo", icon: Calculator, endpoint: "ai-chat" },
-  { nome: "Previsão Fiscal", desc: "Prevê obrigações e valores de impostos futuros com base em dados históricos", modelo: "GPT-5 Mini", tipo: "Previsão", icon: Brain, endpoint: "ai-chat" },
-  { nome: "Verificação de Erros", desc: "Detecta inconsistências em lançamentos, duplicidades e erros de classificação", modelo: "Gemini 3 Flash", tipo: "Auditoria", icon: Sparkles, endpoint: "ai-structured" },
-  { nome: "Economia Tributária", desc: "Sugere oportunidades de economia fiscal com base no perfil do cliente", modelo: "GPT-5.2", tipo: "Consultoria", icon: Calculator, endpoint: "ai-chat" },
+  { nome: "Classificação Contábil", desc: "Classifica automaticamente lançamentos contábeis usando padrões e histórico", modelo: "IA Rápida", tipo: "Classificação", icon: FileText, endpoint: "ai-structured" },
+  { nome: "Análise de Notas Fiscais", desc: "Lê e extrai dados de notas fiscais via OCR inteligente", modelo: "IA Multimodal", tipo: "OCR", icon: FileText, endpoint: "ai-structured" },
+  { nome: "Cálculo Inteligente de Impostos", desc: "Calcula impostos considerando regime tributário e benefícios fiscais", modelo: "IA Premium", tipo: "Cálculo", icon: Calculator, endpoint: "ai-chat" },
+  { nome: "Previsão Fiscal", desc: "Prevê obrigações e valores de impostos futuros com base em dados históricos", modelo: "IA Equilibrada", tipo: "Previsão", icon: Brain, endpoint: "ai-chat" },
+  { nome: "Verificação de Erros", desc: "Detecta inconsistências em lançamentos, duplicidades e erros de classificação", modelo: "IA Rápida", tipo: "Auditoria", icon: Sparkles, endpoint: "ai-structured" },
+  { nome: "Economia Tributária", desc: "Sugere oportunidades de economia fiscal com base no perfil do cliente", modelo: "IA Ultra", tipo: "Consultoria", icon: Calculator, endpoint: "ai-chat" },
 ];
 
 const modelosDisp = [
-  { nome: "GPT-5 (OpenAI)", key: "openai/gpt-5", desc: "Raciocínio avançado para cálculos complexos", status: "Automático", tier: "Premium" },
-  { nome: "GPT-5 Mini", key: "openai/gpt-5-mini", desc: "Equilíbrio performance x custo", status: "Automático", tier: "Standard" },
-  { nome: "GPT-5.2", key: "openai/gpt-5.2", desc: "Último modelo OpenAI", status: "Automático", tier: "Premium" },
-  { nome: "Gemini 2.5 Pro", key: "google/gemini-2.5-pro", desc: "Multimodal, ideal para documentos", status: "Automático", tier: "Premium" },
-  { nome: "Gemini 2.5 Flash", key: "google/gemini-2.5-flash", desc: "Multimodal equilibrado", status: "Automático", tier: "Standard" },
-  { nome: "Gemini 3 Flash", key: "google/gemini-3-flash-preview", desc: "Rápido para classificações", status: "Automático", tier: "Fast" },
-  { nome: "Gemini 3.1 Pro", key: "google/gemini-3.1-pro-preview", desc: "Última geração Google", status: "Automático", tier: "Premium" },
-  { nome: "GPT-5 Nano", key: "openai/gpt-5-nano", desc: "Ultra rápido e econômico", status: "Automático", tier: "Fast" },
-  { nome: "Gemini 2.5 Flash Lite", key: "google/gemini-2.5-flash-lite", desc: "Mais rápido e barato", status: "Automático", tier: "Fast" },
+  { nome: "IA Premium", key: "openai/gpt-5", desc: "Raciocínio avançado para cálculos complexos", status: "Automático", tier: "Premium" },
+  { nome: "IA Equilibrada", key: "openai/gpt-5-mini", desc: "Equilíbrio performance x custo", status: "Automático", tier: "Standard" },
+  { nome: "IA Ultra", key: "openai/gpt-5.2", desc: "Última geração em raciocínio", status: "Automático", tier: "Premium" },
+  { nome: "IA Multimodal Pro", key: "google/gemini-2.5-pro", desc: "Multimodal, ideal para documentos", status: "Automático", tier: "Premium" },
+  { nome: "IA Multimodal", key: "google/gemini-2.5-flash", desc: "Multimodal equilibrado", status: "Automático", tier: "Standard" },
+  { nome: "IA Rápida", key: "google/gemini-3-flash-preview", desc: "Rápido para classificações", status: "Automático", tier: "Fast" },
+  { nome: "IA Avançada", key: "google/gemini-3.1-pro-preview", desc: "Última geração avançada", status: "Automático", tier: "Premium" },
+  { nome: "IA Express", key: "openai/gpt-5-nano", desc: "Ultra rápido e econômico", status: "Automático", tier: "Fast" },
+  { nome: "IA Lite", key: "google/gemini-2.5-flash-lite", desc: "Mais rápido e barato", status: "Automático", tier: "Fast" },
 ];
 
 const integrations = [
   { nome: "Lovable AI Gateway", desc: "Chat, classificação, análise — todos os modelos via gateway unificado", status: "Ativo", icon: Cpu, type: "LLM" },
   { nome: "MCP Proxy", desc: "Conecte servidores MCP externos para expandir as capacidades da IA", status: "Pronto", icon: Network, type: "MCP" },
   { nome: "Saída Estruturada (Tool Calling)", desc: "Extraia dados estruturados de textos, notas fiscais e documentos", status: "Ativo", icon: Workflow, type: "LLM" },
-  { nome: "Geração de Imagens", desc: "Gemini 3 Pro Image — geração de gráficos, relatórios visuais", status: "Disponível", icon: Sparkles, type: "Generativa" },
+  { nome: "Geração de Imagens", desc: "Geração de gráficos, relatórios visuais com IA generativa", status: "Disponível", icon: Sparkles, type: "Generativa" },
   { nome: "APIs Externas (OpenAI/Google direto)", desc: "Use suas próprias chaves API para acesso direto (opcional)", status: "Configurável", icon: Plug, type: "LLM" },
 ];
 

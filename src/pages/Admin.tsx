@@ -33,13 +33,13 @@ type UserWithRole = {
 };
 
 const aiModels = [
-  { model: "GPT-5 (OpenAI)", key: "openai/gpt-5", desc: "Raciocínio avançado, análise fiscal complexa" },
-  { model: "GPT-5 Mini", key: "openai/gpt-5-mini", desc: "Equilíbrio custo x performance" },
-  { model: "GPT-5.2", key: "openai/gpt-5.2", desc: "Último modelo OpenAI" },
-  { model: "Gemini 2.5 Pro", key: "google/gemini-2.5-pro", desc: "Multimodal, contexto grande" },
-  { model: "Gemini 3 Flash", key: "google/gemini-3-flash-preview", desc: "Rápido e eficiente" },
-  { model: "Gemini 3.1 Pro", key: "google/gemini-3.1-pro-preview", desc: "Última geração Google" },
-  { model: "Gemini 2.5 Flash Lite", key: "google/gemini-2.5-flash-lite", desc: "Mais rápido e barato" },
+  { model: "IA Premium", key: "openai/gpt-5", desc: "Raciocínio avançado, análise fiscal complexa" },
+  { model: "IA Equilibrada", key: "openai/gpt-5-mini", desc: "Equilíbrio custo x performance" },
+  { model: "IA Ultra", key: "openai/gpt-5.2", desc: "Última geração em raciocínio" },
+  { model: "IA Multimodal", key: "google/gemini-2.5-pro", desc: "Multimodal, contexto grande" },
+  { model: "IA Rápida", key: "google/gemini-3-flash-preview", desc: "Rápido e eficiente" },
+  { model: "IA Avançada", key: "google/gemini-3.1-pro-preview", desc: "Última geração avançada" },
+  { model: "IA Lite", key: "google/gemini-2.5-flash-lite", desc: "Mais rápido e barato" },
 ];
 
 const actionColors: Record<string, string> = {
@@ -102,8 +102,8 @@ export default function Admin() {
     { api_name: "Belvo API Key", api_key_encrypted: "", is_enabled: false, description: "Alternativa de agregação bancária", category: "Open Banking" },
     { api_name: "Belvo Secret", api_key_encrypted: "", is_enabled: false, description: "Secret do Belvo", category: "Open Banking" },
     // IA (opcionais)
-    { api_name: "OpenAI API Key", api_key_encrypted: "", is_enabled: false, description: "Opcional — endpoint direto OpenAI (GPT-5)", category: "IA (Opcional)" },
-    { api_name: "Google AI API Key", api_key_encrypted: "", is_enabled: false, description: "Opcional — Vertex AI / Gemini direto", category: "IA (Opcional)" },
+    { api_name: "Chave IA Premium", api_key_encrypted: "", is_enabled: false, description: "Opcional — endpoint direto para IA Premium", category: "IA (Opcional)" },
+    { api_name: "Chave IA Multimodal", api_key_encrypted: "", is_enabled: false, description: "Opcional — endpoint direto para IA Multimodal", category: "IA (Opcional)" },
     // Outros
     { api_name: "SendGrid API Key", api_key_encrypted: "", is_enabled: false, description: "Envio de e-mails transacionais", category: "E-mail / Notificações" },
     { api_name: "WhatsApp Business Token", api_key_encrypted: "", is_enabled: false, description: "API oficial WhatsApp Business", category: "E-mail / Notificações" },
@@ -450,9 +450,9 @@ export default function Admin() {
             </CardHeader>
             <CardContent className="space-y-4">
               {[
-                { label: "LOVABLE_API_KEY", desc: "Chave do gateway Lovable AI (GPT-5 + Gemini)", value: "lov_ai_*****_auto_configured", auto: true },
-                { label: "OpenAI API Key", desc: "Opcional — use para endpoint direto da OpenAI", value: "", auto: false },
-                { label: "Google AI API Key", desc: "Opcional — use para Vertex AI direto", value: "", auto: false },
+                { label: "LOVABLE_API_KEY", desc: "Chave do gateway Lovable AI — múltiplos modelos", value: "lov_ai_*****_auto_configured", auto: true },
+                { label: "Chave IA Premium", desc: "Opcional — endpoint direto para IA Premium", value: "", auto: false },
+                { label: "Chave IA Multimodal", desc: "Opcional — endpoint direto para IA Multimodal", value: "", auto: false },
               ].map(k => (
                 <div key={k.label} className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -488,7 +488,7 @@ export default function Admin() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div><Label>Modelo padrão</Label><p className="text-xs text-muted-foreground">Assistente de IA</p></div>
-                <Badge>Gemini 3 Flash</Badge>
+                <Badge>IA Rápida</Badge>
               </div>
               <div className="flex items-center justify-between">
                 <div><Label>Auto-classificação</Label><p className="text-xs text-muted-foreground">Classificar documentos com IA</p></div>
@@ -619,7 +619,7 @@ export default function Admin() {
                 ["Aplicação", "Seu Contador IA"],
                 ["Versão", "2.1.0"],
                 ["Stack", "React + Vite + Lovable Cloud"],
-                ["IA", "Lovable AI (GPT-5 + Gemini)"],
+                ["IA", "Lovable AI — Múltiplos Modelos"],
                 ["APIs Governo", "SEFAZ, eSocial, SPED, Receita Federal, DCTF, PGDAS-D"],
               ].map(([k, v]) => (
                 <div key={k} className="flex justify-between p-2 rounded bg-muted/30">
