@@ -161,9 +161,9 @@ export default function LandingPage() {
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              { name: "GPT-5 (OpenAI)", desc: "Raciocínio avançado para análise fiscal complexa, pareceres e consultoria tributária.", badge: "Premium" },
-              { name: "Gemini Pro (Google)", desc: "Processamento multimodal: analisa documentos, imagens de notas fiscais e extratos.", badge: "Recomendado" },
-              { name: "Gemini Flash", desc: "Respostas ultrarrápidas para classificação automática, resumos e tarefas do dia-a-dia.", badge: "Rápido" },
+              { name: "IA Premium", desc: "Raciocínio avançado para análise fiscal complexa, pareceres e consultoria tributária.", badge: "Premium" },
+              { name: "IA Multimodal", desc: "Processamento multimodal: analisa documentos, imagens de notas fiscais e extratos.", badge: "Recomendado" },
+              { name: "IA Rápida", desc: "Respostas ultrarrápidas para classificação automática, resumos e tarefas do dia-a-dia.", badge: "Rápido" },
             ].map((ai, i) => (
               <div key={ai.name} className={`animate-on-scroll delay-${i + 1} bg-card border rounded-2xl p-6 relative hover-lift`}>
                 <span className="absolute top-4 right-4 text-[10px] px-2.5 py-1 rounded-full bg-primary/10 text-primary font-semibold">{ai.badge}</span>

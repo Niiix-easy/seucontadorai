@@ -619,7 +619,7 @@ export default function Admin() {
                 ["Aplicação", "Seu Contador IA"],
                 ["Versão", "2.1.0"],
                 ["Stack", "React + Vite + Lovable Cloud"],
-                ["IA", "Lovable AI (GPT-5 + Gemini)"],
+                ["IA", "Lovable AI — Múltiplos Modelos"],
                 ["APIs Governo", "SEFAZ, eSocial, SPED, Receita Federal, DCTF, PGDAS-D"],
               ].map(([k, v]) => (
                 <div key={k} className="flex justify-between p-2 rounded bg-muted/30">

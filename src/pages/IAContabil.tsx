@@ -31,7 +31,7 @@ const integrations = [
   { nome: "Lovable AI Gateway", desc: "Chat, classificação, análise — todos os modelos via gateway unificado", status: "Ativo", icon: Cpu, type: "LLM" },
   { nome: "MCP Proxy", desc: "Conecte servidores MCP externos para expandir as capacidades da IA", status: "Pronto", icon: Network, type: "MCP" },
   { nome: "Saída Estruturada (Tool Calling)", desc: "Extraia dados estruturados de textos, notas fiscais e documentos", status: "Ativo", icon: Workflow, type: "LLM" },
-  { nome: "Geração de Imagens", desc: "Gemini 3 Pro Image — geração de gráficos, relatórios visuais", status: "Disponível", icon: Sparkles, type: "Generativa" },
+  { nome: "Geração de Imagens", desc: "Geração de gráficos, relatórios visuais com IA generativa", status: "Disponível", icon: Sparkles, type: "Generativa" },
   { nome: "APIs Externas (OpenAI/Google direto)", desc: "Use suas próprias chaves API para acesso direto (opcional)", status: "Configurável", icon: Plug, type: "LLM" },
 ];
 
