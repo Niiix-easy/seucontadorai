@@ -182,15 +182,25 @@ export default function Admin() {
   const totalCost = tokenUsage.reduce((s: number, t: any) => s + (Number(t.cost_estimate) || 0), 0);
   const tokensByAction: Record<string, number> = {};
   const tokensByModel: Record<string, number> = {};
+  const tokensByUser: Record<string, { tokens: number; cost: number; count: number }> = {};
   tokenUsage.forEach((t: any) => {
     tokensByAction[t.action_type] = (tokensByAction[t.action_type] || 0) + (t.total_tokens || 0);
     const modelShort = (t.model || "unknown").split("/").pop() || t.model;
     tokensByModel[modelShort] = (tokensByModel[modelShort] || 0) + (t.total_tokens || 0);
+    const uid = t.user_id || "unknown";
+    if (!tokensByUser[uid]) tokensByUser[uid] = { tokens: 0, cost: 0, count: 0 };
+    tokensByUser[uid].tokens += (t.total_tokens || 0);
+    tokensByUser[uid].cost += Number(t.cost_estimate || 0);
+    tokensByUser[uid].count += 1;
   });
   const actionPieData = Object.entries(tokensByAction).map(([name, value]) => ({
     name: actionLabels[name] || name, value, color: actionColors[name] || "hsl(200,20%,60%)",
   }));
   const modelBarData = Object.entries(tokensByModel).map(([model, tokens]) => ({ model, tokens }));
+  const userTokenData = Object.entries(tokensByUser).map(([uid, data]) => {
+    const u = users.find(u => u.user_id === uid);
+    return { name: u?.full_name || uid.slice(0, 8) + "...", ...data };
+  }).sort((a, b) => b.tokens - a.tokens);
 
   const categories = [...new Set(apis.map(a => a.category))];
 
@@ -333,13 +343,52 @@ export default function Admin() {
             </Card>
           </div>
 
+          {/* Per-user consumption */}
           <Card>
-            <CardHeader><CardTitle className="font-display text-base">Histórico de Consumo</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="font-display text-base flex items-center gap-2"><Users className="w-4 h-4 text-primary" /> Consumo por Usuário</CardTitle></CardHeader>
+            <CardContent>
+              {userTokenData.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Usuário</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                      <TableHead className="text-right">Tokens</TableHead>
+                      <TableHead className="text-right">Custo</TableHead>
+                      <TableHead className="text-right">% do Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {userTokenData.map(u => (
+                      <TableRow key={u.name}>
+                        <TableCell className="font-medium text-sm">{u.name}</TableCell>
+                        <TableCell className="text-right text-xs">{u.count}</TableCell>
+                        <TableCell className="text-right text-xs font-mono">{u.tokens.toLocaleString("pt-BR")}</TableCell>
+                        <TableCell className="text-right text-xs">R$ {u.cost.toFixed(4)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                              <div className="h-full rounded-full bg-primary" style={{ width: `${totalTokens > 0 ? (u.tokens / totalTokens * 100) : 0}%` }} />
+                            </div>
+                            <span className="text-[10px] text-muted-foreground w-10 text-right">{totalTokens > 0 ? (u.tokens / totalTokens * 100).toFixed(1) : 0}%</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : <p className="text-muted-foreground text-sm text-center py-10">Sem dados de consumo</p>}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="font-display text-base">Histórico Detalhado</CardTitle></CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Data</TableHead>
+                    <TableHead>Usuário</TableHead>
                     <TableHead>Ação</TableHead>
                     <TableHead>Modelo</TableHead>
                     <TableHead>Descrição</TableHead>
@@ -348,16 +397,20 @@ export default function Admin() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {tokenUsage.map((t: any) => (
-                    <TableRow key={t.id}>
-                      <TableCell className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleString("pt-BR")}</TableCell>
-                      <TableCell><Badge variant="outline" className="text-[10px]">{actionLabels[t.action_type] || t.action_type}</Badge></TableCell>
-                      <TableCell className="text-xs font-mono">{(t.model || "").split("/").pop()}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">{t.description}</TableCell>
-                      <TableCell className="text-right text-xs font-medium">{(t.total_tokens || 0).toLocaleString("pt-BR")}</TableCell>
-                      <TableCell className="text-right text-xs">R$ {Number(t.cost_estimate || 0).toFixed(4)}</TableCell>
-                    </TableRow>
-                  ))}
+                  {tokenUsage.map((t: any) => {
+                    const u = users.find(u => u.user_id === t.user_id);
+                    return (
+                      <TableRow key={t.id}>
+                        <TableCell className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleString("pt-BR")}</TableCell>
+                        <TableCell className="text-xs font-medium">{u?.full_name || t.user_id?.slice(0, 8) + "..."}</TableCell>
+                        <TableCell><Badge variant="outline" className="text-[10px]">{actionLabels[t.action_type] || t.action_type}</Badge></TableCell>
+                        <TableCell className="text-xs font-mono">{(t.model || "").split("/").pop()}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">{t.description}</TableCell>
+                        <TableCell className="text-right text-xs font-medium">{(t.total_tokens || 0).toLocaleString("pt-BR")}</TableCell>
+                        <TableCell className="text-right text-xs">R$ {Number(t.cost_estimate || 0).toFixed(4)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
