@@ -151,7 +151,7 @@ export default function Assinatura() {
                       {assinando ? <Loader2 className="w-4 h-4 animate-spin" /> : <PenTool className="w-4 h-4" />}
                       {assinando ? "Assinando..." : "Assinar com Gov.br"}
                     </Button>
-                    <Button variant="outline" className="gap-2" onClick={() => window.open("https://assinatura.iti.gov.br", "_blank")}>
+                    <Button variant="outline" className="gap-2" onClick={() => { navigator.clipboard.writeText("https://assinatura.iti.gov.br"); toast.success("Link copiado para a área de transferência!"); }}>
                       <ExternalLink className="w-4 h-4" /> Portal Assinatura Gov.br
                     </Button>
                   </div>
