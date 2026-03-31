@@ -102,8 +102,8 @@ export default function Admin() {
     { api_name: "Belvo API Key", api_key_encrypted: "", is_enabled: false, description: "Alternativa de agregação bancária", category: "Open Banking" },
     { api_name: "Belvo Secret", api_key_encrypted: "", is_enabled: false, description: "Secret do Belvo", category: "Open Banking" },
     // IA (opcionais)
-    { api_name: "OpenAI API Key", api_key_encrypted: "", is_enabled: false, description: "Opcional — endpoint direto OpenAI (GPT-5)", category: "IA (Opcional)" },
-    { api_name: "Google AI API Key", api_key_encrypted: "", is_enabled: false, description: "Opcional — Vertex AI / Gemini direto", category: "IA (Opcional)" },
+    { api_name: "Chave IA Premium", api_key_encrypted: "", is_enabled: false, description: "Opcional — endpoint direto para IA Premium", category: "IA (Opcional)" },
+    { api_name: "Chave IA Multimodal", api_key_encrypted: "", is_enabled: false, description: "Opcional — endpoint direto para IA Multimodal", category: "IA (Opcional)" },
     // Outros
     { api_name: "SendGrid API Key", api_key_encrypted: "", is_enabled: false, description: "Envio de e-mails transacionais", category: "E-mail / Notificações" },
     { api_name: "WhatsApp Business Token", api_key_encrypted: "", is_enabled: false, description: "API oficial WhatsApp Business", category: "E-mail / Notificações" },
