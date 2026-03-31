@@ -201,11 +201,11 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link to="/login" className="mt-8">
-                <Button className="w-full" variant={p.highlighted ? "default" : "outline"}>
+              <Button className="w-full mt-8" variant={p.highlighted ? "default" : "outline"} asChild>
+                <Link to="/login">
                   {p.highlighted ? "Começar agora" : "Selecionar plano"}
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </div>
           ))}
         </div>
