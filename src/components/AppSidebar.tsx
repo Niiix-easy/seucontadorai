@@ -32,7 +32,7 @@ const modules = [
   { path: "/admin", icon: Shield, label: "Administração", section: "Sistema" },
 ];
 
-export default function AppSidebar() {
+export default function AppSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
