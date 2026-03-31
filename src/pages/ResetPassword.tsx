@@ -47,9 +47,9 @@ export default function ResetPassword() {
           <div className="bg-primary/5 border border-primary/20 rounded-xl p-6 text-center space-y-4">
             <Mail className="w-12 h-12 text-primary mx-auto" />
             <p className="text-sm">Enviamos um link de recuperação para <strong>{email}</strong>. Verifique também a pasta de spam.</p>
-            <Link to="/login">
-              <Button variant="outline" className="gap-2"><ArrowLeft className="w-4 h-4" /> Voltar ao login</Button>
-            </Link>
+            <Button variant="outline" className="gap-2" asChild>
+              <Link to="/login"><ArrowLeft className="w-4 h-4" /> Voltar ao login</Link>
+            </Button>
           </div>
         ) : (
           <form onSubmit={handleReset} className="space-y-4">
