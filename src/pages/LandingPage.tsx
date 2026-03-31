@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import PWAInstallButton from "@/components/PWAInstallButton";
 
 const features = [
-  { icon: Bot, title: "IA Contábil Avançada", desc: "GPT-5, Gemini Pro e mais integrados para automatizar lançamentos, classificações e consultas fiscais." },
+  { icon: Bot, title: "IA Contábil Avançada", desc: "Modelos de IA de última geração integrados para automatizar lançamentos, classificações e consultas fiscais." },
   { icon: Zap, title: "Automação Total", desc: "Importação de XML, conciliação bancária e geração de obrigações acessórias 100% automatizadas." },
   { icon: Shield, title: "Segurança & Compliance", desc: "Dados criptografados, backup automático e conformidade com LGPD e normas contábeis." },
   { icon: BarChart3, title: "BI & Relatórios", desc: "Dashboards inteligentes com insights em tempo real sobre o seu escritório." },
