@@ -1,14 +1,27 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bot, Send, User, Loader2, Settings2, Plus, History, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Bot, Send, User, Loader2, Settings2, Plus, Trash2, Paperclip, X, FileText } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
-type Msg = { role: "user" | "assistant"; content: string; id?: string };
+type Attachment = {
+  name: string;
+  type: string;
+  size: number;
+  url?: string;
+  textContent?: string;
+};
+
+type Msg = {
+  role: "user" | "assistant";
+  content: string;
+  attachments?: Attachment[];
+};
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
@@ -21,6 +34,21 @@ const MODELS = [
   { key: "openai/gpt-5.2", label: "GPT-5.2", desc: "Último OpenAI" },
 ];
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_TYPES = [
+  "text/plain", "text/csv", "text/xml", "application/json",
+  "application/pdf", "application/xml",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "image/png", "image/jpeg", "image/webp",
+];
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+
 export default function IAChat() {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -28,9 +56,10 @@ export default function IAChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState("google/gemini-3-flash-preview");
   const [showSettings, setShowSettings] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const [chatHistory, setChatHistory] = useState<{ content: string; role: string; created_at: string; model: string | null }[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -50,8 +79,6 @@ export default function IAChat() {
       .order("created_at", { ascending: true })
       .limit(200);
     if (data && data.length > 0) {
-      setChatHistory(data);
-      // Load last conversation messages
       setMessages(data.map(d => ({ role: d.role as "user" | "assistant", content: d.content })));
     }
   };
@@ -77,30 +104,127 @@ export default function IAChat() {
       return;
     }
     setMessages([]);
-    setChatHistory([]);
     toast.success("Histórico limpo!");
   };
 
-  const newChat = async () => {
-    // Save current conversation is already done per-message
+  const newChat = () => {
     setMessages([]);
+    setPendingFiles([]);
     toast.success("Nova conversa iniciada!");
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const valid: File[] = [];
+
+    for (const file of files) {
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`${file.name} excede o limite de 10MB`);
+        continue;
+      }
+      if (!ALLOWED_TYPES.includes(file.type) && !file.name.match(/\.(txt|csv|xml|json|pdf|xlsx|docx|png|jpg|jpeg|webp)$/i)) {
+        toast.error(`Tipo de arquivo não suportado: ${file.name}`);
+        continue;
+      }
+      valid.push(file);
+    }
+
+    if (valid.length + pendingFiles.length > 5) {
+      toast.error("Máximo de 5 arquivos por mensagem");
+      return;
+    }
+
+    setPendingFiles(prev => [...prev, ...valid]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadAndProcessFiles = async (): Promise<Attachment[]> => {
+    if (!user || pendingFiles.length === 0) return [];
+
+    const attachments: Attachment[] = [];
+
+    for (const file of pendingFiles) {
+      // For text files, read content directly
+      if (file.type.startsWith("text/") || file.type === "application/json" || file.type === "application/xml" || file.name.match(/\.(txt|csv|xml|json)$/i)) {
+        const text = await file.text();
+        attachments.push({
+          name: file.name,
+          type: file.type || "text/plain",
+          size: file.size,
+          textContent: text.slice(0, 50000), // limit to 50k chars
+        });
+        continue;
+      }
+
+      // Upload binary files to storage
+      const filePath = `${user.id}/${Date.now()}-${file.name}`;
+      const { error } = await supabase.storage
+        .from("chat-documents")
+        .upload(filePath, file);
+
+      if (error) {
+        toast.error(`Erro ao enviar ${file.name}: ${error.message}`);
+        continue;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from("chat-documents")
+        .getPublicUrl(filePath);
+
+      attachments.push({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        url: urlData?.publicUrl,
+      });
+    }
+
+    return attachments;
   };
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && pendingFiles.length === 0) || isLoading) return;
 
-    const userMsg: Msg = { role: "user", content: input.trim() };
+    setIsLoading(true);
+    setUploading(pendingFiles.length > 0);
+
+    let attachments: Attachment[] = [];
+    if (pendingFiles.length > 0) {
+      attachments = await uploadAndProcessFiles();
+      setPendingFiles([]);
+      setUploading(false);
+    }
+
+    // Build user message content
+    let userContent = input.trim();
+    const fileContext = attachments.map(a => {
+      if (a.textContent) {
+        return `\n\n📎 Arquivo: ${a.name} (${formatFileSize(a.size)})\n\`\`\`\n${a.textContent}\n\`\`\``;
+      }
+      return `\n\n📎 Arquivo enviado: ${a.name} (${a.type}, ${formatFileSize(a.size)})`;
+    }).join("");
+
+    const fullContent = userContent + fileContext;
+    const displayContent = userContent || "📎 Documento(s) enviado(s)";
+
+    const userMsg: Msg = {
+      role: "user",
+      content: displayContent,
+      attachments: attachments.length > 0 ? attachments : undefined,
+    };
     setInput("");
     setMessages(prev => [...prev, userMsg]);
-    setIsLoading(true);
 
     // Persist user message
-    await saveMessage("user", userMsg.content);
+    await saveMessage("user", displayContent);
 
     let assistantSoFar = "";
-    const allMessages = [...messages, userMsg].map(m => ({ role: m.role, content: m.content }));
+    const allMessages = [...messages, { role: "user" as const, content: fullContent }].map(m => ({ role: m.role, content: m.content }));
 
     try {
       const resp = await fetch(CHAT_URL, {
@@ -165,7 +289,6 @@ export default function IAChat() {
         }
       }
 
-      // Persist assistant response
       if (assistantSoFar) {
         await saveMessage("assistant", assistantSoFar, selectedModel);
       }
@@ -221,7 +344,7 @@ export default function IAChat() {
             </SelectContent>
           </Select>
           <p className="text-[10px] text-muted-foreground">
-            {messages.length} mensagens na conversa atual • Histórico salvo automaticamente
+            {messages.length} mensagens • Histórico salvo automaticamente • Upload: PDF, DOCX, CSV, TXT, imagens
           </p>
         </div>
       )}
@@ -233,7 +356,7 @@ export default function IAChat() {
             <Bot className="w-16 h-16 text-muted-foreground/30 mb-4" />
             <h2 className="font-display text-lg font-semibold text-muted-foreground">Como posso ajudar?</h2>
             <p className="text-sm text-muted-foreground/70 mt-1 max-w-md">
-              Pergunte sobre contabilidade, fiscal, folha de pagamento, obrigações acessórias e muito mais.
+              Pergunte sobre contabilidade, envie documentos para análise, ou peça ajuda com cálculos fiscais.
             </p>
             <div className="grid grid-cols-2 gap-2 mt-6 max-w-md">
               {[
@@ -266,6 +389,17 @@ export default function IAChat() {
                 ? "bg-primary text-primary-foreground rounded-br-md"
                 : "bg-muted rounded-bl-md"
             }`}>
+              {/* Attachment badges */}
+              {msg.attachments && msg.attachments.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {msg.attachments.map((a, idx) => (
+                    <Badge key={idx} variant="secondary" className="text-[10px] gap-1 bg-primary-foreground/20 text-primary-foreground">
+                      <FileText className="w-3 h-3" />
+                      {a.name} ({formatFileSize(a.size)})
+                    </Badge>
+                  ))}
+                </div>
+              )}
               {msg.role === "assistant" ? (
                 <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>ul]:mb-2 [&>ol]:mb-2">
                   <ReactMarkdown>{msg.content}</ReactMarkdown>
@@ -287,23 +421,62 @@ export default function IAChat() {
               <Bot className="w-4 h-4 text-primary" />
             </div>
             <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3">
-              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">
+                  {uploading ? "Enviando documento(s)..." : "Pensando..."}
+                </span>
+              </div>
             </div>
           </div>
         )}
         <div ref={bottomRef} />
       </div>
 
+      {/* Pending files */}
+      {pendingFiles.length > 0 && (
+        <div className="flex flex-wrap gap-2 px-1 pb-2">
+          {pendingFiles.map((file, i) => (
+            <Badge key={i} variant="outline" className="text-xs gap-1.5 pr-1">
+              <FileText className="w-3 h-3" />
+              {file.name} ({formatFileSize(file.size)})
+              <button onClick={() => removePendingFile(i)} className="ml-1 hover:text-destructive">
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+      )}
+
       {/* Input */}
       <form onSubmit={sendMessage} className="flex gap-2 pt-4 border-t">
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept=".txt,.csv,.xml,.json,.pdf,.xlsx,.docx,.png,.jpg,.jpeg,.webp"
+          className="hidden"
+          onChange={handleFileSelect}
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-12 w-12 shrink-0"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isLoading}
+          title="Anexar documento"
+        >
+          <Paperclip className="w-4 h-4" />
+        </Button>
         <Input
           value={input}
           onChange={e => setInput(e.target.value)}
-          placeholder="Pergunte algo sobre contabilidade..."
+          placeholder={pendingFiles.length > 0 ? "Descreva o que fazer com o(s) documento(s)..." : "Pergunte algo sobre contabilidade..."}
           className="h-12"
           disabled={isLoading}
         />
-        <Button type="submit" size="icon" className="h-12 w-12 shrink-0" disabled={isLoading || !input.trim()}>
+        <Button type="submit" size="icon" className="h-12 w-12 shrink-0" disabled={isLoading || (!input.trim() && pendingFiles.length === 0)}>
           <Send className="w-4 h-4" />
         </Button>
       </form>
