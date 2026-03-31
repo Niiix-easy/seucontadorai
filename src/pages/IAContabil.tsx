@@ -7,12 +7,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Bot, Send, Sparkles, FileText, Calculator, Brain, Network, Plug, Cpu, Workflow } from "lucide-react";
 
 const iaTools = [
-  { nome: "Classificação Contábil", desc: "Classifica automaticamente lançamentos contábeis usando padrões e histórico", modelo: "Gemini 3 Flash", tipo: "Classificação", icon: FileText, endpoint: "ai-structured" },
-  { nome: "Análise de Notas Fiscais", desc: "Lê e extrai dados de notas fiscais via OCR inteligente", modelo: "Gemini 2.5 Pro", tipo: "OCR", icon: FileText, endpoint: "ai-structured" },
-  { nome: "Cálculo Inteligente de Impostos", desc: "Calcula impostos considerando regime tributário e benefícios fiscais", modelo: "GPT-5", tipo: "Cálculo", icon: Calculator, endpoint: "ai-chat" },
-  { nome: "Previsão Fiscal", desc: "Prevê obrigações e valores de impostos futuros com base em dados históricos", modelo: "GPT-5 Mini", tipo: "Previsão", icon: Brain, endpoint: "ai-chat" },
-  { nome: "Verificação de Erros", desc: "Detecta inconsistências em lançamentos, duplicidades e erros de classificação", modelo: "Gemini 3 Flash", tipo: "Auditoria", icon: Sparkles, endpoint: "ai-structured" },
-  { nome: "Economia Tributária", desc: "Sugere oportunidades de economia fiscal com base no perfil do cliente", modelo: "GPT-5.2", tipo: "Consultoria", icon: Calculator, endpoint: "ai-chat" },
+  { nome: "Classificação Contábil", desc: "Classifica automaticamente lançamentos contábeis usando padrões e histórico", modelo: "IA Rápida", tipo: "Classificação", icon: FileText, endpoint: "ai-structured" },
+  { nome: "Análise de Notas Fiscais", desc: "Lê e extrai dados de notas fiscais via OCR inteligente", modelo: "IA Multimodal", tipo: "OCR", icon: FileText, endpoint: "ai-structured" },
+  { nome: "Cálculo Inteligente de Impostos", desc: "Calcula impostos considerando regime tributário e benefícios fiscais", modelo: "IA Premium", tipo: "Cálculo", icon: Calculator, endpoint: "ai-chat" },
+  { nome: "Previsão Fiscal", desc: "Prevê obrigações e valores de impostos futuros com base em dados históricos", modelo: "IA Equilibrada", tipo: "Previsão", icon: Brain, endpoint: "ai-chat" },
+  { nome: "Verificação de Erros", desc: "Detecta inconsistências em lançamentos, duplicidades e erros de classificação", modelo: "IA Rápida", tipo: "Auditoria", icon: Sparkles, endpoint: "ai-structured" },
+  { nome: "Economia Tributária", desc: "Sugere oportunidades de economia fiscal com base no perfil do cliente", modelo: "IA Ultra", tipo: "Consultoria", icon: Calculator, endpoint: "ai-chat" },
 ];
 
 const modelosDisp = [
