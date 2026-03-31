@@ -6,7 +6,7 @@ import {
   Building2, FileText, DollarSign, AlertTriangle,
   BookOpen, Receipt, Users, ClipboardList, FolderOpen,
   BarChart3, Bot, Globe, PenTool, Landmark, Zap,
-  MessageSquare, FileKey, Calculator, ChevronRight
+  MessageSquare, FileKey, Calculator, ChevronRight, TrendingUp
 } from "lucide-react";
 import StatCard from "@/components/StatCard";
 import { Button } from "@/components/ui/button";
@@ -26,22 +26,22 @@ const regimeNames: Record<string, string> = {
 };
 
 const statusConfig: Record<string, { label: string; color: string }> = {
-  todo: { label: "Pendente", color: "bg-[hsl(38,92%,50%)] text-white" },
-  pending: { label: "Pendente", color: "bg-[hsl(38,92%,50%)] text-white" },
-  in_progress: { label: "Em andamento", color: "bg-primary text-primary-foreground" },
-  done: { label: "Concluído", color: "bg-[hsl(160,72%,40%)] text-white" },
-  completed: { label: "Concluído", color: "bg-[hsl(160,72%,40%)] text-white" },
+  todo: { label: "Pendente", color: "bg-warning text-warning-foreground" },
+  pending: { label: "Pendente", color: "bg-warning text-warning-foreground" },
+  in_progress: { label: "Em andamento", color: "bg-info text-info-foreground" },
+  done: { label: "Concluído", color: "bg-success text-success-foreground" },
+  completed: { label: "Concluído", color: "bg-success text-success-foreground" },
 };
 
 const quickLinks = [
   { path: "/contabil", icon: BookOpen, label: "Contábil", desc: "Plano de contas e balancete" },
   { path: "/fiscal", icon: Receipt, label: "Fiscal", desc: "Impostos e obrigações" },
-  { path: "/folha", icon: Users, label: "Folha de Pagamento", desc: "Funcionários e encargos" },
+  { path: "/folha", icon: Users, label: "Folha", desc: "Funcionários e encargos" },
   { path: "/financeiro", icon: DollarSign, label: "Financeiro", desc: "Receitas e despesas" },
-  { path: "/crm", icon: Building2, label: "CRM Clientes", desc: "Gestão de clientes" },
+  { path: "/crm", icon: Building2, label: "CRM", desc: "Gestão de clientes" },
   { path: "/tarefas", icon: ClipboardList, label: "Tarefas", desc: "Gerenciar tarefas" },
   { path: "/documentos", icon: FolderOpen, label: "Documentos", desc: "Arquivos e anexos" },
-  { path: "/bi", icon: BarChart3, label: "BI & Relatórios", desc: "Análise de dados" },
+  { path: "/bi", icon: BarChart3, label: "BI", desc: "Análise de dados" },
   { path: "/ia-chat", icon: MessageSquare, label: "Chat IA", desc: "Assistente inteligente" },
   { path: "/sefaz", icon: Receipt, label: "SEFAZ", desc: "Emissão de NF-e" },
   { path: "/bancos", icon: Landmark, label: "Bancos", desc: "Conciliação bancária" },
@@ -116,30 +116,39 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 lg:p-8 space-y-8 max-w-7xl">
-      <div>
-        <h1 className="text-3xl font-bold font-display tracking-tight">Painel de Controle</h1>
-        <p className="text-muted-foreground text-sm mt-1">Visão geral do escritório — dados reais</p>
+      {/* Header */}
+      <div className="opacity-0 animate-fade-in-down" style={{ animationDelay: '0.05s' }}>
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <TrendingUp className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl lg:text-3xl font-bold font-display tracking-tight">Painel de Controle</h1>
+            <p className="text-muted-foreground text-sm">Visão geral do escritório — dados em tempo real</p>
+          </div>
+        </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Link to="/crm"><StatCard icon={Building2} title="Clientes Ativos" value={String(activeClients)} change={`${clients.length} total`} changeType="up" /></Link>
-        <Link to="/fiscal"><StatCard icon={FileText} title="Obrigações" value={String(totalObligations)} change={`${deliveredPct}% entregues`} changeType="up" /></Link>
-        <Link to="/financeiro"><StatCard icon={DollarSign} title="Faturamento Mensal" value={`R$ ${totalFee.toLocaleString("pt-BR")}`} change="Honorários ativos" changeType="up" /></Link>
-        <Link to="/tarefas"><StatCard icon={AlertTriangle} title="Pendentes" value={String(pendingObligations)} change={`${tasks.filter((t: any) => t.status === "todo").length} tarefas`} changeType={pendingObligations > 5 ? "down" : "up"} /></Link>
+        <Link to="/crm"><StatCard icon={Building2} title="Clientes Ativos" value={String(activeClients)} change={`${clients.length} total`} changeType="up" delay={0.1} /></Link>
+        <Link to="/fiscal"><StatCard icon={FileText} title="Obrigações" value={String(totalObligations)} change={`${deliveredPct}% entregues`} changeType="up" delay={0.15} /></Link>
+        <Link to="/financeiro"><StatCard icon={DollarSign} title="Faturamento Mensal" value={`R$ ${totalFee.toLocaleString("pt-BR")}`} change="Honorários ativos" changeType="up" delay={0.2} /></Link>
+        <Link to="/tarefas"><StatCard icon={AlertTriangle} title="Pendentes" value={String(pendingObligations)} change={`${tasks.filter((t: any) => t.status === "todo").length} tarefas`} changeType={pendingObligations > 5 ? "down" : "up"} delay={0.25} /></Link>
       </div>
 
       {/* Quick access modules */}
-      <div>
-        <h2 className="text-lg font-semibold font-display mb-4">Acesso Rápido aos Módulos</h2>
+      <div className="opacity-0 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+        <h2 className="text-lg font-semibold font-display mb-4">Acesso Rápido</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
-          {quickLinks.map((link) => (
+          {quickLinks.map((link, i) => (
             <Link
               key={link.path}
               to={link.path}
-              className="group bg-card border rounded-xl p-4 hover:border-primary/40 hover:shadow-md transition-all duration-200"
+              className="group bg-card border rounded-xl p-4 hover:border-primary/40 hover:shadow-lg hover:scale-[1.03] transition-all duration-300 opacity-0 animate-fade-in-scale"
+              style={{ animationDelay: `${0.35 + i * 0.04}s` }}
             >
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 group-hover:scale-110 transition-all duration-200">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 group-hover:scale-110 transition-all duration-300">
                 <link.icon className="w-5 h-5 text-primary" />
               </div>
               <p className="text-sm font-medium truncate">{link.label}</p>
@@ -151,7 +160,7 @@ export default function Dashboard() {
 
       {/* Charts */}
       <div className="grid md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 bg-card rounded-xl border p-6">
+        <div className="md:col-span-2 bg-card rounded-xl border p-6 opacity-0 animate-fade-in-up hover:shadow-lg transition-shadow duration-300" style={{ animationDelay: '0.5s' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold font-display">Faturamento</h2>
             <Button variant="ghost" size="sm" asChild>
@@ -169,9 +178,9 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-card rounded-xl border p-6">
+        <div className="bg-card rounded-xl border p-6 opacity-0 animate-fade-in-up hover:shadow-lg transition-shadow duration-300" style={{ animationDelay: '0.55s' }}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold font-display">Clientes por Regime</h2>
+            <h2 className="text-lg font-semibold font-display">Regime Tributário</h2>
             <Button variant="ghost" size="sm" asChild>
               <Link to="/crm" className="text-xs gap-1">Ver tudo <ChevronRight className="w-3 h-3" /></Link>
             </Button>
@@ -190,22 +199,25 @@ export default function Dashboard() {
                 {pieData.map(c => (
                   <div key={c.name} className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color }} />
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c.color }} />
                       <span className="text-muted-foreground">{c.name}</span>
                     </div>
-                    <span className="font-medium">{c.value}</span>
+                    <span className="font-semibold">{c.value}</span>
                   </div>
                 ))}
               </div>
             </>
           ) : (
-            <p className="text-muted-foreground text-sm text-center py-10">Adicione clientes para ver</p>
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <Building2 className="w-8 h-8 text-muted-foreground/30 mb-2" />
+              <p className="text-muted-foreground text-sm">Adicione clientes para ver</p>
+            </div>
           )}
         </div>
       </div>
 
       {/* Tasks */}
-      <div className="bg-card rounded-xl border overflow-hidden">
+      <div className="bg-card rounded-xl border overflow-hidden opacity-0 animate-fade-in-up hover:shadow-lg transition-shadow duration-300" style={{ animationDelay: '0.6s' }}>
         <div className="p-6 border-b flex items-center justify-between">
           <h2 className="text-lg font-semibold font-display">Tarefas Recentes</h2>
           <Button variant="ghost" size="sm" asChild>
@@ -231,7 +243,7 @@ export default function Dashboard() {
                       <td className="py-3 px-6 text-sm font-medium">{t.clients?.company_name || "—"}</td>
                       <td className="py-3 px-6 text-sm text-muted-foreground">{t.title}</td>
                       <td className="py-3 px-6">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${s.color}`}>{s.label}</span>
+                        <span className={`text-[10px] px-2.5 py-1 rounded-full font-medium ${s.color}`}>{s.label}</span>
                       </td>
                       <td className="py-3 px-6 text-sm text-muted-foreground">
                         {t.due_date ? new Date(t.due_date).toLocaleDateString("pt-BR") : "—"}
@@ -243,7 +255,13 @@ export default function Dashboard() {
             </table>
           </div>
         ) : (
-          <p className="text-muted-foreground text-sm text-center py-10">Nenhuma tarefa cadastrada</p>
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <ClipboardList className="w-8 h-8 text-muted-foreground/30 mb-2" />
+            <p className="text-muted-foreground text-sm">Nenhuma tarefa cadastrada</p>
+            <Button variant="outline" size="sm" asChild className="mt-3">
+              <Link to="/tarefas">Criar primeira tarefa</Link>
+            </Button>
+          </div>
         )}
       </div>
     </div>

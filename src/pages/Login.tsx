@@ -85,22 +85,21 @@ export default function Login() {
     <div className="min-h-screen flex bg-background">
       {/* Left panel — immersive brand */}
       <div className="hidden lg:flex lg:w-[45%] relative overflow-hidden">
-        {/* Gradient background */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary/95 to-primary/80" />
         
-        {/* Animated grid pattern */}
+        {/* Grid pattern */}
         <div className="absolute inset-0 opacity-[0.07]" style={{
           backgroundImage: `linear-gradient(hsl(var(--primary-foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--primary-foreground)) 1px, transparent 1px)`,
           backgroundSize: '40px 40px',
         }} />
         
-        {/* Glow orbs */}
-        <div className="absolute top-20 -left-20 w-72 h-72 bg-white/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-10 w-56 h-56 bg-white/8 rounded-full blur-3xl" />
+        {/* Glow orbs with float animation */}
+        <div className="absolute top-20 -left-20 w-72 h-72 bg-white/10 rounded-full blur-3xl animate-float" />
+        <div className="absolute bottom-20 right-10 w-56 h-56 bg-white/8 rounded-full blur-3xl animate-float" style={{ animationDelay: '1.5s' }} />
         
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
-          {/* Logo */}
-          <div className="flex items-center gap-3">
+          {/* Logo — slide in */}
+          <div className="flex items-center gap-3 opacity-0 animate-slide-in-left" style={{ animationDelay: '0.1s' }}>
             <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center border border-white/20">
               <Sparkles className="w-5 h-5 text-primary-foreground" />
             </div>
@@ -109,9 +108,9 @@ export default function Login() {
             </span>
           </div>
 
-          {/* Hero */}
+          {/* Hero — staggered fade in */}
           <div className="space-y-8">
-            <div>
+            <div className="opacity-0 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
               <h1 className="font-display text-4xl xl:text-5xl font-bold text-primary-foreground leading-tight">
                 Contabilidade do futuro,{" "}
                 <span className="text-white/70">hoje.</span>
@@ -121,12 +120,13 @@ export default function Login() {
               </p>
             </div>
 
-            {/* Feature cards */}
+            {/* Feature cards — staggered */}
             <div className="grid grid-cols-2 gap-3">
-              {features.map((f) => (
+              {features.map((f, i) => (
                 <div
                   key={f.title}
-                  className="bg-white/[0.08] backdrop-blur-sm border border-white/[0.12] rounded-xl p-4 hover:bg-white/[0.12] transition-colors duration-300"
+                  className="bg-white/[0.08] backdrop-blur-sm border border-white/[0.12] rounded-xl p-4 hover:bg-white/[0.14] hover:scale-[1.02] transition-all duration-300 opacity-0 animate-fade-in-scale"
+                  style={{ animationDelay: `${0.35 + i * 0.1}s` }}
                 >
                   <f.icon className="w-5 h-5 text-primary-foreground/80 mb-2.5" />
                   <p className="text-sm font-semibold text-primary-foreground">{f.title}</p>
@@ -137,7 +137,7 @@ export default function Login() {
           </div>
 
           {/* Footer */}
-          <p className="text-xs text-primary-foreground/40">
+          <p className="text-xs text-primary-foreground/40 opacity-0 animate-fade-in-up" style={{ animationDelay: '0.8s' }}>
             © 2026 Seu Contador IA · Todos os direitos reservados
           </p>
         </div>
@@ -147,15 +147,15 @@ export default function Login() {
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-[420px] space-y-7">
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center justify-center gap-2.5 mb-2">
+          <div className="lg:hidden flex items-center justify-center gap-2.5 mb-2 opacity-0 animate-fade-in-down" style={{ animationDelay: '0.1s' }}>
             <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
-              <Sparkles className="w-4.5 h-4.5 text-primary-foreground" />
+              <Sparkles className="w-4 h-4 text-primary-foreground" />
             </div>
             <span className="font-display text-xl font-bold">Seu Contador IA</span>
           </div>
 
           {/* Header */}
-          <div className="text-center space-y-1.5">
+          <div className="text-center space-y-1.5 opacity-0 animate-fade-in-down" style={{ animationDelay: '0.15s' }}>
             <h2 className="font-display text-2xl font-bold tracking-tight">
               {isLogin ? "Bem-vindo de volta" : "Crie sua conta"}
             </h2>
@@ -165,18 +165,20 @@ export default function Login() {
           </div>
 
           {/* Google button */}
-          <Button
-            variant="outline"
-            className="w-full h-12 gap-3 text-sm font-medium border-border/60 hover:bg-accent/50 transition-all duration-200"
-            onClick={handleGoogleLogin}
-            disabled={loading}
-          >
-            <Chrome className="w-5 h-5" />
-            Continuar com Google
-          </Button>
+          <div className="opacity-0 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
+            <Button
+              variant="outline"
+              className="w-full h-12 gap-3 text-sm font-medium border-border/60 hover:bg-accent/50 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
+              onClick={handleGoogleLogin}
+              disabled={loading}
+            >
+              <Chrome className="w-5 h-5" />
+              Continuar com Google
+            </Button>
+          </div>
 
           {/* Divider */}
-          <div className="relative">
+          <div className="relative opacity-0 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t border-border/60" />
             </div>
@@ -186,34 +188,34 @@ export default function Login() {
           </div>
 
           {/* Email form */}
-          <form onSubmit={handleEmailAuth} className="space-y-4">
+          <form onSubmit={handleEmailAuth} className="space-y-4 opacity-0 animate-fade-in-up" style={{ animationDelay: '0.35s' }}>
             <div className="space-y-1.5">
               <Label htmlFor="email" className="text-sm font-medium">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
+              <div className="relative group">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 group-focus-within:text-primary transition-colors" />
                 <Input
                   id="email"
                   type="email"
                   placeholder="seu@email.com"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  className="pl-11 h-12 bg-muted/30 border-border/50 focus:bg-background transition-colors"
+                  className="pl-11 h-12 bg-muted/30 border-border/50 focus:bg-background focus:border-primary/50 transition-all duration-200"
                   required
                 />
               </div>
             </div>
 
             {!isLogin && (
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 animate-fade-in-up">
                 <Label htmlFor="crc" className="text-sm font-medium">CRC (Registro no Conselho) *</Label>
-                <div className="relative">
-                  <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
+                <div className="relative group">
+                  <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 group-focus-within:text-primary transition-colors" />
                   <Input
                     id="crc"
                     placeholder="Ex: SP-123456/O"
                     value={crc}
                     onChange={e => setCrc(e.target.value)}
-                    className="pl-11 h-12 bg-muted/30 border-border/50 focus:bg-background transition-colors"
+                    className="pl-11 h-12 bg-muted/30 border-border/50 focus:bg-background focus:border-primary/50 transition-all duration-200"
                     required
                   />
                 </div>
@@ -229,15 +231,15 @@ export default function Login() {
                   </Link>
                 )}
               </div>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
+              <div className="relative group">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 group-focus-within:text-primary transition-colors" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="pl-11 pr-11 h-12 bg-muted/30 border-border/50 focus:bg-background transition-colors"
+                  className="pl-11 pr-11 h-12 bg-muted/30 border-border/50 focus:bg-background focus:border-primary/50 transition-all duration-200"
                   required
                   minLength={6}
                 />
@@ -253,7 +255,7 @@ export default function Login() {
 
             <Button
               type="submit"
-              className="w-full h-12 font-semibold text-sm shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all duration-200"
+              className="w-full h-12 font-semibold text-sm shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
               disabled={loading}
             >
               {loading ? (
@@ -266,7 +268,7 @@ export default function Login() {
           </form>
 
           {/* Toggle auth mode */}
-          <p className="text-center text-sm text-muted-foreground">
+          <p className="text-center text-sm text-muted-foreground opacity-0 animate-fade-in-up" style={{ animationDelay: '0.45s' }}>
             {isLogin ? "Não tem conta?" : "Já tem conta?"}{" "}
             <button
               onClick={() => setIsLogin(!isLogin)}
@@ -277,7 +279,7 @@ export default function Login() {
           </p>
 
           {/* Back */}
-          <div className="text-center">
+          <div className="text-center opacity-0 animate-fade-in-up" style={{ animationDelay: '0.5s' }}>
             <Link
               to="/"
               className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/60 hover:text-foreground transition-colors"
