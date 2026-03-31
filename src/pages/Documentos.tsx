@@ -65,8 +65,15 @@ export default function Documentos() {
   };
 
   const downloadDoc = async (doc: any) => {
-    const { data } = await supabase.storage.from("documents").createSignedUrl(doc.file_path, 300);
-    if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+    const { data } = await supabase.storage.from("documents").createSignedUrl(doc.file_path, 300, { download: true });
+    if (data?.signedUrl) {
+      const a = document.createElement("a");
+      a.href = data.signedUrl;
+      a.download = doc.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
   };
 
   const filtered = documents.filter((d: any) => {
