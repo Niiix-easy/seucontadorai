@@ -348,8 +348,63 @@ export type Database = {
           },
         ]
       }
+      nf_eventos: {
+        Row: {
+          created_at: string
+          descricao: string | null
+          id: string
+          nfe_id: string | null
+          nfse_id: string | null
+          protocolo: string | null
+          sequencia: number | null
+          tipo: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nfe_id?: string | null
+          nfse_id?: string | null
+          protocolo?: string | null
+          sequencia?: number | null
+          tipo: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nfe_id?: string | null
+          nfse_id?: string | null
+          protocolo?: string | null
+          sequencia?: number | null
+          tipo?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nf_eventos_nfe_id_fkey"
+            columns: ["nfe_id"]
+            isOneToOne: false
+            referencedRelation: "nfe_emitidas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nf_eventos_nfse_id_fkey"
+            columns: ["nfse_id"]
+            isOneToOne: false
+            referencedRelation: "nfse_emitidas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nfe_emitidas: {
         Row: {
+          cancelada_em: string | null
+          cce_data: string | null
+          cce_sequencia: number | null
+          cce_texto: string | null
           chave_acesso: string | null
           client_id: string | null
           cnpj_destinatario: string | null
@@ -359,6 +414,7 @@ export type Database = {
           id: string
           info_complementares: string | null
           integrador: string | null
+          motivo_cancelamento: string | null
           natureza_operacao: string | null
           numero: string
           razao_destinatario: string | null
@@ -372,6 +428,10 @@ export type Database = {
           valor_total: number
         }
         Insert: {
+          cancelada_em?: string | null
+          cce_data?: string | null
+          cce_sequencia?: number | null
+          cce_texto?: string | null
           chave_acesso?: string | null
           client_id?: string | null
           cnpj_destinatario?: string | null
@@ -381,6 +441,7 @@ export type Database = {
           id?: string
           info_complementares?: string | null
           integrador?: string | null
+          motivo_cancelamento?: string | null
           natureza_operacao?: string | null
           numero: string
           razao_destinatario?: string | null
@@ -394,6 +455,10 @@ export type Database = {
           valor_total?: number
         }
         Update: {
+          cancelada_em?: string | null
+          cce_data?: string | null
+          cce_sequencia?: number | null
+          cce_texto?: string | null
           chave_acesso?: string | null
           client_id?: string | null
           cnpj_destinatario?: string | null
@@ -403,6 +468,7 @@ export type Database = {
           id?: string
           info_complementares?: string | null
           integrador?: string | null
+          motivo_cancelamento?: string | null
           natureza_operacao?: string | null
           numero?: string
           razao_destinatario?: string | null
@@ -484,6 +550,7 @@ export type Database = {
       nfse_emitidas: {
         Row: {
           base_calculo: number
+          cancelada_em: string | null
           client_id: string | null
           cnpj_prestador: string | null
           cnpj_tomador: string | null
@@ -499,6 +566,7 @@ export type Database = {
           ir_valor: number
           iss_aliquota: number
           iss_valor: number
+          motivo_cancelamento: string | null
           municipio_prestacao: string | null
           numero: string
           pis_valor: number
@@ -514,6 +582,7 @@ export type Database = {
         }
         Insert: {
           base_calculo?: number
+          cancelada_em?: string | null
           client_id?: string | null
           cnpj_prestador?: string | null
           cnpj_tomador?: string | null
@@ -529,6 +598,7 @@ export type Database = {
           ir_valor?: number
           iss_aliquota?: number
           iss_valor?: number
+          motivo_cancelamento?: string | null
           municipio_prestacao?: string | null
           numero: string
           pis_valor?: number
@@ -544,6 +614,7 @@ export type Database = {
         }
         Update: {
           base_calculo?: number
+          cancelada_em?: string | null
           client_id?: string | null
           cnpj_prestador?: string | null
           cnpj_tomador?: string | null
@@ -559,6 +630,7 @@ export type Database = {
           ir_valor?: number
           iss_aliquota?: number
           iss_valor?: number
+          motivo_cancelamento?: string | null
           municipio_prestacao?: string | null
           numero?: string
           pis_valor?: number
