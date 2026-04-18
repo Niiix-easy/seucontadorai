@@ -523,9 +523,34 @@ export default function NotasFiscais() {
 
         <TabsContent value="nfe">
           <Card>
-            <CardHeader><CardTitle className="font-display">NF-e Emitidas</CardTitle><CardDescription>Histórico de notas fiscais de produto</CardDescription></CardHeader>
+            <CardHeader className="flex-row items-start justify-between gap-4 flex-wrap">
+              <div>
+                <CardTitle className="font-display">NF-e Emitidas</CardTitle>
+                <CardDescription>Histórico de notas fiscais de produto</CardDescription>
+              </div>
+              <NFFiltros
+                filters={filtersNfe}
+                onChange={setFiltersNfe}
+                clients={clients}
+                totalFiltered={applyNFFilters(nfes, filtersNfe, { dateField: "data_emissao", valueField: "valor_total" }).length}
+                onExportCsv={() => exportNotasCsv(
+                  applyNFFilters(nfes, filtersNfe, { dateField: "data_emissao", valueField: "valor_total" }),
+                  "nfe-emitidas",
+                  [
+                    { key: "numero", label: "Número" },
+                    { key: "serie", label: "Série" },
+                    { key: "razao_destinatario", label: "Destinatário" },
+                    { key: "cnpj_destinatario", label: "CNPJ" },
+                    { key: "natureza_operacao", label: "Natureza" },
+                    { key: "data_emissao", label: "Data Emissão", format: (v) => v ? new Date(v).toLocaleDateString("pt-BR") : "" },
+                    { key: "valor_total", label: "Valor Total", format: (v) => Number(v || 0).toFixed(2) },
+                    { key: "status", label: "Status" },
+                  ]
+                )}
+              />
+            </CardHeader>
             <CardContent>
-              {nfes.length === 0 ? (
+              {(() => { const nfesFiltradas = applyNFFilters(nfes, filtersNfe, { dateField: "data_emissao", valueField: "valor_total" }); return nfesFiltradas.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <FileText className="w-12 h-12 mx-auto mb-2 opacity-30" />
                   <p>Nenhuma NF-e emitida ainda</p>
