@@ -11,8 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { FileText, Package, Briefcase, Plus, Trash2, Receipt } from "lucide-react";
+import { FileText, Package, Briefcase, Plus, Trash2, Receipt, Download, Ban, FileEdit, MoreVertical } from "lucide-react";
 import { toast } from "sonner";
+import { gerarPDFNFe, gerarPDFNFSe } from "@/lib/pdf-notas";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 type Item = {
   descricao: string;
@@ -45,6 +48,12 @@ export default function NotasFiscais() {
   const queryClient = useQueryClient();
   const [openProduto, setOpenProduto] = useState(false);
   const [openServico, setOpenServico] = useState(false);
+
+  // Cancel/CC-e dialogs
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; tipo: "nfe" | "nfse"; numero: string } | null>(null);
+  const [cancelMotivo, setCancelMotivo] = useState("");
+  const [cceTarget, setCceTarget] = useState<{ id: string; numero: string; sequencia: number } | null>(null);
+  const [cceTexto, setCceTexto] = useState("");
 
   // NF-e (produto) form
   const [nfeClient, setNfeClient] = useState("");
