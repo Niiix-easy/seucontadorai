@@ -43,17 +43,15 @@ export default function Login() {
         if (error) throw error;
         toast.success("Login realizado com sucesso!");
       } else {
-        if (!crc.trim()) {
-          toast.error("CRC é obrigatório para criar conta");
-          setLoading(false);
-          return;
-        }
         const { error, data: signUpData } = await supabase.auth.signUp({
           email, password,
-          options: { emailRedirectTo: window.location.origin, data: { crc: crc.trim() } }
+          options: {
+            emailRedirectTo: window.location.origin,
+            data: crc.trim() ? { crc: crc.trim() } : undefined,
+          },
         });
         if (error) throw error;
-        if (signUpData.user) {
+        if (signUpData.user && crc.trim()) {
           await supabase.from("profiles").update({ crc: crc.trim() }).eq("user_id", signUpData.user.id);
         }
         toast.success("Conta criada com sucesso!");
@@ -207,7 +205,9 @@ export default function Login() {
 
             {!isLogin && (
               <div className="space-y-1.5 animate-fade-in-up">
-                <Label htmlFor="crc" className="text-sm font-medium">CRC (Registro no Conselho) *</Label>
+                <Label htmlFor="crc" className="text-sm font-medium">
+                  CRC <span className="text-muted-foreground font-normal">(opcional)</span>
+                </Label>
                 <div className="relative group">
                   <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 group-focus-within:text-primary transition-colors" />
                   <Input
@@ -216,7 +216,6 @@ export default function Login() {
                     value={crc}
                     onChange={e => setCrc(e.target.value)}
                     className="pl-11 h-12 bg-muted/30 border-border/50 focus:bg-background focus:border-primary/50 transition-all duration-200"
-                    required
                   />
                 </div>
               </div>
