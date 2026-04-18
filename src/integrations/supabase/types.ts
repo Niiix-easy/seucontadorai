@@ -351,9 +351,11 @@ export type Database = {
       nfe_emitidas: {
         Row: {
           chave_acesso: string | null
+          client_id: string | null
           cnpj_destinatario: string | null
           cnpj_emitente: string | null
           created_at: string
+          data_emissao: string
           id: string
           info_complementares: string | null
           integrador: string | null
@@ -371,9 +373,11 @@ export type Database = {
         }
         Insert: {
           chave_acesso?: string | null
+          client_id?: string | null
           cnpj_destinatario?: string | null
           cnpj_emitente?: string | null
           created_at?: string
+          data_emissao?: string
           id?: string
           info_complementares?: string | null
           integrador?: string | null
@@ -391,9 +395,11 @@ export type Database = {
         }
         Update: {
           chave_acesso?: string | null
+          client_id?: string | null
           cnpj_destinatario?: string | null
           cnpj_emitente?: string | null
           created_at?: string
+          data_emissao?: string
           id?: string
           info_complementares?: string | null
           integrador?: string | null
@@ -409,7 +415,15 @@ export type Database = {
           valor_produtos?: number
           valor_total?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "nfe_emitidas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       nfe_itens: {
         Row: {
@@ -463,6 +477,107 @@ export type Database = {
             columns: ["nfe_id"]
             isOneToOne: false
             referencedRelation: "nfe_emitidas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nfse_emitidas: {
+        Row: {
+          base_calculo: number
+          client_id: string | null
+          cnpj_prestador: string | null
+          cnpj_tomador: string | null
+          codigo_servico: string | null
+          codigo_verificacao: string | null
+          cofins_valor: number
+          created_at: string
+          csll_valor: number
+          data_emissao: string
+          discriminacao: string
+          id: string
+          inss_valor: number
+          ir_valor: number
+          iss_aliquota: number
+          iss_valor: number
+          municipio_prestacao: string | null
+          numero: string
+          pis_valor: number
+          razao_prestador: string | null
+          razao_tomador: string | null
+          serie: string
+          status: string
+          updated_at: string
+          user_id: string
+          valor_deducoes: number
+          valor_liquido: number
+          valor_servicos: number
+        }
+        Insert: {
+          base_calculo?: number
+          client_id?: string | null
+          cnpj_prestador?: string | null
+          cnpj_tomador?: string | null
+          codigo_servico?: string | null
+          codigo_verificacao?: string | null
+          cofins_valor?: number
+          created_at?: string
+          csll_valor?: number
+          data_emissao?: string
+          discriminacao: string
+          id?: string
+          inss_valor?: number
+          ir_valor?: number
+          iss_aliquota?: number
+          iss_valor?: number
+          municipio_prestacao?: string | null
+          numero: string
+          pis_valor?: number
+          razao_prestador?: string | null
+          razao_tomador?: string | null
+          serie?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          valor_deducoes?: number
+          valor_liquido?: number
+          valor_servicos?: number
+        }
+        Update: {
+          base_calculo?: number
+          client_id?: string | null
+          cnpj_prestador?: string | null
+          cnpj_tomador?: string | null
+          codigo_servico?: string | null
+          codigo_verificacao?: string | null
+          cofins_valor?: number
+          created_at?: string
+          csll_valor?: number
+          data_emissao?: string
+          discriminacao?: string
+          id?: string
+          inss_valor?: number
+          ir_valor?: number
+          iss_aliquota?: number
+          iss_valor?: number
+          municipio_prestacao?: string | null
+          numero?: string
+          pis_valor?: number
+          razao_prestador?: string | null
+          razao_tomador?: string | null
+          serie?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          valor_deducoes?: number
+          valor_liquido?: number
+          valor_servicos?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nfse_emitidas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
