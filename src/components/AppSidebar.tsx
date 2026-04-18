@@ -8,6 +8,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { ThemeToggle } from "./ThemeToggle";
 
 const modules = [
   { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard", section: "" },
@@ -102,19 +103,23 @@ export default function AppSidebar({ onNavigate }: { onNavigate?: () => void } =
         ))}
       </nav>
 
-      {/* Logout + Collapse */}
+      {/* Theme + Logout + Collapse */}
       <div className="border-t border-sidebar-border">
+        <ThemeToggle collapsed={collapsed} />
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-5 py-3 w-full text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors"
+          className={cn(
+            "flex items-center gap-3 px-5 py-3 w-full text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors border-t border-sidebar-border",
+            collapsed && "justify-center px-0"
+          )}
           title="Sair"
         >
-          <LogOut className="w-4 h-4" />
+          <LogOut className="w-4 h-4 shrink-0" />
           {!collapsed && <span>Sair</span>}
         </button>
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="flex items-center justify-center h-10 w-full border-t border-sidebar-border text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors"
+          className="hidden lg:flex items-center justify-center h-10 w-full border-t border-sidebar-border text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors"
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>

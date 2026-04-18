@@ -11,8 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { FileText, Package, Briefcase, Plus, Trash2, Receipt } from "lucide-react";
+import { FileText, Package, Briefcase, Plus, Trash2, Receipt, Download, Ban, FileEdit, MoreVertical } from "lucide-react";
 import { toast } from "sonner";
+import { gerarPDFNFe, gerarPDFNFSe } from "@/lib/pdf-notas";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 type Item = {
   descricao: string;
@@ -45,6 +48,12 @@ export default function NotasFiscais() {
   const queryClient = useQueryClient();
   const [openProduto, setOpenProduto] = useState(false);
   const [openServico, setOpenServico] = useState(false);
+
+  // Cancel/CC-e dialogs
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; tipo: "nfe" | "nfse"; numero: string } | null>(null);
+  const [cancelMotivo, setCancelMotivo] = useState("");
+  const [cceTarget, setCceTarget] = useState<{ id: string; numero: string; sequencia: number } | null>(null);
+  const [cceTexto, setCceTexto] = useState("");
 
   // NF-e (produto) form
   const [nfeClient, setNfeClient] = useState("");
@@ -235,6 +244,81 @@ export default function NotasFiscais() {
 
   const totalNfeMes = nfes.reduce((s, n: any) => s + Number(n.valor_total || 0), 0);
   const totalNfseMes = nfses.reduce((s, n: any) => s + Number(n.valor_servicos || 0), 0);
+
+  // PDF / Cancel / CC-e handlers
+  const downloadNfePdf = async (nfe: any) => {
+    const { data: itens } = await supabase
+      .from("nfe_itens")
+      .select("*")
+      .eq("nfe_id", nfe.id)
+      .order("numero_item");
+    gerarPDFNFe({ ...nfe, itens: itens || [] });
+  };
+
+  const downloadNfsePdf = (nfse: any) => gerarPDFNFSe(nfse);
+
+  const confirmarCancelamento = async () => {
+    if (!cancelTarget || !user) return;
+    if (cancelMotivo.trim().length < 15) {
+      toast.error("Motivo deve ter no mínimo 15 caracteres (exigência SEFAZ)");
+      return;
+    }
+    const table = cancelTarget.tipo === "nfe" ? "nfe_emitidas" : "nfse_emitidas";
+    const { error } = await supabase
+      .from(table)
+      .update({
+        status: "cancelada",
+        cancelada_em: new Date().toISOString(),
+        motivo_cancelamento: cancelMotivo,
+      })
+      .eq("id", cancelTarget.id);
+    if (error) {
+      toast.error("Erro ao cancelar: " + error.message);
+      return;
+    }
+    await supabase.from("nf_eventos").insert({
+      user_id: user.id,
+      [cancelTarget.tipo === "nfe" ? "nfe_id" : "nfse_id"]: cancelTarget.id,
+      tipo: "cancelamento",
+      descricao: cancelMotivo,
+    });
+    toast.success(`${cancelTarget.tipo === "nfe" ? "NF-e" : "NFS-e"} ${cancelTarget.numero} cancelada`);
+    queryClient.invalidateQueries({ queryKey: [`${cancelTarget.tipo}-emitidas`] });
+    setCancelTarget(null);
+    setCancelMotivo("");
+  };
+
+  const confirmarCce = async () => {
+    if (!cceTarget || !user) return;
+    if (cceTexto.trim().length < 15) {
+      toast.error("Texto da correção deve ter no mínimo 15 caracteres");
+      return;
+    }
+    const novaSeq = (cceTarget.sequencia || 0) + 1;
+    const { error } = await supabase
+      .from("nfe_emitidas")
+      .update({
+        cce_texto: cceTexto,
+        cce_data: new Date().toISOString(),
+        cce_sequencia: novaSeq,
+      })
+      .eq("id", cceTarget.id);
+    if (error) {
+      toast.error("Erro: " + error.message);
+      return;
+    }
+    await supabase.from("nf_eventos").insert({
+      user_id: user.id,
+      nfe_id: cceTarget.id,
+      tipo: "cce",
+      descricao: cceTexto,
+      sequencia: novaSeq,
+    });
+    toast.success(`Carta de correção #${novaSeq} registrada para NF-e ${cceTarget.numero}`);
+    queryClient.invalidateQueries({ queryKey: ["nfe-emitidas"] });
+    setCceTarget(null);
+    setCceTexto("");
+  };
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl space-y-6">
@@ -446,19 +530,53 @@ export default function NotasFiscais() {
                   <table className="w-full text-sm">
                     <thead><tr className="bg-muted/50 text-xs text-muted-foreground uppercase">
                       <th className="text-left py-2 px-3">Número</th>
-                      <th className="text-left py-2 px-3">Destinatário</th>
-                      <th className="text-left py-2 px-3">Natureza</th>
+                      <th className="text-left py-2 px-3 hidden md:table-cell">Destinatário</th>
+                      <th className="text-left py-2 px-3 hidden lg:table-cell">Natureza</th>
                       <th className="text-right py-2 px-3">Valor</th>
                       <th className="text-center py-2 px-3">Status</th>
+                      <th className="w-10"></th>
                     </tr></thead>
                     <tbody>
                       {nfes.map((n: any) => (
                         <tr key={n.id} className="border-t hover:bg-muted/30">
-                          <td className="py-2 px-3 font-mono">{n.numero}/{n.serie}</td>
-                          <td className="py-2 px-3">{n.razao_destinatario || "-"}</td>
-                          <td className="py-2 px-3 text-muted-foreground">{n.natureza_operacao || "-"}</td>
+                          <td className="py-2 px-3 font-mono">
+                            {n.numero}/{n.serie}
+                            {(n.cce_sequencia ?? 0) > 0 && (
+                              <span className="ml-2 text-[10px] text-info">CC-e #{n.cce_sequencia}</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 hidden md:table-cell">{n.razao_destinatario || "-"}</td>
+                          <td className="py-2 px-3 text-muted-foreground hidden lg:table-cell">{n.natureza_operacao || "-"}</td>
                           <td className="py-2 px-3 text-right font-mono">R$ {Number(n.valor_total).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
-                          <td className="py-2 px-3 text-center"><Badge>{n.status}</Badge></td>
+                          <td className="py-2 px-3 text-center">
+                            <Badge variant={n.status === "cancelada" ? "destructive" : "default"}>{n.status}</Badge>
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0"><MoreVertical className="w-4 h-4" /></Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => downloadNfePdf(n)}>
+                                  <Download className="w-4 h-4 mr-2" /> Baixar DANFE (PDF)
+                                </DropdownMenuItem>
+                                {n.status !== "cancelada" && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => setCceTarget({ id: n.id, numero: n.numero, sequencia: n.cce_sequencia ?? 0 })}>
+                                      <FileEdit className="w-4 h-4 mr-2" /> Carta de correção
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="text-destructive"
+                                      onClick={() => setCancelTarget({ id: n.id, tipo: "nfe", numero: n.numero })}
+                                    >
+                                      <Ban className="w-4 h-4 mr-2" /> Cancelar NF-e
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -483,21 +601,47 @@ export default function NotasFiscais() {
                   <table className="w-full text-sm">
                     <thead><tr className="bg-muted/50 text-xs text-muted-foreground uppercase">
                       <th className="text-left py-2 px-3">Número</th>
-                      <th className="text-left py-2 px-3">Tomador</th>
-                      <th className="text-left py-2 px-3">Discriminação</th>
+                      <th className="text-left py-2 px-3 hidden md:table-cell">Tomador</th>
+                      <th className="text-left py-2 px-3 hidden lg:table-cell">Discriminação</th>
                       <th className="text-right py-2 px-3">Valor</th>
-                      <th className="text-right py-2 px-3">ISS</th>
+                      <th className="text-right py-2 px-3 hidden sm:table-cell">ISS</th>
                       <th className="text-center py-2 px-3">Status</th>
+                      <th className="w-10"></th>
                     </tr></thead>
                     <tbody>
                       {nfses.map((n: any) => (
                         <tr key={n.id} className="border-t hover:bg-muted/30">
                           <td className="py-2 px-3 font-mono">{n.numero}/{n.serie}</td>
-                          <td className="py-2 px-3">{n.razao_tomador || "-"}</td>
-                          <td className="py-2 px-3 text-muted-foreground max-w-xs truncate">{n.discriminacao}</td>
+                          <td className="py-2 px-3 hidden md:table-cell">{n.razao_tomador || "-"}</td>
+                          <td className="py-2 px-3 text-muted-foreground max-w-xs truncate hidden lg:table-cell">{n.discriminacao}</td>
                           <td className="py-2 px-3 text-right font-mono">R$ {Number(n.valor_servicos).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
-                          <td className="py-2 px-3 text-right font-mono">R$ {Number(n.iss_valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
-                          <td className="py-2 px-3 text-center"><Badge>{n.status}</Badge></td>
+                          <td className="py-2 px-3 text-right font-mono hidden sm:table-cell">R$ {Number(n.iss_valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
+                          <td className="py-2 px-3 text-center">
+                            <Badge variant={n.status === "cancelada" ? "destructive" : "default"}>{n.status}</Badge>
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0"><MoreVertical className="w-4 h-4" /></Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => downloadNfsePdf(n)}>
+                                  <Download className="w-4 h-4 mr-2" /> Baixar PDF
+                                </DropdownMenuItem>
+                                {n.status !== "cancelada" && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="text-destructive"
+                                      onClick={() => setCancelTarget({ id: n.id, tipo: "nfse", numero: n.numero })}
+                                    >
+                                      <Ban className="w-4 h-4 mr-2" /> Cancelar NFS-e
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -508,6 +652,52 @@ export default function NotasFiscais() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Cancelamento */}
+      <AlertDialog open={!!cancelTarget} onOpenChange={(o) => !o && setCancelTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar {cancelTarget?.tipo === "nfe" ? "NF-e" : "NFS-e"} {cancelTarget?.numero}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Informe o motivo do cancelamento (mínimo 15 caracteres). Essa ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            value={cancelMotivo}
+            onChange={(e) => setCancelMotivo(e.target.value)}
+            placeholder="Ex.: Erro de digitação no valor unitário do item 1"
+            rows={3}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setCancelMotivo("")}>Voltar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmarCancelamento} className="bg-destructive hover:bg-destructive/90">
+              Confirmar cancelamento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Carta de correção */}
+      <AlertDialog open={!!cceTarget} onOpenChange={(o) => !o && setCceTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Carta de correção — NF-e {cceTarget?.numero}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Permitida apenas para corrigir informações que não alterem valor, quantidade, partes ou data. Sequência: #{(cceTarget?.sequencia ?? 0) + 1}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            value={cceTexto}
+            onChange={(e) => setCceTexto(e.target.value)}
+            placeholder="Ex.: Onde se lê 'CFOP 5101' leia-se 'CFOP 5102'"
+            rows={4}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setCceTexto("")}>Voltar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmarCce}>Registrar correção</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
