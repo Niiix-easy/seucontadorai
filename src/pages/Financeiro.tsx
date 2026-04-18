@@ -141,17 +141,17 @@ export default function Financeiro() {
     .map(([, value]) => value);
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight flex items-center gap-3">
-            <DollarSign className="w-8 h-8 text-primary" /> Financeiro
+          <h1 className="text-2xl sm:text-3xl font-bold font-display tracking-tight flex items-center gap-3">
+            <DollarSign className="w-7 h-7 sm:w-8 sm:h-8 text-primary" /> Financeiro
           </h1>
           <p className="text-muted-foreground text-sm mt-1">{records.length} lançamentos</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
+            <Button className="gap-2 w-full sm:w-auto">
               <Plus className="w-4 h-4" /> Novo Lançamento
             </Button>
           </DialogTrigger>
@@ -265,13 +265,13 @@ export default function Financeiro() {
         </Card>
       )}
 
-      <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Buscar..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
         </div>
         <Select value={filterType} onValueChange={setFilterType}>
-          <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="sm:w-[140px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="receita">Receitas</SelectItem>
@@ -290,38 +290,40 @@ export default function Financeiro() {
         </div>
       ) : (
         <div className="bg-card rounded-xl border overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-muted/50 text-xs text-muted-foreground uppercase">
-                <th className="text-left py-3 px-4">Descrição</th>
-                <th className="text-left py-3 px-4">Data</th>
-                <th className="text-left py-3 px-4">Tipo</th>
-                <th className="text-right py-3 px-4">Valor</th>
-                <th className="w-10" />
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((record: any) => (
-                <tr key={record.id} className="border-t hover:bg-muted/30">
-                  <td className="py-3 px-4 text-sm font-medium">{record.description}</td>
-                  <td className="py-3 px-4 text-sm text-muted-foreground">{new Date(record.date).toLocaleDateString("pt-BR")}</td>
-                  <td className="py-3 px-4">
-                    <Badge variant={record.type === "receita" ? "default" : "destructive"} className="text-[10px]">
-                      {record.type === "receita" ? "Receita" : "Despesa"}
-                    </Badge>
-                  </td>
-                  <td className={`py-3 px-4 text-sm text-right font-mono font-medium ${record.type === "receita" ? "text-primary" : "text-destructive"}`}>
-                    {record.type === "receita" ? "+" : "-"} R$ {formatCurrency(record.amount)}
-                  </td>
-                  <td className="py-3 px-4">
-                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteMutation.mutate(record.id)}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full stack-table">
+              <thead>
+                <tr className="bg-muted/50 text-xs text-muted-foreground uppercase">
+                  <th className="text-left py-3 px-4">Descrição</th>
+                  <th className="text-left py-3 px-4">Data</th>
+                  <th className="text-left py-3 px-4">Tipo</th>
+                  <th className="text-right py-3 px-4">Valor</th>
+                  <th className="w-10" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((record: any) => (
+                  <tr key={record.id} className="border-t hover:bg-muted/30">
+                    <td data-label="Descrição" className="py-3 px-4 text-sm font-medium">{record.description}</td>
+                    <td data-label="Data" className="py-3 px-4 text-sm text-muted-foreground">{new Date(record.date).toLocaleDateString("pt-BR")}</td>
+                    <td data-label="Tipo" className="py-3 px-4">
+                      <Badge variant={record.type === "receita" ? "default" : "destructive"} className="text-[10px]">
+                        {record.type === "receita" ? "Receita" : "Despesa"}
+                      </Badge>
+                    </td>
+                    <td data-label="Valor" className={`py-3 px-4 text-sm text-right font-mono font-medium ${record.type === "receita" ? "text-primary" : "text-destructive"}`}>
+                      {record.type === "receita" ? "+" : "-"} R$ {formatCurrency(record.amount)}
+                    </td>
+                    <td data-label="" className="py-3 px-4">
+                      <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteMutation.mutate(record.id)}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

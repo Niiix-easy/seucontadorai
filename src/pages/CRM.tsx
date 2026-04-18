@@ -126,11 +126,11 @@ export default function CRM() {
   const totalFee = clients.filter(c => c.status === "active").reduce((s, c) => s + (c.monthly_fee || 0), 0);
 
   return (
-    <div className="p-6 lg:p-8 space-y-6 max-w-7xl">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-[Space_Grotesk] tracking-tight flex items-center gap-3">
-            <Users className="w-8 h-8 text-primary" /> CRM Clientes
+          <h1 className="text-2xl sm:text-3xl font-bold font-[Space_Grotesk] tracking-tight flex items-center gap-3">
+            <Users className="w-7 h-7 sm:w-8 sm:h-8 text-primary" /> CRM Clientes
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
             {clients.length} clientes • Faturamento: R$ {totalFee.toLocaleString("pt-BR")}
@@ -138,9 +138,9 @@ export default function CRM() {
         </div>
         <Dialog open={dialogOpen} onOpenChange={(o) => { if (!o) resetForm(); setDialogOpen(o); }}>
           <DialogTrigger asChild>
-            <Button className="gap-2"><Plus className="w-4 h-4" /> Novo Cliente</Button>
+            <Button className="gap-2 w-full sm:w-auto"><Plus className="w-4 h-4" /> Novo Cliente</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-2xl sm:max-h-[90vh] sm:overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingClient ? "Editar Cliente" : "Novo Cliente"}</DialogTitle>
             </DialogHeader>
@@ -232,22 +232,24 @@ export default function CRM() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Buscar por nome, CNPJ ou email..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
         </div>
-        <Select value={filterRegime} onValueChange={setFilterRegime}>
-          <SelectTrigger className="w-[180px]"><SelectValue placeholder="Regime" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os regimes</SelectItem>
-            {Object.entries(regimeLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="active">Ativos</SelectItem>
-            <SelectItem value="inactive">Inativos</SelectItem>
-            <SelectItem value="suspended">Suspensos</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="grid grid-cols-2 sm:flex gap-3">
+          <Select value={filterRegime} onValueChange={setFilterRegime}>
+            <SelectTrigger className="sm:w-[180px]"><SelectValue placeholder="Regime" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os regimes</SelectItem>
+              {Object.entries(regimeLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="sm:w-[140px]"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="active">Ativos</SelectItem>
+              <SelectItem value="inactive">Inativos</SelectItem>
+              <SelectItem value="suspended">Suspensos</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Table */}
@@ -262,7 +264,7 @@ export default function CRM() {
       ) : (
         <div className="bg-card rounded-xl border overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full stack-table">
               <thead>
                 <tr className="bg-muted/50 text-xs text-muted-foreground uppercase tracking-wider">
                   <th className="text-left py-3 px-4 font-medium">Empresa</th>
@@ -279,18 +281,18 @@ export default function CRM() {
                   const st = statusLabels[c.status] || statusLabels.active;
                   return (
                     <tr key={c.id} className="border-t hover:bg-muted/30 transition-colors">
-                      <td className="py-3 px-4">
+                      <td data-label="Empresa" className="py-3 px-4">
                         <div className="text-sm font-medium">{c.company_name}</div>
                         {c.trade_name && <div className="text-xs text-muted-foreground">{c.trade_name}</div>}
                       </td>
-                      <td className="py-3 px-4 text-sm text-muted-foreground hidden md:table-cell">{c.cnpj || "—"}</td>
-                      <td className="py-3 px-4 text-sm text-muted-foreground hidden lg:table-cell">{c.email || "—"}</td>
-                      <td className="py-3 px-4 text-xs">{regimeLabels[c.tax_regime || ""] || c.tax_regime || "—"}</td>
-                      <td className="py-3 px-4"><Badge variant={st.variant}>{st.label}</Badge></td>
-                      <td className="py-3 px-4 text-sm text-right font-medium hidden sm:table-cell">
+                      <td data-label="CNPJ" className="py-3 px-4 text-sm text-muted-foreground md:table-cell">{c.cnpj || "—"}</td>
+                      <td data-label="Email" className="py-3 px-4 text-sm text-muted-foreground hidden lg:table-cell">{c.email || "—"}</td>
+                      <td data-label="Regime" className="py-3 px-4 text-xs">{regimeLabels[c.tax_regime || ""] || c.tax_regime || "—"}</td>
+                      <td data-label="Status" className="py-3 px-4"><Badge variant={st.variant}>{st.label}</Badge></td>
+                      <td data-label="Honorário" className="py-3 px-4 text-sm text-right font-medium">
                         {c.monthly_fee ? `R$ ${Number(c.monthly_fee).toLocaleString("pt-BR")}` : "—"}
                       </td>
-                      <td className="py-3 px-4 text-right">
+                      <td data-label="Ações" className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Pencil className="w-4 h-4" /></Button>
                           <Button variant="ghost" size="icon" className="text-destructive" onClick={() => setDeleteId(c.id)}><Trash2 className="w-4 h-4" /></Button>
