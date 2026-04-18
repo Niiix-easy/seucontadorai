@@ -553,31 +553,53 @@ export default function NotasFiscais() {
                           <td className="py-2 px-3 text-center">
                             <Badge variant={n.status === "cancelada" ? "destructive" : "default"}>{n.status}</Badge>
                           </td>
-                          <td className="py-2 px-3 text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0"><MoreVertical className="w-4 h-4" /></Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => downloadNfePdf(n)}>
-                                  <Download className="w-4 h-4 mr-2" /> Baixar DANFE (PDF)
-                                </DropdownMenuItem>
-                                {n.status !== "cancelada" && (
-                                  <>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => setCceTarget({ id: n.id, numero: n.numero, sequencia: n.cce_sequencia ?? 0 })}>
-                                      <FileEdit className="w-4 h-4 mr-2" /> Carta de correção
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      className="text-destructive"
-                                      onClick={() => setCancelTarget({ id: n.id, tipo: "nfe", numero: n.numero })}
-                                    >
-                                      <Ban className="w-4 h-4 mr-2" /> Cancelar NF-e
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                          <td className="py-2 px-3">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Ver detalhes / histórico" onClick={() => setDetalheTarget({ id: n.id, tipo: "nfe", numero: n.numero, serie: n.serie })}>
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Baixar DANFE" onClick={() => downloadNfePdf(n)}>
+                                <Download className="w-4 h-4" />
+                              </Button>
+                              {n.status !== "cancelada" && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  title="Cancelar NF-e"
+                                  onClick={() => setCancelTarget({ id: n.id, tipo: "nfe", numero: n.numero })}
+                                >
+                                  <Ban className="w-4 h-4" />
+                                </Button>
+                              )}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0"><MoreVertical className="w-4 h-4" /></Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => setDetalheTarget({ id: n.id, tipo: "nfe", numero: n.numero, serie: n.serie })}>
+                                    <History className="w-4 h-4 mr-2" /> Histórico de eventos
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => downloadNfePdf(n)}>
+                                    <Download className="w-4 h-4 mr-2" /> Baixar DANFE (PDF)
+                                  </DropdownMenuItem>
+                                  {n.status !== "cancelada" && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem onClick={() => setCceTarget({ id: n.id, numero: n.numero, sequencia: n.cce_sequencia ?? 0 })}>
+                                        <FileEdit className="w-4 h-4 mr-2" /> Carta de correção
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        className="text-destructive"
+                                        onClick={() => setCancelTarget({ id: n.id, tipo: "nfe", numero: n.numero })}
+                                      >
+                                        <Ban className="w-4 h-4 mr-2" /> Cancelar NF-e
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           </td>
                         </tr>
                       ))}
