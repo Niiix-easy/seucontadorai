@@ -530,19 +530,53 @@ export default function NotasFiscais() {
                   <table className="w-full text-sm">
                     <thead><tr className="bg-muted/50 text-xs text-muted-foreground uppercase">
                       <th className="text-left py-2 px-3">Número</th>
-                      <th className="text-left py-2 px-3">Destinatário</th>
-                      <th className="text-left py-2 px-3">Natureza</th>
+                      <th className="text-left py-2 px-3 hidden md:table-cell">Destinatário</th>
+                      <th className="text-left py-2 px-3 hidden lg:table-cell">Natureza</th>
                       <th className="text-right py-2 px-3">Valor</th>
                       <th className="text-center py-2 px-3">Status</th>
+                      <th className="w-10"></th>
                     </tr></thead>
                     <tbody>
                       {nfes.map((n: any) => (
                         <tr key={n.id} className="border-t hover:bg-muted/30">
-                          <td className="py-2 px-3 font-mono">{n.numero}/{n.serie}</td>
-                          <td className="py-2 px-3">{n.razao_destinatario || "-"}</td>
-                          <td className="py-2 px-3 text-muted-foreground">{n.natureza_operacao || "-"}</td>
+                          <td className="py-2 px-3 font-mono">
+                            {n.numero}/{n.serie}
+                            {(n.cce_sequencia ?? 0) > 0 && (
+                              <span className="ml-2 text-[10px] text-info">CC-e #{n.cce_sequencia}</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 hidden md:table-cell">{n.razao_destinatario || "-"}</td>
+                          <td className="py-2 px-3 text-muted-foreground hidden lg:table-cell">{n.natureza_operacao || "-"}</td>
                           <td className="py-2 px-3 text-right font-mono">R$ {Number(n.valor_total).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
-                          <td className="py-2 px-3 text-center"><Badge>{n.status}</Badge></td>
+                          <td className="py-2 px-3 text-center">
+                            <Badge variant={n.status === "cancelada" ? "destructive" : "default"}>{n.status}</Badge>
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0"><MoreVertical className="w-4 h-4" /></Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => downloadNfePdf(n)}>
+                                  <Download className="w-4 h-4 mr-2" /> Baixar DANFE (PDF)
+                                </DropdownMenuItem>
+                                {n.status !== "cancelada" && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => setCceTarget({ id: n.id, numero: n.numero, sequencia: n.cce_sequencia ?? 0 })}>
+                                      <FileEdit className="w-4 h-4 mr-2" /> Carta de correção
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="text-destructive"
+                                      onClick={() => setCancelTarget({ id: n.id, tipo: "nfe", numero: n.numero })}
+                                    >
+                                      <Ban className="w-4 h-4 mr-2" /> Cancelar NF-e
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -567,21 +601,47 @@ export default function NotasFiscais() {
                   <table className="w-full text-sm">
                     <thead><tr className="bg-muted/50 text-xs text-muted-foreground uppercase">
                       <th className="text-left py-2 px-3">Número</th>
-                      <th className="text-left py-2 px-3">Tomador</th>
-                      <th className="text-left py-2 px-3">Discriminação</th>
+                      <th className="text-left py-2 px-3 hidden md:table-cell">Tomador</th>
+                      <th className="text-left py-2 px-3 hidden lg:table-cell">Discriminação</th>
                       <th className="text-right py-2 px-3">Valor</th>
-                      <th className="text-right py-2 px-3">ISS</th>
+                      <th className="text-right py-2 px-3 hidden sm:table-cell">ISS</th>
                       <th className="text-center py-2 px-3">Status</th>
+                      <th className="w-10"></th>
                     </tr></thead>
                     <tbody>
                       {nfses.map((n: any) => (
                         <tr key={n.id} className="border-t hover:bg-muted/30">
                           <td className="py-2 px-3 font-mono">{n.numero}/{n.serie}</td>
-                          <td className="py-2 px-3">{n.razao_tomador || "-"}</td>
-                          <td className="py-2 px-3 text-muted-foreground max-w-xs truncate">{n.discriminacao}</td>
+                          <td className="py-2 px-3 hidden md:table-cell">{n.razao_tomador || "-"}</td>
+                          <td className="py-2 px-3 text-muted-foreground max-w-xs truncate hidden lg:table-cell">{n.discriminacao}</td>
                           <td className="py-2 px-3 text-right font-mono">R$ {Number(n.valor_servicos).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
-                          <td className="py-2 px-3 text-right font-mono">R$ {Number(n.iss_valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
-                          <td className="py-2 px-3 text-center"><Badge>{n.status}</Badge></td>
+                          <td className="py-2 px-3 text-right font-mono hidden sm:table-cell">R$ {Number(n.iss_valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
+                          <td className="py-2 px-3 text-center">
+                            <Badge variant={n.status === "cancelada" ? "destructive" : "default"}>{n.status}</Badge>
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0"><MoreVertical className="w-4 h-4" /></Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => downloadNfsePdf(n)}>
+                                  <Download className="w-4 h-4 mr-2" /> Baixar PDF
+                                </DropdownMenuItem>
+                                {n.status !== "cancelada" && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="text-destructive"
+                                      onClick={() => setCancelTarget({ id: n.id, tipo: "nfse", numero: n.numero })}
+                                    >
+                                      <Ban className="w-4 h-4 mr-2" /> Cancelar NFS-e
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
