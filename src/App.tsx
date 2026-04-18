@@ -11,6 +11,7 @@ import Login from "./pages/Login";
 import Index from "./pages/Index";
 import Contabil from "./pages/Contabil";
 import Fiscal from "./pages/Fiscal";
+import NotasFiscais from "./pages/NotasFiscais";
 import Folha from "./pages/Folha";
 import ImportacaoXML from "./pages/ImportacaoXML";
 import Automacao from "./pages/Automacao";
@@ -51,6 +52,7 @@ function App() {
               <Route path="/dashboard" element={<Index />} />
               <Route path="/contabil" element={<Contabil />} />
               <Route path="/fiscal" element={<Fiscal />} />
+              <Route path="/notas-fiscais" element={<NotasFiscais />} />
               <Route path="/folha" element={<Folha />} />
               <Route path="/xml" element={<ImportacaoXML />} />
               <Route path="/automacao" element={<Automacao />} />
