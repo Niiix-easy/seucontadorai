@@ -55,6 +55,7 @@ export default function NotasFiscais() {
   const [cancelMotivo, setCancelMotivo] = useState("");
   const [cceTarget, setCceTarget] = useState<{ id: string; numero: string; sequencia: number } | null>(null);
   const [cceTexto, setCceTexto] = useState("");
+  const [detalheTarget, setDetalheTarget] = useState<{ id: string; tipo: "nfe" | "nfse"; numero: string; serie: string } | null>(null);
 
   // NF-e (produto) form
   const [nfeClient, setNfeClient] = useState("");
