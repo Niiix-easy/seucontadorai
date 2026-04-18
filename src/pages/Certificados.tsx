@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { isValidCpfOrCnpj, maskCpfCnpj } from "@/lib/br-validators";
 
 type Certificado = {
   id: string;
@@ -95,6 +96,7 @@ export default function Certificados() {
     if (!selectedFile) { toast.error("Selecione um arquivo .pfx ou .p12"); return; }
     if (!senha) { toast.error("Informe a senha do certificado"); return; }
     if (!cnpjUpload.trim()) { toast.error("Informe o CNPJ"); return; }
+    if (!isValidCpfOrCnpj(cnpjUpload)) { toast.error("CNPJ/CPF inválido"); return; }
     if (!razaoUpload.trim()) { toast.error("Informe a Razão Social"); return; }
     if (!user) { toast.error("Faça login"); return; }
 
@@ -243,7 +245,18 @@ export default function Certificados() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div><Label>CNPJ / CPF *</Label><Input placeholder="00.000.000/0001-00" value={cnpjUpload} onChange={e => setCnpjUpload(e.target.value)} className="mt-1.5 font-mono" /></div>
+                  <div>
+                    <Label>CNPJ / CPF *</Label>
+                    <Input
+                      placeholder="00.000.000/0001-00"
+                      value={cnpjUpload}
+                      onChange={e => setCnpjUpload(maskCpfCnpj(e.target.value))}
+                      className={`mt-1.5 font-mono ${cnpjUpload && !isValidCpfOrCnpj(cnpjUpload) ? "border-destructive" : ""}`}
+                    />
+                    {cnpjUpload && !isValidCpfOrCnpj(cnpjUpload) && (
+                      <p className="text-xs text-destructive mt-1">CNPJ/CPF inválido</p>
+                    )}
+                  </div>
                   <div><Label>Razão Social *</Label><Input placeholder="Nome da empresa" value={razaoUpload} onChange={e => setRazaoUpload(e.target.value)} className="mt-1.5" /></div>
                   <div><Label>Senha *</Label>
                     <div className="relative mt-1.5">
