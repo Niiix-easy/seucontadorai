@@ -675,6 +675,28 @@ export default function NotasFiscais() {
         </TabsContent>
       </Tabs>
 
+      {/* Detalhes da nota com histórico de eventos */}
+      <Dialog open={!!detalheTarget} onOpenChange={(o) => !o && setDetalheTarget(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-primary" />
+              {detalheTarget?.tipo === "nfe" ? "NF-e" : "NFS-e"} {detalheTarget?.numero}/{detalheTarget?.serie}
+            </DialogTitle>
+          </DialogHeader>
+          <Tabs defaultValue="historico">
+            <TabsList>
+              <TabsTrigger value="historico"><History className="w-4 h-4" /> Histórico de eventos</TabsTrigger>
+            </TabsList>
+            <TabsContent value="historico" className="mt-4">
+              {detalheTarget && (
+                <HistoricoEventos notaId={detalheTarget.id} tipo={detalheTarget.tipo} />
+              )}
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
+
       {/* Cancelamento */}
       <AlertDialog open={!!cancelTarget} onOpenChange={(o) => !o && setCancelTarget(null)}>
         <AlertDialogContent>
