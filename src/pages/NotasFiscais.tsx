@@ -652,6 +652,52 @@ export default function NotasFiscais() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Cancelamento */}
+      <AlertDialog open={!!cancelTarget} onOpenChange={(o) => !o && setCancelTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar {cancelTarget?.tipo === "nfe" ? "NF-e" : "NFS-e"} {cancelTarget?.numero}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Informe o motivo do cancelamento (mínimo 15 caracteres). Essa ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            value={cancelMotivo}
+            onChange={(e) => setCancelMotivo(e.target.value)}
+            placeholder="Ex.: Erro de digitação no valor unitário do item 1"
+            rows={3}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setCancelMotivo("")}>Voltar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmarCancelamento} className="bg-destructive hover:bg-destructive/90">
+              Confirmar cancelamento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Carta de correção */}
+      <AlertDialog open={!!cceTarget} onOpenChange={(o) => !o && setCceTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Carta de correção — NF-e {cceTarget?.numero}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Permitida apenas para corrigir informações que não alterem valor, quantidade, partes ou data. Sequência: #{(cceTarget?.sequencia ?? 0) + 1}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            value={cceTexto}
+            onChange={(e) => setCceTexto(e.target.value)}
+            placeholder="Ex.: Onde se lê 'CFOP 5101' leia-se 'CFOP 5102'"
+            rows={4}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setCceTexto("")}>Voltar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmarCce}>Registrar correção</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
