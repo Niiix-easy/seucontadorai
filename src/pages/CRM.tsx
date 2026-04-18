@@ -17,6 +17,7 @@ import {
   Users, Plus, Search, Pencil, Trash2, Building2, Mail, Phone, MapPin, FileText, Loader2
 } from "lucide-react";
 import { toast } from "sonner";
+import { maskCNPJ, maskCPF, isValidCNPJ, isValidCPF, stripDigits } from "@/lib/br-validators";
 
 type Client = {
   id: string; company_name: string; trade_name: string | null; cnpj: string | null; cpf: string | null;
@@ -156,11 +157,27 @@ export default function CRM() {
                 </div>
                 <div className="space-y-2">
                   <Label>CNPJ</Label>
-                  <Input value={form.cnpj} onChange={e => setForm({ ...form, cnpj: e.target.value })} placeholder="00.000.000/0000-00" />
+                  <Input
+                    value={form.cnpj}
+                    onChange={e => setForm({ ...form, cnpj: maskCNPJ(e.target.value) })}
+                    placeholder="00.000.000/0000-00"
+                    className={form.cnpj && !isValidCNPJ(form.cnpj) ? "border-destructive" : ""}
+                  />
+                  {form.cnpj && !isValidCNPJ(form.cnpj) && stripDigits(form.cnpj).length === 14 && (
+                    <p className="text-xs text-destructive">CNPJ inválido</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>CPF</Label>
-                  <Input value={form.cpf} onChange={e => setForm({ ...form, cpf: e.target.value })} placeholder="000.000.000-00" />
+                  <Input
+                    value={form.cpf}
+                    onChange={e => setForm({ ...form, cpf: maskCPF(e.target.value) })}
+                    placeholder="000.000.000-00"
+                    className={form.cpf && !isValidCPF(form.cpf) ? "border-destructive" : ""}
+                  />
+                  {form.cpf && !isValidCPF(form.cpf) && stripDigits(form.cpf).length === 11 && (
+                    <p className="text-xs text-destructive">CPF inválido</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Email</Label>
