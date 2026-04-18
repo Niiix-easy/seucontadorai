@@ -11,11 +11,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { FileText, Package, Briefcase, Plus, Trash2, Receipt, Download, Ban, FileEdit, MoreVertical } from "lucide-react";
+import { FileText, Package, Briefcase, Plus, Trash2, Receipt, Download, Ban, FileEdit, MoreVertical, History, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { gerarPDFNFe, gerarPDFNFSe } from "@/lib/pdf-notas";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import HistoricoEventos from "@/components/HistoricoEventos";
 
 type Item = {
   descricao: string;
