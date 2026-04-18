@@ -643,28 +643,26 @@ export default function NotasFiscais() {
                           <td className="py-2 px-3 text-center">
                             <Badge variant={n.status === "cancelada" ? "destructive" : "default"}>{n.status}</Badge>
                           </td>
-                          <td className="py-2 px-3 text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0"><MoreVertical className="w-4 h-4" /></Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => downloadNfsePdf(n)}>
-                                  <Download className="w-4 h-4 mr-2" /> Baixar PDF
-                                </DropdownMenuItem>
-                                {n.status !== "cancelada" && (
-                                  <>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                      className="text-destructive"
-                                      onClick={() => setCancelTarget({ id: n.id, tipo: "nfse", numero: n.numero })}
-                                    >
-                                      <Ban className="w-4 h-4 mr-2" /> Cancelar NFS-e
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                          <td className="py-2 px-3">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Ver detalhes / histórico" onClick={() => setDetalheTarget({ id: n.id, tipo: "nfse", numero: n.numero, serie: n.serie })}>
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Baixar PDF" onClick={() => downloadNfsePdf(n)}>
+                                <Download className="w-4 h-4" />
+                              </Button>
+                              {n.status !== "cancelada" && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  title="Cancelar NFS-e"
+                                  onClick={() => setCancelTarget({ id: n.id, tipo: "nfse", numero: n.numero })}
+                                >
+                                  <Ban className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
