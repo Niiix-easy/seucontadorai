@@ -17,6 +17,7 @@ import { gerarPDFNFe, gerarPDFNFSe } from "@/lib/pdf-notas";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import HistoricoEventos from "@/components/HistoricoEventos";
+import { NFFiltros, emptyFilters, applyNFFilters, exportNotasCsv, type NFFilters as NFFiltersType } from "@/components/NFFiltros";
 
 type Item = {
   descricao: string;
