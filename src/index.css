@@ -108,6 +108,34 @@
   }
 }
 
+/* ─────────────────────────────────────────────
+   Mobile: tabelas como cards
+   Aplique a classe .stack-table na <table>.
+   Cada <td> precisa de data-label="Nome da coluna".
+   ───────────────────────────────────────────── */
+@media (max-width: 639px) {
+  .stack-table thead {
+    @apply hidden;
+  }
+  .stack-table tr {
+    @apply block border rounded-lg p-3 mb-2 bg-card;
+  }
+  .stack-table tbody tr + tr {
+    @apply border-t;
+  }
+  .stack-table td {
+    @apply block text-right py-1 px-0 border-0;
+  }
+  .stack-table td::before {
+    content: attr(data-label);
+    @apply float-left font-medium text-xs uppercase text-muted-foreground tracking-wider mr-2;
+  }
+  .stack-table td:empty,
+  .stack-table td[data-label=""] {
+    @apply hidden;
+  }
+}
+
 /* Scroll-triggered animations */
 .animate-on-scroll {
   opacity: 0;
