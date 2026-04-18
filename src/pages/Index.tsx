@@ -115,16 +115,16 @@ export default function Dashboard() {
   const displayBarData = barData.length > 0 ? barData : [{ month: "Atual", valor: totalFee }];
 
   return (
-    <div className="p-6 lg:p-8 space-y-8 max-w-7xl">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 max-w-7xl">
       {/* Header */}
       <div className="opacity-0 animate-fade-in-down" style={{ animationDelay: '0.05s' }}>
         <div className="flex items-center gap-3 mb-1">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
             <TrendingUp className="w-5 h-5 text-primary" />
           </div>
-          <div>
-            <h1 className="text-2xl lg:text-3xl font-bold font-display tracking-tight">Painel de Controle</h1>
-            <p className="text-muted-foreground text-sm">Visão geral do escritório — dados em tempo real</p>
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold font-display tracking-tight">Painel de Controle</h1>
+            <p className="text-muted-foreground text-xs sm:text-sm">Visão geral do escritório — dados em tempo real</p>
           </div>
         </div>
       </div>
@@ -226,7 +226,7 @@ export default function Dashboard() {
         </div>
         {tasks.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full stack-table">
               <thead>
                 <tr className="bg-muted/50 text-xs text-muted-foreground uppercase tracking-wider">
                   <th className="text-left py-3 px-6 font-medium">Cliente</th>
@@ -240,12 +240,12 @@ export default function Dashboard() {
                   const s = statusConfig[t.status] || statusConfig.pending;
                   return (
                     <tr key={t.id} className="border-t hover:bg-muted/30 transition-colors">
-                      <td className="py-3 px-6 text-sm font-medium">{t.clients?.company_name || "—"}</td>
-                      <td className="py-3 px-6 text-sm text-muted-foreground">{t.title}</td>
-                      <td className="py-3 px-6">
+                      <td data-label="Cliente" className="py-3 px-6 text-sm font-medium">{t.clients?.company_name || "—"}</td>
+                      <td data-label="Tarefa" className="py-3 px-6 text-sm text-muted-foreground">{t.title}</td>
+                      <td data-label="Status" className="py-3 px-6">
                         <span className={`text-[10px] px-2.5 py-1 rounded-full font-medium ${s.color}`}>{s.label}</span>
                       </td>
-                      <td className="py-3 px-6 text-sm text-muted-foreground">
+                      <td data-label="Prazo" className="py-3 px-6 text-sm text-muted-foreground">
                         {t.due_date ? new Date(t.due_date).toLocaleDateString("pt-BR") : "—"}
                       </td>
                     </tr>

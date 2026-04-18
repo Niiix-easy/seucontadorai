@@ -85,15 +85,15 @@ export default function Documentos() {
   const totalSize = documents.reduce((s: number, d: any) => s + (d.file_size || 0), 0);
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight flex items-center gap-3">
-            <FolderOpen className="w-8 h-8 text-primary" /> Gestão de Documentos
+          <h1 className="text-2xl sm:text-3xl font-bold font-display tracking-tight flex items-center gap-3">
+            <FolderOpen className="w-7 h-7 sm:w-8 sm:h-8 text-primary" /> Gestão de Documentos
           </h1>
           <p className="text-muted-foreground text-sm mt-1">{documents.length} documentos • {(totalSize / 1024 / 1024).toFixed(1)} MB</p>
         </div>
-        <Button className="gap-2 relative" disabled={uploading}>
+        <Button className="gap-2 relative w-full sm:w-auto" disabled={uploading}>
           <Upload className="w-4 h-4" /> {uploading ? "Enviando..." : "Upload"}
           <input type="file" multiple className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleUpload} accept=".pdf,.xml,.jpg,.png,.doc,.docx,.xls,.xlsx" />
         </Button>
@@ -105,7 +105,7 @@ export default function Documentos() {
           <Input placeholder="Buscar documentos..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
         </div>
         <Select value={filterCat} onValueChange={setFilterCat}>
-          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="sm:w-[160px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas categorias</SelectItem>
             {Object.entries(categoryLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}

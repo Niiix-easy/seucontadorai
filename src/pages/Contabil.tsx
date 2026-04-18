@@ -67,16 +67,16 @@ export default function Contabil() {
   const resultado = totalReceitas - totalDespesas;
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight flex items-center gap-3">
-            <BookOpen className="w-8 h-8 text-primary" /> Sistema Contábil
+          <h1 className="text-2xl sm:text-3xl font-bold font-display tracking-tight flex items-center gap-3">
+            <BookOpen className="w-7 h-7 sm:w-8 sm:h-8 text-primary" /> Sistema Contábil
           </h1>
           <p className="text-muted-foreground text-sm mt-1">{clients.length} clientes ativos • Período: {periodo}</p>
         </div>
         <Select value={periodo} onValueChange={setPeriodo}>
-          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="2026-03">Março 2026</SelectItem>
             <SelectItem value="2026-02">Fevereiro 2026</SelectItem>
@@ -105,7 +105,7 @@ export default function Contabil() {
       </div>
 
       <Tabs defaultValue="plano" className="space-y-4">
-        <TabsList>
+        <TabsList className="overflow-x-auto w-full justify-start max-w-full">
           <TabsTrigger value="plano">Plano de Contas</TabsTrigger>
           <TabsTrigger value="balancete">Balancete</TabsTrigger>
           <TabsTrigger value="dre">DRE</TabsTrigger>

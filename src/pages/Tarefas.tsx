@@ -147,11 +147,11 @@ export default function Tarefas() {
   const counts = { todo: tasks.filter(t => t.status === "todo").length, in_progress: tasks.filter(t => t.status === "in_progress").length, done: tasks.filter(t => t.status === "done").length };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6 max-w-7xl">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-[Space_Grotesk] tracking-tight flex items-center gap-3">
-            <ClipboardList className="w-8 h-8 text-primary" /> Tarefas
+          <h1 className="text-2xl sm:text-3xl font-bold font-[Space_Grotesk] tracking-tight flex items-center gap-3">
+            <ClipboardList className="w-7 h-7 sm:w-8 sm:h-8 text-primary" /> Tarefas
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
             {counts.todo} pendentes • {counts.in_progress} em andamento • {counts.done} concluídas
@@ -159,9 +159,9 @@ export default function Tarefas() {
         </div>
         <Dialog open={dialogOpen} onOpenChange={o => { if (!o) resetForm(); setDialogOpen(o); }}>
           <DialogTrigger asChild>
-            <Button className="gap-2"><Plus className="w-4 h-4" /> Nova Tarefa</Button>
+            <Button className="gap-2 w-full sm:w-auto"><Plus className="w-4 h-4" /> Nova Tarefa</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="sm:max-w-lg">
             <DialogHeader><DialogTitle>{editingTask ? "Editar Tarefa" : "Nova Tarefa"}</DialogTitle></DialogHeader>
             <form onSubmit={e => { e.preventDefault(); saveMutation.mutate(form); }} className="space-y-4">
               <div className="space-y-2">
@@ -227,25 +227,27 @@ export default function Tarefas() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Buscar tarefas..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
         </div>
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos status</SelectItem>
-            <SelectItem value="todo">Pendentes</SelectItem>
-            <SelectItem value="in_progress">Em andamento</SelectItem>
-            <SelectItem value="done">Concluídas</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filterPriority} onValueChange={setFilterPriority}>
-          <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Prioridade</SelectItem>
-            <SelectItem value="urgent">Urgente</SelectItem>
-            <SelectItem value="high">Alta</SelectItem>
-            <SelectItem value="medium">Média</SelectItem>
-            <SelectItem value="low">Baixa</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="grid grid-cols-2 sm:flex gap-3">
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="sm:w-[160px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos status</SelectItem>
+              <SelectItem value="todo">Pendentes</SelectItem>
+              <SelectItem value="in_progress">Em andamento</SelectItem>
+              <SelectItem value="done">Concluídas</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filterPriority} onValueChange={setFilterPriority}>
+            <SelectTrigger className="sm:w-[140px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Prioridade</SelectItem>
+              <SelectItem value="urgent">Urgente</SelectItem>
+              <SelectItem value="high">Alta</SelectItem>
+              <SelectItem value="medium">Média</SelectItem>
+              <SelectItem value="low">Baixa</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {isLoading ? (

@@ -171,15 +171,15 @@ export default function Certificados() {
   if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight flex items-center gap-3">
-            <FileKey className="w-8 h-8 text-primary" /> Certificados Digitais
+          <h1 className="text-2xl sm:text-3xl font-bold font-display tracking-tight flex items-center gap-3">
+            <FileKey className="w-7 h-7 sm:w-8 sm:h-8 text-primary shrink-0" /> Certificados Digitais
           </h1>
           <p className="text-muted-foreground text-sm mt-1">{certificados.length} certificados • {validos} válidos • {expirando} expirando • {expirados} expirados</p>
         </div>
-        <Button variant="outline" className="gap-2" onClick={handleVerificarValidades}><RefreshCw className="w-4 h-4" /> Verificar Validades</Button>
+        <Button variant="outline" className="gap-2 w-full sm:w-auto" onClick={handleVerificarValidades}><RefreshCw className="w-4 h-4" /> Verificar Validades</Button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -190,7 +190,7 @@ export default function Certificados() {
       </div>
 
       <Tabs defaultValue="certificados" className="space-y-4">
-        <TabsList>
+        <TabsList className="overflow-x-auto w-full justify-start max-w-full">
           <TabsTrigger value="certificados">Meus Certificados</TabsTrigger>
           <TabsTrigger value="upload">Upload</TabsTrigger>
           <TabsTrigger value="info">Informações</TabsTrigger>

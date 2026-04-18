@@ -51,16 +51,16 @@ export default function Fiscal() {
   const entregues = obrigacoes.filter(o => o.status === "entregue").length;
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight flex items-center gap-3">
-            <Receipt className="w-8 h-8 text-primary" /> Módulo Fiscal
+          <h1 className="text-2xl sm:text-3xl font-bold font-display tracking-tight flex items-center gap-3">
+            <Receipt className="w-7 h-7 sm:w-8 sm:h-8 text-primary" /> Módulo Fiscal
           </h1>
           <p className="text-muted-foreground text-sm mt-1">{clients.length} clientes • {entregues}/{obrigacoes.length} obrigações entregues</p>
         </div>
         <Select value={periodo} onValueChange={setPeriodo}>
-          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="2026-03">Março 2026</SelectItem>
             <SelectItem value="2026-02">Fevereiro 2026</SelectItem>
@@ -88,10 +88,10 @@ export default function Fiscal() {
       </div>
 
       <Tabs defaultValue="impostos" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="impostos">Apuração de Impostos</TabsTrigger>
-          <TabsTrigger value="obrigacoes">Obrigações Acessórias</TabsTrigger>
-          <TabsTrigger value="grafico">Visão Gráfica</TabsTrigger>
+        <TabsList className="overflow-x-auto w-full justify-start max-w-full">
+          <TabsTrigger value="impostos">Apuração</TabsTrigger>
+          <TabsTrigger value="obrigacoes">Obrigações</TabsTrigger>
+          <TabsTrigger value="grafico">Gráficos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="impostos">
@@ -99,7 +99,7 @@ export default function Fiscal() {
             <CardHeader><CardTitle className="font-display">Apuração de Impostos — {periodo}</CardTitle></CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full stack-table">
                   <thead><tr className="bg-muted/50 text-xs text-muted-foreground uppercase">
                     <th className="text-left py-3 px-4">Imposto</th>
                     <th className="text-right py-3 px-4">Base de Cálculo</th>
@@ -110,24 +110,28 @@ export default function Fiscal() {
                   <tbody>
                     {impostos.map(i => (
                       <tr key={i.nome} className="border-t hover:bg-muted/30">
-                        <td className="py-3 px-4 font-medium text-sm">{i.nome}</td>
-                        <td className="py-3 px-4 text-sm text-right font-mono">R$ {i.base.toLocaleString("pt-BR")}</td>
-                        <td className="py-3 px-4 text-sm text-right">{i.aliquota}%</td>
-                        <td className="py-3 px-4 text-sm text-right font-mono font-medium">R$ {i.valor.toLocaleString("pt-BR")}</td>
-                        <td className="py-3 px-4 text-center">
+                        <td data-label="Imposto" className="py-3 px-4 font-medium text-sm">{i.nome}</td>
+                        <td data-label="Base" className="py-3 px-4 text-sm text-right font-mono">R$ {i.base.toLocaleString("pt-BR")}</td>
+                        <td data-label="Alíquota" className="py-3 px-4 text-sm text-right">{i.aliquota}%</td>
+                        <td data-label="Valor" className="py-3 px-4 text-sm text-right font-mono font-medium">R$ {i.valor.toLocaleString("pt-BR")}</td>
+                        <td data-label="Status" className="py-3 px-4 text-center">
                           <Badge variant={i.status === "calculado" ? "default" : "outline"} className="text-[10px]">
                             {i.status === "calculado" ? "Calculado" : "Pendente"}
                           </Badge>
                         </td>
                       </tr>
                     ))}
-                    <tr className="border-t bg-muted/50 font-semibold">
+                    <tr className="border-t bg-muted/50 font-semibold hidden sm:table-row">
                       <td className="py-3 px-4" colSpan={3}>TOTAL</td>
                       <td className="py-3 px-4 text-right font-mono">R$ {totalImpostos.toLocaleString("pt-BR")}</td>
                       <td />
                     </tr>
                   </tbody>
                 </table>
+                <div className="sm:hidden p-3 mt-2 bg-muted/50 rounded-lg flex justify-between font-semibold">
+                  <span>TOTAL</span>
+                  <span className="font-mono">R$ {totalImpostos.toLocaleString("pt-BR")}</span>
+                </div>
               </div>
             </CardContent>
           </Card>

@@ -67,10 +67,10 @@ export default function BI() {
   const tasksPending = tasks.filter((t: any) => t.status === "todo").length;
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl space-y-6">
       <div>
-        <h1 className="text-3xl font-bold font-display tracking-tight flex items-center gap-3">
-          <BarChart3 className="w-8 h-8 text-primary" /> BI & Relatórios
+        <h1 className="text-2xl sm:text-3xl font-bold font-display tracking-tight flex items-center gap-3">
+          <BarChart3 className="w-7 h-7 sm:w-8 sm:h-8 text-primary" /> BI & Relatórios
         </h1>
         <p className="text-muted-foreground text-sm mt-1">Análise de dados do escritório em tempo real</p>
       </div>
