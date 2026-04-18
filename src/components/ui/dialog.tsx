@@ -36,16 +36,13 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        // Mobile: full-screen sheet from the bottom edge for usability on small screens.
-        // ≥640px: classic centered modal.
         "fixed z-50 grid gap-4 border bg-background shadow-lg duration-200",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-        // Mobile defaults
-        "inset-x-0 bottom-0 top-0 w-full max-w-full p-4 overflow-y-auto",
-        "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
-        // Desktop overrides (≥640px)
-        "sm:left-[50%] sm:top-[50%] sm:right-auto sm:bottom-auto sm:inset-auto",
-        "sm:w-full sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:p-6 sm:rounded-lg",
+        // Mobile (<640px): fullscreen sheet from bottom, scrollable
+        "max-sm:inset-0 max-sm:w-full max-sm:max-w-full max-sm:p-4 max-sm:overflow-y-auto",
+        "max-sm:data-[state=closed]:slide-out-to-bottom max-sm:data-[state=open]:slide-in-from-bottom",
+        // Desktop (≥640px): centered modal
+        "sm:left-1/2 sm:top-1/2 sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:p-6 sm:rounded-lg",
         "sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95",
         "sm:data-[state=closed]:slide-out-to-left-1/2 sm:data-[state=closed]:slide-out-to-top-[48%]",
         "sm:data-[state=open]:slide-in-from-left-1/2 sm:data-[state=open]:slide-in-from-top-[48%]",

@@ -17,6 +17,7 @@ import { gerarPDFNFe, gerarPDFNFSe } from "@/lib/pdf-notas";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import HistoricoEventos from "@/components/HistoricoEventos";
+import { NFFiltros, emptyFilters, applyNFFilters, exportNotasCsv, type NFFilters as NFFiltersType } from "@/components/NFFiltros";
 
 type Item = {
   descricao: string;
@@ -56,6 +57,8 @@ export default function NotasFiscais() {
   const [cceTarget, setCceTarget] = useState<{ id: string; numero: string; sequencia: number } | null>(null);
   const [cceTexto, setCceTexto] = useState("");
   const [detalheTarget, setDetalheTarget] = useState<{ id: string; tipo: "nfe" | "nfse"; numero: string; serie: string } | null>(null);
+  const [filtersNfe, setFiltersNfe] = useState<NFFiltersType>(emptyFilters);
+  const [filtersNfse, setFiltersNfse] = useState<NFFiltersType>(emptyFilters);
 
   // NF-e (produto) form
   const [nfeClient, setNfeClient] = useState("");
@@ -520,9 +523,34 @@ export default function NotasFiscais() {
 
         <TabsContent value="nfe">
           <Card>
-            <CardHeader><CardTitle className="font-display">NF-e Emitidas</CardTitle><CardDescription>Histórico de notas fiscais de produto</CardDescription></CardHeader>
+            <CardHeader className="flex-row items-start justify-between gap-4 flex-wrap">
+              <div>
+                <CardTitle className="font-display">NF-e Emitidas</CardTitle>
+                <CardDescription>Histórico de notas fiscais de produto</CardDescription>
+              </div>
+              <NFFiltros
+                filters={filtersNfe}
+                onChange={setFiltersNfe}
+                clients={clients}
+                totalFiltered={applyNFFilters(nfes, filtersNfe, { dateField: "data_emissao", valueField: "valor_total" }).length}
+                onExportCsv={() => exportNotasCsv(
+                  applyNFFilters(nfes, filtersNfe, { dateField: "data_emissao", valueField: "valor_total" }),
+                  "nfe-emitidas",
+                  [
+                    { key: "numero", label: "Número" },
+                    { key: "serie", label: "Série" },
+                    { key: "razao_destinatario", label: "Destinatário" },
+                    { key: "cnpj_destinatario", label: "CNPJ" },
+                    { key: "natureza_operacao", label: "Natureza" },
+                    { key: "data_emissao", label: "Data Emissão", format: (v) => v ? new Date(v).toLocaleDateString("pt-BR") : "" },
+                    { key: "valor_total", label: "Valor Total", format: (v) => Number(v || 0).toFixed(2) },
+                    { key: "status", label: "Status" },
+                  ]
+                )}
+              />
+            </CardHeader>
             <CardContent>
-              {nfes.length === 0 ? (
+              {(() => { const nfesFiltradas = applyNFFilters(nfes, filtersNfe, { dateField: "data_emissao", valueField: "valor_total" }); return nfesFiltradas.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <FileText className="w-12 h-12 mx-auto mb-2 opacity-30" />
                   <p>Nenhuma NF-e emitida ainda</p>
@@ -539,7 +567,7 @@ export default function NotasFiscais() {
                       <th className="w-10"></th>
                     </tr></thead>
                     <tbody>
-                      {nfes.map((n: any) => (
+                      {nfesFiltradas.map((n: any) => (
                         <tr key={n.id} className="border-t hover:bg-muted/30">
                           <td className="py-2 px-3 font-mono">
                             {n.numero}/{n.serie}
@@ -606,7 +634,7 @@ export default function NotasFiscais() {
                     </tbody>
                   </table>
                 </div>
-              )}
+              ); })()}
             </CardContent>
           </Card>
         </TabsContent>
