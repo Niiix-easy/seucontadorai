@@ -145,7 +145,12 @@ export default function CRM() {
             <DialogHeader>
               <DialogTitle>{editingClient ? "Editar Cliente" : "Novo Cliente"}</DialogTitle>
             </DialogHeader>
-            <form onSubmit={e => { e.preventDefault(); saveMutation.mutate(form); }} className="space-y-4">
+            <form onSubmit={e => {
+              e.preventDefault();
+              if (form.cnpj && !isValidCNPJ(form.cnpj)) { toast.error("CNPJ inválido"); return; }
+              if (form.cpf && !isValidCPF(form.cpf)) { toast.error("CPF inválido"); return; }
+              saveMutation.mutate(form);
+            }} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Razão Social *</Label>
