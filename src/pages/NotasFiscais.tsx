@@ -245,6 +245,81 @@ export default function NotasFiscais() {
   const totalNfeMes = nfes.reduce((s, n: any) => s + Number(n.valor_total || 0), 0);
   const totalNfseMes = nfses.reduce((s, n: any) => s + Number(n.valor_servicos || 0), 0);
 
+  // PDF / Cancel / CC-e handlers
+  const downloadNfePdf = async (nfe: any) => {
+    const { data: itens } = await supabase
+      .from("nfe_itens")
+      .select("*")
+      .eq("nfe_id", nfe.id)
+      .order("numero_item");
+    gerarPDFNFe({ ...nfe, itens: itens || [] });
+  };
+
+  const downloadNfsePdf = (nfse: any) => gerarPDFNFSe(nfse);
+
+  const confirmarCancelamento = async () => {
+    if (!cancelTarget || !user) return;
+    if (cancelMotivo.trim().length < 15) {
+      toast.error("Motivo deve ter no mínimo 15 caracteres (exigência SEFAZ)");
+      return;
+    }
+    const table = cancelTarget.tipo === "nfe" ? "nfe_emitidas" : "nfse_emitidas";
+    const { error } = await supabase
+      .from(table)
+      .update({
+        status: "cancelada",
+        cancelada_em: new Date().toISOString(),
+        motivo_cancelamento: cancelMotivo,
+      })
+      .eq("id", cancelTarget.id);
+    if (error) {
+      toast.error("Erro ao cancelar: " + error.message);
+      return;
+    }
+    await supabase.from("nf_eventos").insert({
+      user_id: user.id,
+      [cancelTarget.tipo === "nfe" ? "nfe_id" : "nfse_id"]: cancelTarget.id,
+      tipo: "cancelamento",
+      descricao: cancelMotivo,
+    });
+    toast.success(`${cancelTarget.tipo === "nfe" ? "NF-e" : "NFS-e"} ${cancelTarget.numero} cancelada`);
+    queryClient.invalidateQueries({ queryKey: [`${cancelTarget.tipo}-emitidas`] });
+    setCancelTarget(null);
+    setCancelMotivo("");
+  };
+
+  const confirmarCce = async () => {
+    if (!cceTarget || !user) return;
+    if (cceTexto.trim().length < 15) {
+      toast.error("Texto da correção deve ter no mínimo 15 caracteres");
+      return;
+    }
+    const novaSeq = (cceTarget.sequencia || 0) + 1;
+    const { error } = await supabase
+      .from("nfe_emitidas")
+      .update({
+        cce_texto: cceTexto,
+        cce_data: new Date().toISOString(),
+        cce_sequencia: novaSeq,
+      })
+      .eq("id", cceTarget.id);
+    if (error) {
+      toast.error("Erro: " + error.message);
+      return;
+    }
+    await supabase.from("nf_eventos").insert({
+      user_id: user.id,
+      nfe_id: cceTarget.id,
+      tipo: "cce",
+      descricao: cceTexto,
+      sequencia: novaSeq,
+    });
+    toast.success(`Carta de correção #${novaSeq} registrada para NF-e ${cceTarget.numero}`);
+    queryClient.invalidateQueries({ queryKey: ["nfe-emitidas"] });
+    setCceTarget(null);
+    setCceTexto("");
+  };
+
   return (
     <div className="p-6 lg:p-8 max-w-7xl space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
