@@ -169,15 +169,16 @@ export default function Bancos() {
   if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight flex items-center gap-3">
-            <Landmark className="w-8 h-8 text-primary" /> Integração Bancária & Conciliação
+          <h1 className="text-2xl sm:text-3xl font-bold font-display tracking-tight flex items-center gap-3">
+            <Landmark className="w-7 h-7 sm:w-8 sm:h-8 text-primary shrink-0" />
+            <span className="leading-tight">Integração Bancária</span>
           </h1>
           <p className="text-muted-foreground text-sm mt-1">{conectados} bancos conectados • Saldo: R$ {saldoTotal.toLocaleString("pt-BR")}</p>
         </div>
-        <Button variant="outline" className="gap-2" onClick={() => { toast.success("Sincronizando..."); loadData(); }}>
+        <Button variant="outline" className="gap-2 w-full sm:w-auto" onClick={() => { toast.success("Sincronizando..."); loadData(); }}>
           <RefreshCw className="w-4 h-4" /> Sincronizar
         </Button>
       </div>
@@ -190,7 +191,7 @@ export default function Bancos() {
       </div>
 
       <Tabs defaultValue="conciliacao" className="space-y-4">
-        <TabsList>
+        <TabsList className="overflow-x-auto w-full justify-start max-w-full">
           <TabsTrigger value="conciliacao">Conciliação</TabsTrigger>
           <TabsTrigger value="bancos">Contas</TabsTrigger>
           <TabsTrigger value="transacoes">Transações</TabsTrigger>
@@ -274,13 +275,13 @@ export default function Bancos() {
         <TabsContent value="transacoes">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <CardTitle className="font-display text-base">Extrato</CardTitle>
-                <div className="relative w-64"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 h-8 text-xs" /></div>
+                <div className="relative w-full sm:w-64"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 h-8 text-xs" /></div>
               </div>
             </CardHeader>
-            <CardContent className="p-0">
-              <table className="w-full">
+            <CardContent className="p-0 sm:p-0 overflow-x-auto">
+              <table className="w-full stack-table">
                 <thead><tr className="bg-muted/50 text-xs text-muted-foreground uppercase">
                   <th className="text-left py-3 px-4">Data</th><th className="text-left py-3 px-4">Descrição</th>
                   <th className="text-left py-3 px-4">Banco</th><th className="text-right py-3 px-4">Valor</th>
@@ -288,14 +289,14 @@ export default function Bancos() {
                 </tr></thead>
                 <tbody>{filteredTransacoes.map(t => (
                   <tr key={t.id} className="border-t hover:bg-muted/30">
-                    <td className="py-3 px-4 text-sm text-muted-foreground">{t.data}</td>
-                    <td className="py-3 px-4 text-sm font-medium">{t.descricao}</td>
-                    <td className="py-3 px-4 text-sm text-muted-foreground">{t.banco || "—"}</td>
-                    <td className={`py-3 px-4 text-sm text-right font-mono font-medium ${Number(t.valor) >= 0 ? "text-primary" : "text-destructive"}`}>
+                    <td data-label="Data" className="py-3 px-4 text-sm text-muted-foreground">{t.data}</td>
+                    <td data-label="Descrição" className="py-3 px-4 text-sm font-medium">{t.descricao}</td>
+                    <td data-label="Banco" className="py-3 px-4 text-sm text-muted-foreground">{t.banco || "—"}</td>
+                    <td data-label="Valor" className={`py-3 px-4 text-sm text-right font-mono font-medium ${Number(t.valor) >= 0 ? "text-primary" : "text-destructive"}`}>
                       {Number(t.valor) >= 0 ? "+" : ""}R$ {Math.abs(Number(t.valor)).toLocaleString("pt-BR")}
                     </td>
-                    <td className="py-3 px-4 text-xs text-muted-foreground">{t.conta_contabil || "—"}</td>
-                    <td className="py-3 px-4 text-center">
+                    <td data-label="Conta" className="py-3 px-4 text-xs text-muted-foreground">{t.conta_contabil || "—"}</td>
+                    <td data-label="Status" className="py-3 px-4 text-center">
                       {t.classificado ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" /> : <Badge variant="outline" className="text-[10px]">Pendente</Badge>}
                     </td>
                   </tr>

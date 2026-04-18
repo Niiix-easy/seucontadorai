@@ -41,10 +41,10 @@ export default function Folha() {
   const totalEncargos = encargosData.reduce((s, e) => s + e.valor, 0);
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl space-y-6">
       <div>
-        <h1 className="text-3xl font-bold font-display tracking-tight flex items-center gap-3">
-          <Users className="w-8 h-8 text-primary" /> Folha de Pagamento
+        <h1 className="text-2xl sm:text-3xl font-bold font-display tracking-tight flex items-center gap-3">
+          <Users className="w-7 h-7 sm:w-8 sm:h-8 text-primary" /> Folha de Pagamento
         </h1>
         <p className="text-muted-foreground text-sm mt-1">{funcionarios.length} funcionários • Competência: Março/2026</p>
       </div>
@@ -69,7 +69,7 @@ export default function Folha() {
       </div>
 
       <Tabs defaultValue="folha" className="space-y-4">
-        <TabsList>
+        <TabsList className="overflow-x-auto w-full justify-start">
           <TabsTrigger value="folha">Folha</TabsTrigger>
           <TabsTrigger value="encargos">Encargos</TabsTrigger>
           <TabsTrigger value="esocial">eSocial</TabsTrigger>
@@ -80,7 +80,7 @@ export default function Folha() {
             <CardHeader><CardTitle className="font-display">Resumo da Folha — Março 2026</CardTitle></CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full stack-table">
                   <thead><tr className="bg-muted/50 text-xs text-muted-foreground uppercase">
                     <th className="text-left py-3 px-4">Funcionário</th>
                     <th className="text-left py-3 px-4">Cargo</th>
@@ -93,13 +93,13 @@ export default function Folha() {
                   <tbody>
                     {funcionarios.map(f => (
                       <tr key={f.nome} className="border-t hover:bg-muted/30">
-                        <td className="py-3 px-4 font-medium text-sm">{f.nome}</td>
-                        <td className="py-3 px-4 text-sm text-muted-foreground">{f.cargo}</td>
-                        <td className="py-3 px-4 text-sm text-right font-mono">R$ {f.salario.toLocaleString("pt-BR")}</td>
-                        <td className="py-3 px-4 text-sm text-right font-mono text-destructive">R$ {f.inss.toLocaleString("pt-BR")}</td>
-                        <td className="py-3 px-4 text-sm text-right font-mono text-destructive">R$ {f.irrf.toLocaleString("pt-BR")}</td>
-                        <td className="py-3 px-4 text-sm text-right font-mono">R$ {f.fgts.toLocaleString("pt-BR")}</td>
-                        <td className="py-3 px-4 text-sm text-right font-mono font-bold text-primary">R$ {f.liquido.toLocaleString("pt-BR")}</td>
+                        <td data-label="Funcionário" className="py-3 px-4 font-medium text-sm">{f.nome}</td>
+                        <td data-label="Cargo" className="py-3 px-4 text-sm text-muted-foreground">{f.cargo}</td>
+                        <td data-label="Salário" className="py-3 px-4 text-sm text-right font-mono">R$ {f.salario.toLocaleString("pt-BR")}</td>
+                        <td data-label="INSS" className="py-3 px-4 text-sm text-right font-mono text-destructive">R$ {f.inss.toLocaleString("pt-BR")}</td>
+                        <td data-label="IRRF" className="py-3 px-4 text-sm text-right font-mono text-destructive">R$ {f.irrf.toLocaleString("pt-BR")}</td>
+                        <td data-label="FGTS" className="py-3 px-4 text-sm text-right font-mono">R$ {f.fgts.toLocaleString("pt-BR")}</td>
+                        <td data-label="Líquido" className="py-3 px-4 text-sm text-right font-mono font-bold text-primary">R$ {f.liquido.toLocaleString("pt-BR")}</td>
                       </tr>
                     ))}
                   </tbody>

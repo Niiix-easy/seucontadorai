@@ -323,22 +323,22 @@ export default function NotasFiscais() {
   };
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight flex items-center gap-3">
-            <Receipt className="w-8 h-8 text-primary" /> Notas Fiscais
+          <h1 className="text-2xl sm:text-3xl font-bold font-display tracking-tight flex items-center gap-3">
+            <Receipt className="w-7 h-7 sm:w-8 sm:h-8 text-primary" /> Notas Fiscais
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
             Emissão de NF-e (produtos) e NFS-e (serviços)
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 sm:flex gap-2">
           <Dialog open={openProduto} onOpenChange={setOpenProduto}>
             <DialogTrigger asChild>
-              <Button><Package className="w-4 h-4" /> Emitir NF-e</Button>
+              <Button className="w-full sm:w-auto"><Package className="w-4 h-4" /> Emitir NF-e</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-4xl sm:max-h-[90vh] sm:overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="font-display">Emitir Nota Fiscal de Produto (NF-e)</DialogTitle>
               </DialogHeader>
@@ -425,9 +425,9 @@ export default function NotasFiscais() {
 
           <Dialog open={openServico} onOpenChange={setOpenServico}>
             <DialogTrigger asChild>
-              <Button variant="outline"><Briefcase className="w-4 h-4" /> Emitir NFS-e</Button>
+              <Button variant="outline" className="w-full sm:w-auto"><Briefcase className="w-4 h-4" /> Emitir NFS-e</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-2xl sm:max-h-[90vh] sm:overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="font-display">Emitir Nota Fiscal de Serviço (NFS-e)</DialogTitle>
               </DialogHeader>
@@ -677,7 +677,7 @@ export default function NotasFiscais() {
 
       {/* Detalhes da nota com histórico de eventos */}
       <Dialog open={!!detalheTarget} onOpenChange={(o) => !o && setDetalheTarget(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl sm:max-h-[90vh] sm:overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display flex items-center gap-2">
               <Receipt className="w-5 h-5 text-primary" />
