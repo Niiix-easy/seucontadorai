@@ -567,7 +567,7 @@ export default function NotasFiscais() {
                       <th className="w-10"></th>
                     </tr></thead>
                     <tbody>
-                      {nfes.map((n: any) => (
+                      {nfesFiltradas.map((n: any) => (
                         <tr key={n.id} className="border-t hover:bg-muted/30">
                           <td className="py-2 px-3 font-mono">
                             {n.numero}/{n.serie}
@@ -634,7 +634,7 @@ export default function NotasFiscais() {
                     </tbody>
                   </table>
                 </div>
-              )}
+              ); })()}
             </CardContent>
           </Card>
         </TabsContent>
