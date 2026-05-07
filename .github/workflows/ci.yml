@@ -106,36 +106,92 @@ jobs:
           # Tenta Vercel primeiro, depois Netlify como fallback
           deploy_vercel || deploy_netlify || { echo "❌ All deploy providers failed"; exit 1; }
 
-      - name: Healthcheck & SHA Validation
+      - name: Advanced Healthcheck, Assets & SHA Validation
         if: success() && steps.deploy.outputs.url != ''
         run: |
           URL=${{ steps.deploy.outputs.url }}
           EXPECTED_SHA=${{ github.sha }}
           echo "🔍 Validating $URL/health.json for SHA: $EXPECTED_SHA"
+          
+          validate_assets() {
+            local base_url=$1
+            echo "Checking main assets..."
+            local assets=$(curl -s $base_url | grep -oE 'assets/[^"]+\.(js|css)' | sort -u)
+            if [ -z "$assets" ]; then
+              echo "⚠️ No assets found to validate"
+              return 1
+            fi
+            for asset in $assets; do
+              local asset_url="$base_url/$asset"
+              local code=$(curl -s -o /dev/null -w "%{http_code}" "$asset_url")
+              if [ "$code" != "200" ]; then
+                echo "❌ Asset failed: $asset_url (HTTP $code)"
+                return 1
+              fi
+              echo "✅ Asset OK: $asset"
+            done
+            return 0
+          }
+
           for i in {1..10}; do
             HTTP_CODE=$(curl -s -o response.json -w "%{http_code}" $URL/health.json)
             if [ "$HTTP_CODE" == "200" ]; then
               ACTUAL_SHA=$(cat response.json | jq -r '.commit')
-              if [ "$ACTUAL_SHA" == "$EXPECTED_SHA" ]; then
-                echo "✅ Staging is UP and version matches SHA: $ACTUAL_SHA"
-                exit 0
+              STATUS=$(cat response.json | jq -r '.status')
+              
+              if [ "$STATUS" == "UP" ] && [ "$ACTUAL_SHA" == "$EXPECTED_SHA" ]; then
+                if validate_assets "$URL"; then
+                  echo "✅ Staging is UP, Version matches and Assets are loading!"
+                  exit 0
+                fi
               fi
-              echo "⚠️ Version mismatch. Found: $ACTUAL_SHA, Expected: $EXPECTED_SHA"
+              echo "⚠️ Validation incomplete. Status: $STATUS, SHA: $ACTUAL_SHA"
             fi
             echo "⏳ Waiting for propagation... ($i/10)"
             sleep 5
           done
           echo "❌ Healthcheck failed or version mismatch"
+          
+          if [ -n "${{ secrets.VERCEL_TOKEN }}" ]; then
+             echo "🔄 Rolling back Vercel..."
+             vercel rollback --token ${{ secrets.VERCEL_TOKEN }} --confirm || true
+          fi
           exit 1
 
-      - name: Notify (Discord/Slack)
+      - name: Production Promotion
+        if: success() && github.ref == 'refs/heads/main' && steps.deploy.outputs.url != ''
+        run: |
+          echo "🚀 Staging validated. Promoting to Production..."
+          if [ -n "${{ secrets.VERCEL_TOKEN }}" ]; then
+            vercel --token ${{ secrets.VERCEL_TOKEN }} --prod --confirm
+          elif [ -n "${{ secrets.NETLIFY_AUTH_TOKEN }}" ]; then
+            netlify deploy --dir=dist --prod --auth ${{ secrets.NETLIFY_AUTH_TOKEN }} --site ${{ secrets.NETLIFY_SITE_ID }}
+          fi
+
+      - name: Advanced Notify (Discord/Slack)
         if: always() && secrets.NOTIFICATIONS_WEBHOOK
         run: |
           STATUS="✅ SUCCESS"
-          [ "${{ job.status }}" == "failure" ] && STATUS="🚨 FAILED"
+          COLOR="65280"
+          [ "${{ job.status }}" == "failure" ] && STATUS="🚨 FAILED" && COLOR="16711680"
           
-          MSG="**$STATUS** - Pipeline: ${{ github.repository }}\nBranch: \`${{ github.ref_name }}\`"
-          [ -n "${{ steps.deploy.outputs.url }}" ] && MSG="$MSG\n🌍 Staging: ${{ steps.deploy.outputs.url }}"
-          [ "${{ job.status }}" == "failure" ] && MSG="$MSG\n🔍 Logs & Artifacts: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          ARTIFACTS_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           
-          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$MSG\"}" ${{ secrets.NOTIFICATIONS_WEBHOOK }}
+          JSON_DATA=$(cat <<EOF
+          {
+            "embeds": [{
+              "title": "$STATUS - Pipeline: ${{ github.repository }}",
+              "color": $COLOR,
+              "fields": [
+                {"name": "Branch", "value": "\`${{ github.ref_name }}\`", "inline": true},
+                {"name": "Commit", "value": "\`${{ github.sha }}\`", "inline": true},
+                {"name": "Staging URL", "value": "${{ steps.deploy.outputs.url || 'N/A' }}"},
+                {"name": "Artifacts (Logs, PDFs, Videos)", "value": "[Click here to view results]($ARTIFACTS_URL)"}
+              ],
+              "footer": { "text": "Lovable CI/CD System" }
+            }]
+          }
+          EOF
+          )
+          
+          curl -X POST -H "Content-Type: application/json" -d "$JSON_DATA" ${{ secrets.NOTIFICATIONS_WEBHOOK }}
