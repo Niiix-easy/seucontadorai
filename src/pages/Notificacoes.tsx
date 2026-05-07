@@ -188,7 +188,10 @@ export default function Notificacoes() {
      },
    });
  
-   const exportToPDF = () => {
+    const [selectedColumns, setSelectedColumns] = useState<string[]>(["Data", "Título", "Mensagem", "Status"]);
+    const [showPdfOptions, setShowPdfOptions] = useState(false);
+
+    const exportToPDF = () => {
      if (!data?.notifications.length) return;
      
      const doc = new jsPDF();
@@ -205,20 +208,35 @@ export default function Notificacoes() {
      doc.text(`Filtro: ${filter === "unread" ? "Apenas não lidas" : "Todas"}`, 14, 44);
      doc.text(`Ordenação: ${sort === "desc" ? "Mais recentes" : "Mais antigas"}`, 14, 50);
      
-     const tableData = data.notifications.map(n => [
-       n.created_at ? format(new Date(n.created_at), "dd/MM/yyyy HH:mm") : "",
-       n.title,
-       n.message,
-       n.type,
-       n.read ? "Lida" : "Não lida"
-     ]);
+      const tableData = data.notifications.map(n => {
+        const row: any[] = [];
+        if (selectedColumns.includes("Data")) row.push(n.created_at ? format(new Date(n.created_at), "dd/MM/yyyy HH:mm") : "");
+        if (selectedColumns.includes("Título")) row.push(n.title);
+        if (selectedColumns.includes("Mensagem")) row.push(n.message);
+        if (selectedColumns.includes("Tipo")) row.push(n.type);
+        if (selectedColumns.includes("Status")) row.push(n.read ? "Lida" : "Não lida");
+        return row;
+      });
  
      doc.autoTable({
        startY: 60,
-       head: [["Data", "Título", "Mensagem", "Tipo", "Status"]],
+        head: [selectedColumns],
        body: tableData,
        styles: { fontSize: 8 },
        headStyles: { fillColor: [79, 70, 229] },
+        didDrawPage: (data: any) => {
+          if (data.pageNumber > 1) {
+            doc.setFontSize(10);
+            doc.text("Escritório de Contabilidade - Auditoria (Continuação)", 14, 15);
+            doc.line(14, 18, 196, 18);
+          }
+          
+          const str = `Página ${doc.internal.getNumberOfPages()}`;
+          doc.setFontSize(8);
+          const pageSize = doc.internal.pageSize;
+          const pageHeight = pageSize.height ? pageSize.height : pageSize.getHeight();
+          doc.text(str, data.settings.margin.left, pageHeight - 10);
+        },
      });
  
      doc.save(`notificacoes_${format(new Date(), "ddMMyyyy_HHmm")}.pdf`);
@@ -334,13 +352,50 @@ export default function Notificacoes() {
           <p className="text-muted-foreground">Gerencie seus avisos e alertas do sistema</p>
         </div>
         <div className="flex items-center gap-2">
-          <Dialog open={showPreferences} onOpenChange={setShowPreferences}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Settings2 className="w-4 h-4 mr-2" />
-                Preferências
-              </Button>
-            </DialogTrigger>
+          <div className="flex gap-2">
+            <Dialog open={showPdfOptions} onOpenChange={setShowPdfOptions}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <FileDown className="w-4 h-4 mr-2" />
+                  Exportar PDF
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Opções do PDF</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    {["Data", "Título", "Mensagem", "Tipo", "Status"].map((col) => (
+                      <div key={col} className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`col-${col}`} 
+                          checked={selectedColumns.includes(col)}
+                          onCheckedChange={(checked) => {
+                            if (checked) setSelectedColumns([...selectedColumns, col]);
+                            else setSelectedColumns(selectedColumns.filter(c => c !== col));
+                          }}
+                        />
+                        <label htmlFor={`col-${col}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                          {col}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  <Button className="w-full mt-4" onClick={() => { exportToPDF(); setShowPdfOptions(false); }}>
+                    Gerar Documento
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={showPreferences} onOpenChange={setShowPreferences}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Settings2 className="w-4 h-4 mr-2" />
+                  Preferências
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Preferências de Notificação</DialogTitle>
