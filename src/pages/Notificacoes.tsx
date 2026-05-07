@@ -396,7 +396,7 @@ export default function Notificacoes() {
                   Preferências
                 </Button>
               </DialogTrigger>
-            <DialogContent>
+              <DialogContent>
               <DialogHeader>
                 <DialogTitle>Preferências de Notificação</DialogTitle>
               </DialogHeader>
