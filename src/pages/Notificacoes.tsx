@@ -489,10 +489,24 @@ export default function Notificacoes() {
                    </Button>
                  </div>
                )}
-               <Button variant="outline" size="sm" onClick={exportToCSV} disabled={!data?.notifications.length}>
-                 <Download className="w-4 h-4 mr-2" />
-                 Exportar CSV
-               </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" disabled={!data?.notifications.length}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={exportToCSV}>
+                      <FileDown className="w-4 h-4 mr-2" />
+                      Exportar CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportToPDF}>
+                      <FileDown className="w-4 h-4 mr-2" />
+                      Exportar PDF
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
              </div>
           </div>
 
