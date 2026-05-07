@@ -337,42 +337,59 @@ export default function Notificacoes() {
               <DialogHeader>
                 <DialogTitle>Preferências de Notificação</DialogTitle>
               </DialogHeader>
-              <div className="space-y-6 py-4">
-                <div className="space-y-4">
-                  <h3 className="text-sm font-medium">Tipos de Alerta</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Notas Fiscais (Emissão/Correção)</span>
-                      <Switch checked={prefs.nfe} onCheckedChange={(c) => setPrefs(p => ({ ...p, nfe: c }))} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Auditoria e Segurança</span>
-                      <Switch checked={prefs.audit} onCheckedChange={(c) => setPrefs(p => ({ ...p, audit: c }))} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">CRM e Clientes</span>
-                      <Switch checked={prefs.nfse} onCheckedChange={(c) => setPrefs(p => ({ ...p, nfse: c }))} />
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-4 pt-4 border-t">
-                  <h3 className="text-sm font-medium">Canais</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Notificações no Navegador</span>
-                      <Switch checked={prefs.push} onCheckedChange={(c) => setPrefs(p => ({ ...p, push: c }))} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Alertas por E-mail</span>
-                      <Switch checked={prefs.email} onCheckedChange={(c) => setPrefs(p => ({ ...p, email: c }))} />
-                    </div>
-                  </div>
-                </div>
-                <Button className="w-full" onClick={() => {
-                  toast.success("Preferências salvas com sucesso!");
-                  setShowPreferences(false);
-                }}>Salvar Preferências</Button>
-              </div>
+               <div className="space-y-6 py-4">
+                 <div className="space-y-4">
+                   <h3 className="text-sm font-medium">Tipos de Alerta</h3>
+                   <div className="space-y-3">
+                     <div className="flex items-center justify-between">
+                       <span className="text-sm">Notas Fiscais (Emissão/Correção)</span>
+                       <Switch 
+                         checked={prefs?.nfe ?? true} 
+                         onCheckedChange={(c) => updatePrefsMutation.mutate({ nfe: c })}
+                         disabled={updatePrefsMutation.isPending} 
+                       />
+                     </div>
+                     <div className="flex items-center justify-between">
+                       <span className="text-sm">Auditoria e Segurança</span>
+                       <Switch 
+                         checked={prefs?.audit ?? true} 
+                         onCheckedChange={(c) => updatePrefsMutation.mutate({ audit: c })}
+                         disabled={updatePrefsMutation.isPending} 
+                       />
+                     </div>
+                     <div className="flex items-center justify-between">
+                       <span className="text-sm">CRM e Clientes</span>
+                       <Switch 
+                         checked={prefs?.nfse ?? true} 
+                         onCheckedChange={(c) => updatePrefsMutation.mutate({ nfse: c })}
+                         disabled={updatePrefsMutation.isPending} 
+                       />
+                     </div>
+                   </div>
+                 </div>
+                 <div className="space-y-4 pt-4 border-t">
+                   <h3 className="text-sm font-medium">Canais</h3>
+                   <div className="space-y-3">
+                     <div className="flex items-center justify-between">
+                       <span className="text-sm">Notificações no Navegador</span>
+                       <Switch 
+                         checked={prefs?.push ?? true} 
+                         onCheckedChange={(c) => updatePrefsMutation.mutate({ push: c })}
+                         disabled={updatePrefsMutation.isPending} 
+                       />
+                     </div>
+                     <div className="flex items-center justify-between">
+                       <span className="text-sm">Alertas por E-mail</span>
+                       <Switch 
+                         checked={prefs?.email ?? true} 
+                         onCheckedChange={(c) => updatePrefsMutation.mutate({ email: c })}
+                         disabled={updatePrefsMutation.isPending} 
+                       />
+                     </div>
+                   </div>
+                 </div>
+                 <Button className="w-full" onClick={() => setShowPreferences(false)}>Fechar</Button>
+               </div>
             </DialogContent>
           </Dialog>
 
