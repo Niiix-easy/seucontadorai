@@ -2,7 +2,8 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -10,6 +11,88 @@ import { Badge } from "@/components/ui/badge";
  import { ShieldAlert, Ban, FileEdit, RefreshCw, History, Loader2, Download } from "lucide-react";
  import jsPDF from "jspdf";
  import autoTable from "jspdf-autotable";
+ 
+
+type Evento = {
+  id: string;
+  tipo: string;
+  descricao: string | null;
+  protocolo: string | null;
+  sequencia: number | null;
+  created_at: string;
+  nfe_id: string | null;
+  nfse_id: string | null;
+};
+
+const tipoConfig: Record<string, { label: string; icon: any; color: string }> = {
+  cancelamento: { label: "Cancelamento", icon: Ban, color: "bg-destructive/10 text-destructive border-destructive/30" },
+  cce: { label: "Carta de correção", icon: FileEdit, color: "bg-info/10 text-info border-info/30" },
+  reenvio: { label: "Reenvio", icon: RefreshCw, color: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
+  emissao: { label: "Emissão", icon: History, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
+};
+
+ export default function Auditoria() {
+   const { user } = useAuth();
+   const [tipoFilter, setTipoFilter] = useState("all");
+  const [notaFilter, setNotaFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  const { data: eventos = [], isLoading } = useQuery({
+    queryKey: ["nf-eventos-all"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("nf_eventos")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(500);
+      return (data || []) as Evento[];
+    },
+    enabled: !!user,
+  });
+
+  const { data: nfeMap = {} } = useQuery({
+    queryKey: ["nfe-numeros"],
+    queryFn: async () => {
+      const { data } = await supabase.from("nfe_emitidas").select("id, numero, serie");
+      const m: Record<string, string> = {};
+      (data || []).forEach((n: any) => { m[n.id] = `NF-e ${n.numero}/${n.serie}`; });
+      return m;
+    },
+    enabled: !!user,
+  });
+
+  const { data: nfseMap = {} } = useQuery({
+    queryKey: ["nfse-numeros"],
+    queryFn: async () => {
+      const { data } = await supabase.from("nfse_emitidas").select("id, numero, serie");
+      const m: Record<string, string> = {};
+      (data || []).forEach((n: any) => { m[n.id] = `NFS-e ${n.numero}/${n.serie}`; });
+      return m;
+    },
+    enabled: !!user,
+  });
+
+  const filtered = useMemo(() => {
+    return eventos.filter(e => {
+      if (tipoFilter !== "all" && e.tipo !== tipoFilter) return false;
+      if (dateFrom && new Date(e.created_at) < new Date(dateFrom + "T00:00:00")) return false;
+      if (dateTo && new Date(e.created_at) > new Date(dateTo + "T23:59:59")) return false;
+      if (notaFilter) {
+        const ref = (e.nfe_id ? nfeMap[e.nfe_id] : nfseMap[e.nfse_id || ""]) || "";
+        if (!ref.toLowerCase().includes(notaFilter.toLowerCase())) return false;
+      }
+      return true;
+    });
+  }, [eventos, tipoFilter, dateFrom, dateTo, notaFilter, nfeMap, nfseMap]);
+
+   const stats = useMemo(() => ({
+     total: eventos.length,
+     cancelamentos: eventos.filter(e => e.tipo === "cancelamento").length,
+     cces: eventos.filter(e => e.tipo === "cce").length,
+     reenvios: eventos.filter(e => e.tipo === "reenvio").length,
+   }), [eventos]);
+ 
    const exportPDF = () => {
      const doc = new jsPDF({ unit: "mm", format: "a4" });
      const W = doc.internal.pageSize.getWidth();
@@ -77,87 +160,6 @@ import { Badge } from "@/components/ui/badge";
  
      doc.save("auditoria-eventos.pdf");
    };
- 
-
-type Evento = {
-  id: string;
-  tipo: string;
-  descricao: string | null;
-  protocolo: string | null;
-  sequencia: number | null;
-  created_at: string;
-  nfe_id: string | null;
-  nfse_id: string | null;
-};
-
-const tipoConfig: Record<string, { label: string; icon: any; color: string }> = {
-  cancelamento: { label: "Cancelamento", icon: Ban, color: "bg-destructive/10 text-destructive border-destructive/30" },
-  cce: { label: "Carta de correção", icon: FileEdit, color: "bg-info/10 text-info border-info/30" },
-  reenvio: { label: "Reenvio", icon: RefreshCw, color: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
-  emissao: { label: "Emissão", icon: History, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
-};
-
-export default function Auditoria() {
-  const { user } = useAuth();
-  const [tipoFilter, setTipoFilter] = useState("all");
-  const [notaFilter, setNotaFilter] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-
-  const { data: eventos = [], isLoading } = useQuery({
-    queryKey: ["nf-eventos-all"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("nf_eventos")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(500);
-      return (data || []) as Evento[];
-    },
-    enabled: !!user,
-  });
-
-  const { data: nfeMap = {} } = useQuery({
-    queryKey: ["nfe-numeros"],
-    queryFn: async () => {
-      const { data } = await supabase.from("nfe_emitidas").select("id, numero, serie");
-      const m: Record<string, string> = {};
-      (data || []).forEach((n: any) => { m[n.id] = `NF-e ${n.numero}/${n.serie}`; });
-      return m;
-    },
-    enabled: !!user,
-  });
-
-  const { data: nfseMap = {} } = useQuery({
-    queryKey: ["nfse-numeros"],
-    queryFn: async () => {
-      const { data } = await supabase.from("nfse_emitidas").select("id, numero, serie");
-      const m: Record<string, string> = {};
-      (data || []).forEach((n: any) => { m[n.id] = `NFS-e ${n.numero}/${n.serie}`; });
-      return m;
-    },
-    enabled: !!user,
-  });
-
-  const filtered = useMemo(() => {
-    return eventos.filter(e => {
-      if (tipoFilter !== "all" && e.tipo !== tipoFilter) return false;
-      if (dateFrom && new Date(e.created_at) < new Date(dateFrom + "T00:00:00")) return false;
-      if (dateTo && new Date(e.created_at) > new Date(dateTo + "T23:59:59")) return false;
-      if (notaFilter) {
-        const ref = (e.nfe_id ? nfeMap[e.nfe_id] : nfseMap[e.nfse_id || ""]) || "";
-        if (!ref.toLowerCase().includes(notaFilter.toLowerCase())) return false;
-      }
-      return true;
-    });
-  }, [eventos, tipoFilter, dateFrom, dateTo, notaFilter, nfeMap, nfseMap]);
-
-  const stats = useMemo(() => ({
-    total: eventos.length,
-    cancelamentos: eventos.filter(e => e.tipo === "cancelamento").length,
-    cces: eventos.filter(e => e.tipo === "cce").length,
-    reenvios: eventos.filter(e => e.tipo === "reenvio").length,
-  }), [eventos]);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl space-y-6">
