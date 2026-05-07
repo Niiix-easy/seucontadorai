@@ -590,8 +590,8 @@ export default function Notificacoes() {
             <span className="text-xs text-muted-foreground font-medium">Selecionar tudo nesta página</span>
           </div>
 
-      <div className="space-y-4">
-          <div className="space-y-3">
+       <div className="space-y-4">
+           <div className="space-y-3">
             {isLoading ? (
               Array(3).fill(0).map((_, i) => (
                 <Card key={i} className="animate-pulse">
