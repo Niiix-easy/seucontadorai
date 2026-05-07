@@ -726,5 +726,6 @@ export default function Notificacoes() {
         </div>
       )}
     </div>
+    </div>
   );
 }
