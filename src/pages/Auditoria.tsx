@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useMemo, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
  import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -33,6 +34,15 @@ const tipoConfig: Record<string, { label: string; icon: any; color: string }> = 
 
  export default function Auditoria() {
    const { user } = useAuth();
+   const location = useLocation();
+
+   useEffect(() => {
+     const params = new URLSearchParams(location.search);
+     const tipo = params.get("tipo");
+     if (tipo) {
+       setTipoFilter(tipo);
+     }
+   }, [location.search]);
    const [tipoFilter, setTipoFilter] = useState("all");
   const [notaFilter, setNotaFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
