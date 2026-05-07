@@ -6,7 +6,7 @@ import {
   Building2, FileText, DollarSign, AlertTriangle,
   BookOpen, Receipt, Users, ClipboardList, FolderOpen,
   BarChart3, Bot, Globe, PenTool, Landmark, Zap,
-  MessageSquare, FileKey, Calculator, ChevronRight, TrendingUp
+  MessageSquare, FileKey, Calculator, ChevronRight, TrendingUp, Bell
 } from "lucide-react";
 import StatCard from "@/components/StatCard";
 import { Button } from "@/components/ui/button";
@@ -93,6 +93,20 @@ export default function Dashboard() {
   const totalObligations = obligations.length;
   const deliveredPct = totalObligations > 0 ? Math.round(((totalObligations - pendingObligations) / totalObligations) * 100) : 0;
 
+  const { data: notifications = [] } = useQuery({
+    queryKey: ["dashboard-notifications"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("read", false)
+        .limit(10);
+      return data || [];
+    },
+    enabled: !!user,
+  });
+  const unreadCount = notifications.length;
+
   const regimeCounts: Record<string, number> = {};
   clients.forEach((c: any) => {
     const r = c.tax_regime || "outros";
@@ -130,11 +144,12 @@ export default function Dashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <Link to="/crm"><StatCard icon={Building2} title="Clientes Ativos" value={String(activeClients)} change={`${clients.length} total`} changeType="up" delay={0.1} /></Link>
         <Link to="/fiscal"><StatCard icon={FileText} title="Obrigações" value={String(totalObligations)} change={`${deliveredPct}% entregues`} changeType="up" delay={0.15} /></Link>
         <Link to="/financeiro"><StatCard icon={DollarSign} title="Faturamento Mensal" value={`R$ ${totalFee.toLocaleString("pt-BR")}`} change="Honorários ativos" changeType="up" delay={0.2} /></Link>
         <Link to="/tarefas"><StatCard icon={AlertTriangle} title="Pendentes" value={String(pendingObligations)} change={`${tasks.filter((t: any) => t.status === "todo").length} tarefas`} changeType={pendingObligations > 5 ? "down" : "up"} delay={0.25} /></Link>
+        <Link to="/notificacoes"><StatCard icon={Bell} title="Notificações" value={String(unreadCount)} change={unreadCount > 0 ? `${unreadCount} não lidas` : "Nenhum alerta"} changeType={unreadCount > 0 ? "down" : "neutral"} delay={0.3} /></Link>
       </div>
 
       {/* Quick access modules */}

@@ -85,8 +85,8 @@ export default function NotasFiscais() {
          user_id: user.id,
          title: `${cancelTarget.tipo === "nfe" ? "NF-e" : "NFS-e"} Cancelada`,
          message: `A nota ${cancelTarget.numero} foi cancelada: ${cancelMotivo.substring(0, 50)}...`,
-         type: "warning",
-         link: "/notas-fiscais"
+          type: "audit",
+          link: "/auditoria?tipo=cancelamento"
        });
      }
  
@@ -112,8 +112,8 @@ export default function NotasFiscais() {
          user_id: user.id,
          title: "Carta de Correção Registrada",
          message: `Nova CC-e (#${novaSeq}) para a NF-e ${cceTarget.numero}: ${cceTexto.substring(0, 50)}...`,
-         type: "info",
-         link: "/notas-fiscais"
+          type: "audit",
+          link: "/auditoria?tipo=cce"
        });
      }
  
