@@ -11,40 +11,63 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
       - name: Install dependencies
         run: bun install
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/package.json') }}
+
       - name: Lint
         run: bun run lint
+
       - name: Typecheck & Build
         run: bun run build
+
       - name: Unit Tests
         run: bun run test
+
       - name: Install Playwright Browsers
         run: bunx playwright install --with-deps
+
       - name: E2E Tests
         run: bunx playwright test
-      - name: Upload Test Artifacts (PDFs & Reports)
-        if: always()
+
+      - name: Upload Test Artifacts
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-artifacts
+          name: playwright-debug
           path: |
             test-results/
             playwright-report/
-            generated-pdfs/
-      - name: Upload Build Artifacts
-        if: success()
+
+      - name: Upload Exported PDFs
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: dist/
-      - name: Deploy to Staging
+          name: generated-pdfs
+          path: generated-pdfs/
+
+      - name: Deploy to Vercel (Staging)
         if: success() && github.ref == 'refs/heads/main'
-        run: |
-          echo "Iniciando deploy para staging..."
-          # Aqui entraria o comando de deploy específico (Vercel, Netlify, Cloudflare, etc)
-          # Como o projeto usa Lovable/Vite padrão, o deploy é gerenciado internamente,
-          # mas simulamos o step de pipeline para o usuário.
-          echo "Deploy concluído com sucesso."
+        uses: amondnet/vercel-deploy-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--staging'
