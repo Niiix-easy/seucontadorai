@@ -654,6 +654,39 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          audit: boolean | null
+          email: boolean | null
+          id: string
+          nfe: boolean | null
+          nfse: boolean | null
+          push: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          audit?: boolean | null
+          email?: boolean | null
+          id?: string
+          nfe?: boolean | null
+          nfse?: boolean | null
+          push?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          audit?: boolean | null
+          email?: boolean | null
+          id?: string
+          nfe?: boolean | null
+          nfse?: boolean | null
+          push?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string | null
