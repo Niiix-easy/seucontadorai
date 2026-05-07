@@ -1,12 +1,12 @@
-import { useState } from "react";
+ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
    Bell, CheckCircle, Clock, ExternalLink, Download,
    Trash2, CheckSquare, ChevronLeft, ChevronRight, Undo2,
-   ShieldAlert, Receipt, FileSignature, Search, CheckCircle2,
-   Filter, ArrowUpDown, Settings2, MoreHorizontal, Check
+    ShieldAlert, Receipt, FileSignature, Search, CheckCircle2, 
+    ArrowUpDown, Settings2, MoreHorizontal, Check, FileDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,9 +32,17 @@ import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+ import jsPDF from "jspdf";
+ import "jspdf-autotable";
 
 const ITEMS_PER_PAGE = 10;
 
+ declare module 'jspdf' {
+   interface jsPDF {
+     autoTable: (options: any) => jsPDF;
+   }
+ }
+ 
 export default function Notificacoes() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -45,14 +53,45 @@ export default function Notificacoes() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showPreferences, setShowPreferences] = useState(false);
 
-  // Preferences state (mock)
-  const [prefs, setPrefs] = useState({
-    nfe: true,
-    nfse: true,
-    audit: true,
-    email: true,
-    push: true
-  });
+   const { data: prefs } = useQuery({
+     queryKey: ["notification-preferences", user?.id],
+     queryFn: async () => {
+       const { data, error } = await supabase
+         .from("notification_preferences")
+         .select("*")
+         .eq("user_id", user?.id)
+         .maybeSingle();
+       
+       if (error) throw error;
+       
+       if (!data) {
+         const defaultPrefs = { nfe: true, nfse: true, audit: true, email: true, push: true };
+         const { data: newData, error: insertError } = await supabase
+           .from("notification_preferences")
+           .insert([{ user_id: user?.id, ...defaultPrefs }])
+           .select()
+           .single();
+         if (insertError) throw insertError;
+         return newData;
+       }
+       return data;
+     },
+     enabled: !!user,
+   });
+ 
+   const updatePrefsMutation = useMutation({
+     mutationFn: async (newPrefs: any) => {
+       const { error } = await supabase
+         .from("notification_preferences")
+         .update(newPrefs)
+         .eq("user_id", user?.id);
+       if (error) throw error;
+     },
+     onSuccess: () => {
+       queryClient.invalidateQueries({ queryKey: ["notification-preferences"] });
+       toast.success("Preferências atualizadas");
+     }
+   });
 
   const { data, isLoading } = useQuery({
     queryKey: ["notifications", user?.id, page, filter, search, sort],
@@ -94,22 +133,89 @@ export default function Notificacoes() {
     },
   });
 
-  const markAllAsReadMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase
-        .from("notifications")
-        .update({ read: true })
-        .eq("user_id", user?.id)
-        .eq("read", false);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-notifications"] });
-      toast.success("Todas as notificações foram marcadas como lidas");
-      setSelectedIds([]);
-    },
-  });
+   const markAllAsReadMutation = useMutation({
+     mutationFn: async () => {
+       const startTime = performance.now();
+       try {
+         let query = supabase
+           .from("notifications")
+           .update({ read: true })
+           .eq("user_id", user?.id);
+ 
+         if (filter === "unread") {
+           query = query.eq("read", false);
+         }
+ 
+         const { error } = await query;
+         if (error) throw error;
+         
+         const duration = performance.now() - startTime;
+         console.log(`[Analytics] markAllAsRead took ${duration.toFixed(2)}ms`);
+       } catch (error) {
+         console.error("[Analytics] markAllAsRead failed", error);
+         throw error;
+       }
+     },
+     onSuccess: () => {
+       queryClient.invalidateQueries({ queryKey: ["notifications"] });
+       queryClient.invalidateQueries({ queryKey: ["dashboard-notifications"] });
+       toast.success("Notificações marcadas como lidas");
+       setSelectedIds([]);
+     },
+   });
+ 
+   const markAllAsUnreadMutation = useMutation({
+     mutationFn: async () => {
+       const { error } = await supabase
+         .from("notifications")
+         .update({ read: false })
+         .eq("user_id", user?.id);
+       if (error) throw error;
+     },
+     onSuccess: () => {
+       queryClient.invalidateQueries({ queryKey: ["notifications"] });
+       queryClient.invalidateQueries({ queryKey: ["dashboard-notifications"] });
+       toast.success("Todas as notificações marcadas como não lidas");
+       setSelectedIds([]);
+     },
+   });
+ 
+   const exportToPDF = () => {
+     if (!data?.notifications.length) return;
+     
+     const doc = new jsPDF();
+     const title = "Relatório de Notificações - Seu Contador IA";
+     const dateStr = format(new Date(), "dd/MM/yyyy HH:mm");
+     
+     // Header
+     doc.setFontSize(18);
+     doc.text("Escritório de Contabilidade - Auditoria", 14, 20);
+     doc.setFontSize(12);
+     doc.text(title, 14, 30);
+     doc.setFontSize(10);
+     doc.text(`Data: ${dateStr}`, 14, 38);
+     doc.text(`Filtro: ${filter === "unread" ? "Apenas não lidas" : "Todas"}`, 14, 44);
+     doc.text(`Ordenação: ${sort === "desc" ? "Mais recentes" : "Mais antigas"}`, 14, 50);
+     
+     const tableData = data.notifications.map(n => [
+       n.created_at ? format(new Date(n.created_at), "dd/MM/yyyy HH:mm") : "",
+       n.title,
+       n.message,
+       n.type,
+       n.read ? "Lida" : "Não lida"
+     ]);
+ 
+     doc.autoTable({
+       startY: 60,
+       head: [["Data", "Título", "Mensagem", "Tipo", "Status"]],
+       body: tableData,
+       styles: { fontSize: 8 },
+       headStyles: { fillColor: [79, 70, 229] },
+     });
+ 
+     doc.save(`notificacoes_${format(new Date(), "ddMMyyyy_HHmm")}.pdf`);
+     toast.success("Relatório PDF gerado com sucesso!");
+   };
 
    const markSelectedAsReadMutation = useMutation({
      mutationFn: async (read: boolean = true) => {
@@ -231,54 +337,80 @@ export default function Notificacoes() {
               <DialogHeader>
                 <DialogTitle>Preferências de Notificação</DialogTitle>
               </DialogHeader>
-              <div className="space-y-6 py-4">
-                <div className="space-y-4">
-                  <h3 className="text-sm font-medium">Tipos de Alerta</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Notas Fiscais (Emissão/Correção)</span>
-                      <Switch checked={prefs.nfe} onCheckedChange={(c) => setPrefs(p => ({ ...p, nfe: c }))} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Auditoria e Segurança</span>
-                      <Switch checked={prefs.audit} onCheckedChange={(c) => setPrefs(p => ({ ...p, audit: c }))} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">CRM e Clientes</span>
-                      <Switch checked={prefs.nfse} onCheckedChange={(c) => setPrefs(p => ({ ...p, nfse: c }))} />
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-4 pt-4 border-t">
-                  <h3 className="text-sm font-medium">Canais</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Notificações no Navegador</span>
-                      <Switch checked={prefs.push} onCheckedChange={(c) => setPrefs(p => ({ ...p, push: c }))} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Alertas por E-mail</span>
-                      <Switch checked={prefs.email} onCheckedChange={(c) => setPrefs(p => ({ ...p, email: c }))} />
-                    </div>
-                  </div>
-                </div>
-                <Button className="w-full" onClick={() => {
-                  toast.success("Preferências salvas com sucesso!");
-                  setShowPreferences(false);
-                }}>Salvar Preferências</Button>
-              </div>
+               <div className="space-y-6 py-4">
+                 <div className="space-y-4">
+                   <h3 className="text-sm font-medium">Tipos de Alerta</h3>
+                   <div className="space-y-3">
+                     <div className="flex items-center justify-between">
+                       <span className="text-sm">Notas Fiscais (Emissão/Correção)</span>
+                       <Switch 
+                         checked={prefs?.nfe ?? true} 
+                         onCheckedChange={(c) => updatePrefsMutation.mutate({ nfe: c })}
+                         disabled={updatePrefsMutation.isPending} 
+                       />
+                     </div>
+                     <div className="flex items-center justify-between">
+                       <span className="text-sm">Auditoria e Segurança</span>
+                       <Switch 
+                         checked={prefs?.audit ?? true} 
+                         onCheckedChange={(c) => updatePrefsMutation.mutate({ audit: c })}
+                         disabled={updatePrefsMutation.isPending} 
+                       />
+                     </div>
+                     <div className="flex items-center justify-between">
+                       <span className="text-sm">CRM e Clientes</span>
+                       <Switch 
+                         checked={prefs?.nfse ?? true} 
+                         onCheckedChange={(c) => updatePrefsMutation.mutate({ nfse: c })}
+                         disabled={updatePrefsMutation.isPending} 
+                       />
+                     </div>
+                   </div>
+                 </div>
+                 <div className="space-y-4 pt-4 border-t">
+                   <h3 className="text-sm font-medium">Canais</h3>
+                   <div className="space-y-3">
+                     <div className="flex items-center justify-between">
+                       <span className="text-sm">Notificações no Navegador</span>
+                       <Switch 
+                         checked={prefs?.push ?? true} 
+                         onCheckedChange={(c) => updatePrefsMutation.mutate({ push: c })}
+                         disabled={updatePrefsMutation.isPending} 
+                       />
+                     </div>
+                     <div className="flex items-center justify-between">
+                       <span className="text-sm">Alertas por E-mail</span>
+                       <Switch 
+                         checked={prefs?.email ?? true} 
+                         onCheckedChange={(c) => updatePrefsMutation.mutate({ email: c })}
+                         disabled={updatePrefsMutation.isPending} 
+                       />
+                     </div>
+                   </div>
+                 </div>
+                 <Button className="w-full" onClick={() => setShowPreferences(false)}>Fechar</Button>
+               </div>
             </DialogContent>
           </Dialog>
 
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => markAllAsReadMutation.mutate()}
-            disabled={markAllAsReadMutation.isPending}
-          >
-            <CheckSquare className="w-4 h-4 mr-2" />
-            Marcar todas como lidas
-          </Button>
+           <DropdownMenu>
+             <DropdownMenuTrigger asChild>
+               <Button variant="outline" size="sm" disabled={markAllAsReadMutation.isPending || markAllAsUnreadMutation.isPending}>
+                 <CheckSquare className="w-4 h-4 mr-2" />
+                 Ações em Massa
+               </Button>
+             </DropdownMenuTrigger>
+             <DropdownMenuContent align="end">
+               <DropdownMenuItem onClick={() => markAllAsReadMutation.mutate()}>
+                 <CheckCircle2 className="w-4 h-4 mr-2" />
+                 Marcar {filter === "unread" ? "filtradas" : "todas"} como lidas
+               </DropdownMenuItem>
+               <DropdownMenuItem onClick={() => markAllAsUnreadMutation.mutate()}>
+                 <Undo2 className="w-4 h-4 mr-2" />
+                 Marcar todas como não lidas
+               </DropdownMenuItem>
+             </DropdownMenuContent>
+           </DropdownMenu>
         </div>
       </div>
 
@@ -366,10 +498,24 @@ export default function Notificacoes() {
                    </Button>
                  </div>
                )}
-               <Button variant="outline" size="sm" onClick={exportToCSV} disabled={!data?.notifications.length}>
-                 <Download className="w-4 h-4 mr-2" />
-                 Exportar CSV
-               </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" disabled={!data?.notifications.length}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={exportToCSV}>
+                      <FileDown className="w-4 h-4 mr-2" />
+                      Exportar CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportToPDF}>
+                      <FileDown className="w-4 h-4 mr-2" />
+                      Exportar PDF
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
              </div>
           </div>
 
@@ -419,9 +565,9 @@ export default function Notificacoes() {
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                              <h4 className={cn("text-sm font-semibold truncate", !notification.read ? "text-foreground" : "text-muted-foreground")}>
-                                {notification.title}
-                              </h4>
+                             <h4 className={cn("text-sm font-semibold truncate", !notification.read ? "text-foreground font-bold" : "text-muted-foreground")}>
+                               {notification.title}
+                             </h4>
                               {!notification.read && <Badge className="h-1.5 w-1.5 rounded-full p-0 bg-primary border-none" />}
                             </div>
                             <p className="text-sm text-muted-foreground mt-1 leading-relaxed line-clamp-2">
@@ -473,13 +619,13 @@ export default function Notificacoes() {
                             </Link>
                           </Button>
                           
-                          {notification.link && (
-                            <Button variant="ghost" size="sm" asChild className="text-primary hover:bg-primary/5" onClick={() => !notification.read && markAsReadMutation.mutate(notification.id)}>
-                              <Link to={notification.link} className="gap-1.5">
-                                Abrir Auditoria
-                              </Link>
-                            </Button>
-                          )}
+                           {notification.link && (
+                             <Button variant="ghost" size="sm" asChild className="text-primary hover:bg-primary/5" onClick={() => !notification.read && markAsReadMutation.mutate(notification.id)}>
+                               <Link to={notification.link} className="gap-1.5" aria-label="Abrir Auditoria Relacionada">
+                                 Abrir Auditoria
+                               </Link>
+                             </Button>
+                           )}
                         </div>
                       </div>
                     </div>

@@ -1,4 +1,4 @@
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+ import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import {
   LayoutDashboard, BookOpen, Receipt, FileText, Users, ClipboardList,
   FolderOpen, DollarSign, BarChart3, Bot, Globe, PenTool, Building2,
@@ -8,6 +8,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+ import { useQuery } from "@tanstack/react-query";
 import { ThemeToggle } from "./ThemeToggle";
 
 const modules = [
@@ -43,6 +44,20 @@ export default function AppSidebar({ onNavigate }: { onNavigate?: () => void } =
 
   const sections = [...new Set(modules.map(m => m.section))];
 
+   const { data: unreadCount = 0 } = useQuery({
+     queryKey: ["unread-notifications-count"],
+     queryFn: async () => {
+       const { count, error } = await supabase
+         .from("notifications")
+         .select("*", { count: "exact", head: true })
+         .eq("read", false);
+       
+       if (error) throw error;
+       return count || 0;
+     },
+     refetchInterval: 10000, // Update every 10s
+   });
+ 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast.success("Logout realizado!");
@@ -98,6 +113,11 @@ export default function AppSidebar({ onNavigate }: { onNavigate?: () => void } =
                 >
                   <mod.icon className={cn("w-4 h-4 shrink-0", isActive && "text-sidebar-primary")} />
                   {!collapsed && <span className="truncate">{mod.label}</span>}
+                   {mod.path === "/notificacoes" && unreadCount > 0 && (
+                     <span className={cn("ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground font-bold", collapsed && "absolute top-1 right-1 h-3 w-3 text-[0px]")}>
+                       {unreadCount}
+                     </span>
+                   )}
                 </NavLink>
               );
             })}
