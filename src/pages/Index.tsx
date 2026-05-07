@@ -93,19 +93,18 @@ export default function Dashboard() {
   const totalObligations = obligations.length;
   const deliveredPct = totalObligations > 0 ? Math.round(((totalObligations - pendingObligations) / totalObligations) * 100) : 0;
 
-  const { data: notifications = [] } = useQuery({
+  const { data: unreadCount = 0 } = useQuery({
     queryKey: ["dashboard-notifications"],
     queryFn: async () => {
-      const { data } = await supabase
+      const { count, error } = await supabase
         .from("notifications")
-        .select("*")
-        .eq("read", false)
-        .limit(10);
-      return data || [];
+        .select("*", { count: "exact", head: true })
+        .eq("read", false);
+      if (error) throw error;
+      return count || 0;
     },
     enabled: !!user,
   });
-  const unreadCount = notifications.length;
 
   const regimeCounts: Record<string, number> = {};
   clients.forEach((c: any) => {
