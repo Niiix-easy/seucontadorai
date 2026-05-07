@@ -3,11 +3,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  Bell, CheckCircle, Clock, ExternalLink,
-  Trash2, CheckSquare, ChevronLeft, ChevronRight,
-  ShieldAlert, Receipt, FileSignature, Search,
-  Filter, ArrowUpDown, Settings2, MoreHorizontal,
-  Check
+   Bell, CheckCircle, Clock, ExternalLink, Download,
+   Trash2, CheckSquare, ChevronLeft, ChevronRight, Undo2,
+   ShieldAlert, Receipt, FileSignature, Search, CheckCircle2,
+   Filter, ArrowUpDown, Settings2, MoreHorizontal, Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -112,21 +111,50 @@ export default function Notificacoes() {
     },
   });
 
-  const markSelectedAsReadMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase
-        .from("notifications")
-        .update({ read: true })
-        .in("id", selectedIds);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-notifications"] });
-      toast.success(`${selectedIds.length} notificações marcadas como lidas`);
-      setSelectedIds([]);
-    },
-  });
+   const markSelectedAsReadMutation = useMutation({
+     mutationFn: async (read: boolean = true) => {
+       const { error } = await supabase
+         .from("notifications")
+         .update({ read })
+         .in("id", selectedIds);
+       if (error) throw error;
+     },
+     onSuccess: (_, read) => {
+       queryClient.invalidateQueries({ queryKey: ["notifications"] });
+       queryClient.invalidateQueries({ queryKey: ["dashboard-notifications"] });
+       toast.success(`${selectedIds.length} notificações marcadas como ${read ? 'lidas' : 'não lidas'}`);
+       setSelectedIds([]);
+     },
+   });
+
+   const exportToCSV = () => {
+     if (!data?.notifications.length) return;
+     
+     const headers = ["Data", "Título", "Mensagem", "Tipo", "Lida", "Link"];
+     const rows = data.notifications.map(n => [
+       n.created_at ? format(new Date(n.created_at), "dd/MM/yyyy HH:mm") : "",
+       n.title,
+       n.message.replace(/,/g, " "),
+       n.type,
+       n.read ? "Sim" : "Não",
+       n.link || ""
+     ]);
+
+     const csvContent = [
+       headers.join(","),
+       ...rows.map(row => row.join(","))
+     ].join("\n");
+
+     const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+     const url = URL.createObjectURL(blob);
+     const link = document.createElement("a");
+     link.setAttribute("href", url);
+     link.setAttribute("download", `notificacoes_${format(new Date(), "ddMMyyyy_HHmm")}.csv`);
+     document.body.appendChild(link);
+     link.click();
+     document.body.removeChild(link);
+     toast.success("Notificações exportadas com sucesso!");
+   };
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -306,26 +334,43 @@ export default function Notificacoes() {
                 onChange={(e) => { setSearch(e.target.value); setPage(0); }}
               />
             </div>
-            {selectedIds.length > 0 && (
-              <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2">
-                <Button 
-                  variant="secondary" 
-                  size="sm"
-                  onClick={() => markSelectedAsReadMutation.mutate()}
-                  disabled={markSelectedAsReadMutation.isPending}
-                >
-                  Marcar lidas ({selectedIds.length})
-                </Button>
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  onClick={() => deleteSelectedMutation.mutate()}
-                  disabled={deleteSelectedMutation.isPending}
-                >
-                  Excluir
-                </Button>
-              </div>
-            )}
+             <div className="flex items-center gap-2">
+               {selectedIds.length > 0 && (
+                 <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2">
+                   <Button 
+                     variant="secondary" 
+                     size="sm"
+                     onClick={() => markSelectedAsReadMutation.mutate(true)}
+                     disabled={markSelectedAsReadMutation.isPending}
+                   >
+                     <CheckCircle2 className="w-4 h-4 mr-1" />
+                     Marcar lidas ({selectedIds.length})
+                   </Button>
+                   <Button 
+                     variant="outline" 
+                     size="sm"
+                     onClick={() => markSelectedAsReadMutation.mutate(false)}
+                     disabled={markSelectedAsReadMutation.isPending}
+                   >
+                     <Undo2 className="w-4 h-4 mr-1" />
+                     Não lidas
+                   </Button>
+                   <Button 
+                     variant="destructive" 
+                     size="sm"
+                     onClick={() => deleteSelectedMutation.mutate()}
+                     disabled={deleteSelectedMutation.isPending}
+                   >
+                     <Trash2 className="w-4 h-4 mr-1" />
+                     Excluir
+                   </Button>
+                 </div>
+               )}
+               <Button variant="outline" size="sm" onClick={exportToCSV} disabled={!data?.notifications.length}>
+                 <Download className="w-4 h-4 mr-2" />
+                 Exportar CSV
+               </Button>
+             </div>
           </div>
 
           <div className="flex items-center gap-2 px-2 py-1">
