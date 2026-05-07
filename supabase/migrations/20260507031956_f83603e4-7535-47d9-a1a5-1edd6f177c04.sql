@@ -1,0 +1,2 @@
+CREATE INDEX IF NOT EXISTS idx_notifications_perf ON public.notifications (user_id, read, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_read_only ON public.notifications (read) WHERE read = false;

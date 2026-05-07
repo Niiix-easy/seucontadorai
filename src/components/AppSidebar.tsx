@@ -4,7 +4,7 @@ import {
   FolderOpen, DollarSign, BarChart3, Bot, Globe, PenTool, Building2,
   Landmark, ChevronLeft, ChevronRight, Zap, Shield, MessageSquare, LogOut, FileKey, Calculator, FileSignature, ShieldAlert, Bell
 } from "lucide-react";
-import { useState } from "react";
+ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -44,19 +44,39 @@ export default function AppSidebar({ onNavigate }: { onNavigate?: () => void } =
 
   const sections = [...new Set(modules.map(m => m.section))];
 
-   const { data: unreadCount = 0 } = useQuery({
-     queryKey: ["unread-notifications-count"],
-     queryFn: async () => {
-       const { count, error } = await supabase
-         .from("notifications")
-         .select("*", { count: "exact", head: true })
-         .eq("read", false);
-       
-       if (error) throw error;
-       return count || 0;
-     },
-     refetchInterval: 10000, // Update every 10s
-   });
+  const { data: unreadCount = 0, refetch } = useQuery({
+    queryKey: ["unread-notifications-count"],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("notifications")
+        .select("*", { count: "exact", head: true })
+        .eq("read", false);
+      
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('notifications-realtime-sidebar')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications'
+        },
+        () => {
+          refetch();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetch]);
  
   const handleLogout = async () => {
     await supabase.auth.signOut();
