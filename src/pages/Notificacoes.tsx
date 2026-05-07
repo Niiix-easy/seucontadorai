@@ -1,12 +1,12 @@
-import { useState } from "react";
+ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
    Bell, CheckCircle, Clock, ExternalLink, Download,
    Trash2, CheckSquare, ChevronLeft, ChevronRight, Undo2,
-   ShieldAlert, Receipt, FileSignature, Search, CheckCircle2,
-   Filter, ArrowUpDown, Settings2, MoreHorizontal, Check
+    ShieldAlert, Receipt, FileSignature, Search, CheckCircle2, 
+    ArrowUpDown, Settings2, MoreHorizontal, Check, FileDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,9 +32,17 @@ import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+ import jsPDF from "jspdf";
+ import "jspdf-autotable";
 
 const ITEMS_PER_PAGE = 10;
 
+ declare module 'jspdf' {
+   interface jsPDF {
+     autoTable: (options: any) => jsPDF;
+   }
+ }
+ 
 export default function Notificacoes() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -45,14 +53,45 @@ export default function Notificacoes() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showPreferences, setShowPreferences] = useState(false);
 
-  // Preferences state (mock)
-  const [prefs, setPrefs] = useState({
-    nfe: true,
-    nfse: true,
-    audit: true,
-    email: true,
-    push: true
-  });
+   const { data: prefs } = useQuery({
+     queryKey: ["notification-preferences", user?.id],
+     queryFn: async () => {
+       const { data, error } = await supabase
+         .from("notification_preferences")
+         .select("*")
+         .eq("user_id", user?.id)
+         .maybeSingle();
+       
+       if (error) throw error;
+       
+       if (!data) {
+         const defaultPrefs = { nfe: true, nfse: true, audit: true, email: true, push: true };
+         const { data: newData, error: insertError } = await supabase
+           .from("notification_preferences")
+           .insert([{ user_id: user?.id, ...defaultPrefs }])
+           .select()
+           .single();
+         if (insertError) throw insertError;
+         return newData;
+       }
+       return data;
+     },
+     enabled: !!user,
+   });
+ 
+   const updatePrefsMutation = useMutation({
+     mutationFn: async (newPrefs: any) => {
+       const { error } = await supabase
+         .from("notification_preferences")
+         .update(newPrefs)
+         .eq("user_id", user?.id);
+       if (error) throw error;
+     },
+     onSuccess: () => {
+       queryClient.invalidateQueries({ queryKey: ["notification-preferences"] });
+       toast.success("Preferências atualizadas");
+     }
+   });
 
   const { data, isLoading } = useQuery({
     queryKey: ["notifications", user?.id, page, filter, search, sort],
