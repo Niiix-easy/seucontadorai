@@ -133,22 +133,89 @@ export default function Notificacoes() {
     },
   });
 
-  const markAllAsReadMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase
-        .from("notifications")
-        .update({ read: true })
-        .eq("user_id", user?.id)
-        .eq("read", false);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-notifications"] });
-      toast.success("Todas as notificações foram marcadas como lidas");
-      setSelectedIds([]);
-    },
-  });
+   const markAllAsReadMutation = useMutation({
+     mutationFn: async () => {
+       const startTime = performance.now();
+       try {
+         let query = supabase
+           .from("notifications")
+           .update({ read: true })
+           .eq("user_id", user?.id);
+ 
+         if (filter === "unread") {
+           query = query.eq("read", false);
+         }
+ 
+         const { error } = await query;
+         if (error) throw error;
+         
+         const duration = performance.now() - startTime;
+         console.log(`[Analytics] markAllAsRead took ${duration.toFixed(2)}ms`);
+       } catch (error) {
+         console.error("[Analytics] markAllAsRead failed", error);
+         throw error;
+       }
+     },
+     onSuccess: () => {
+       queryClient.invalidateQueries({ queryKey: ["notifications"] });
+       queryClient.invalidateQueries({ queryKey: ["dashboard-notifications"] });
+       toast.success("Notificações marcadas como lidas");
+       setSelectedIds([]);
+     },
+   });
+ 
+   const markAllAsUnreadMutation = useMutation({
+     mutationFn: async () => {
+       const { error } = await supabase
+         .from("notifications")
+         .update({ read: false })
+         .eq("user_id", user?.id);
+       if (error) throw error;
+     },
+     onSuccess: () => {
+       queryClient.invalidateQueries({ queryKey: ["notifications"] });
+       queryClient.invalidateQueries({ queryKey: ["dashboard-notifications"] });
+       toast.success("Todas as notificações marcadas como não lidas");
+       setSelectedIds([]);
+     },
+   });
+ 
+   const exportToPDF = () => {
+     if (!data?.notifications.length) return;
+     
+     const doc = new jsPDF();
+     const title = "Relatório de Notificações - Seu Contador IA";
+     const dateStr = format(new Date(), "dd/MM/yyyy HH:mm");
+     
+     // Header
+     doc.setFontSize(18);
+     doc.text("Escritório de Contabilidade - Auditoria", 14, 20);
+     doc.setFontSize(12);
+     doc.text(title, 14, 30);
+     doc.setFontSize(10);
+     doc.text(`Data: ${dateStr}`, 14, 38);
+     doc.text(`Filtro: ${filter === "unread" ? "Apenas não lidas" : "Todas"}`, 14, 44);
+     doc.text(`Ordenação: ${sort === "desc" ? "Mais recentes" : "Mais antigas"}`, 14, 50);
+     
+     const tableData = data.notifications.map(n => [
+       n.created_at ? format(new Date(n.created_at), "dd/MM/yyyy HH:mm") : "",
+       n.title,
+       n.message,
+       n.type,
+       n.read ? "Lida" : "Não lida"
+     ]);
+ 
+     doc.autoTable({
+       startY: 60,
+       head: [["Data", "Título", "Mensagem", "Tipo", "Status"]],
+       body: tableData,
+       styles: { fontSize: 8 },
+       headStyles: { fillColor: [79, 70, 229] },
+     });
+ 
+     doc.save(`notificacoes_${format(new Date(), "ddMMyyyy_HHmm")}.pdf`);
+     toast.success("Relatório PDF gerado com sucesso!");
+   };
 
    const markSelectedAsReadMutation = useMutation({
      mutationFn: async (read: boolean = true) => {
