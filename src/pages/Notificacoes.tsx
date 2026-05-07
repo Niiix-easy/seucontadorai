@@ -451,12 +451,12 @@ export default function Notificacoes() {
                      </div>
                    </div>
                  </div>
-                 <Button className="w-full" onClick={() => setShowPreferences(false)}>Fechar</Button>
-               </div>
-            </DialogContent>
-          </Dialog>
+                  <Button className="w-full" onClick={() => setShowPreferences(false)}>Fechar</Button>
+                </div>
+             </DialogContent>
+           </Dialog>
 
-           <DropdownMenu>
+            <DropdownMenu>
              <DropdownMenuTrigger asChild>
                <Button variant="outline" size="sm" disabled={markAllAsReadMutation.isPending || markAllAsUnreadMutation.isPending}>
                  <CheckSquare className="w-4 h-4 mr-2" />
