@@ -103,8 +103,19 @@ jobs:
             return 0
           }
 
-          # Tenta Vercel primeiro, depois Netlify como fallback
-          deploy_vercel || deploy_netlify || { echo "❌ All deploy providers failed"; exit 1; }
+          deploy_cloudflare() {
+            if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then return 1; fi
+            echo "🚀 Deploying to Cloudflare Pages..."
+            npm install -g wrangler@latest
+            jq ".commit = \"$VITE_COMMIT_SHA\"" public/health.json > dist/health.json
+            wrangler pages deploy dist --project-name=${{ github.event.repository.name }} --branch=${{ github.ref_name }} > cf_output.txt
+            URL=$(cat cf_output.txt | grep -o 'https://[^ ]*\.pages\.dev' | head -n 1)
+            echo "url=$URL" >> $GITHUB_OUTPUT
+            return 0
+          }
+
+          # Tenta Vercel primeiro, depois Netlify, depois Cloudflare como fallback
+          deploy_vercel || deploy_netlify || deploy_cloudflare || { echo "❌ All deploy providers failed"; exit 1; }
 
       - name: Advanced Healthcheck, Assets & SHA Validation
         if: success() && steps.deploy.outputs.url != ''
@@ -152,9 +163,13 @@ jobs:
           done
           echo "❌ Healthcheck failed or version mismatch"
           
-          if [ -n "${{ secrets.VERCEL_TOKEN }}" ]; then
-             echo "🔄 Rolling back Vercel..."
-             vercel rollback --token ${{ secrets.VERCEL_TOKEN }} --confirm || true
+          if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ] || [ "$STATUS" != "UP" ]; then
+            echo "🔄 Validation failed. Attempting rollback if provider supported..."
+            if [ -n "${{ secrets.VERCEL_TOKEN }}" ]; then
+               vercel rollback --token ${{ secrets.VERCEL_TOKEN }} --confirm || true
+            fi
+            # Para Netlify, o 'rollback' seria um novo deploy do commit anterior estável, 
+            # que exigiria salvar o SHA estável anterior em algum lugar.
           fi
           exit 1
 
