@@ -1,4 +1,4 @@
- import { useState, useEffect } from "react";
+ import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -48,7 +48,8 @@ export default function Notificacoes() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [filter, setFilter] = useState<"all" | "unread">("all");
-  const [search, setSearch] = useState("");
+   const [search, setSearch] = useState("");
+   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sort, setSort] = useState<"desc" | "asc">("desc");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showPreferences, setShowPreferences] = useState(false);
@@ -93,15 +94,22 @@ export default function Notificacoes() {
      }
    });
 
+   useEffect(() => {
+     const timer = setTimeout(() => {
+       setDebouncedSearch(search);
+     }, 500);
+     return () => clearTimeout(timer);
+   }, [search]);
+
   const { data, isLoading } = useQuery({
-    queryKey: ["notifications", user?.id, page, filter, search, sort],
+    queryKey: ["notifications", user?.id, page, filter, debouncedSearch, sort],
     queryFn: async () => {
       let query = supabase
         .from("notifications")
         .select("*", { count: "exact" });
 
-      if (search) {
-        query = query.or(`title.ilike.%${search}%,message.ilike.%${search}%`);
+      if (debouncedSearch) {
+        query = query.or(`title.ilike.%${debouncedSearch}%,message.ilike.%${debouncedSearch}%`);
       }
 
       query = query
