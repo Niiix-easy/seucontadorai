@@ -619,13 +619,13 @@ export default function Notificacoes() {
                             </Link>
                           </Button>
                           
-                          {notification.link && (
-                            <Button variant="ghost" size="sm" asChild className="text-primary hover:bg-primary/5" onClick={() => !notification.read && markAsReadMutation.mutate(notification.id)}>
-                              <Link to={notification.link} className="gap-1.5">
-                                Abrir Auditoria
-                              </Link>
-                            </Button>
-                          )}
+                           {notification.link && (
+                             <Button variant="ghost" size="sm" asChild className="text-primary hover:bg-primary/5" onClick={() => !notification.read && markAsReadMutation.mutate(notification.id)}>
+                               <Link to={notification.link} className="gap-1.5" aria-label="Abrir Auditoria Relacionada">
+                                 Abrir Auditoria
+                               </Link>
+                             </Button>
+                           )}
                         </div>
                       </div>
                     </div>
