@@ -18,10 +18,21 @@ jobs:
       - name: Cache Bun dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          path: |
+            ~/.bun/install/cache
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-bun-npm-${{ hashFiles('**/bun.lockb', '**/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-bun-
+            ${{ runner.os }}-bun-npm-
+
+      - name: Cache Vite Build
+        uses: actions/cache@v4
+        with:
+          path: dist
+          key: ${{ runner.os }}-vite-build-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-vite-build-
 
       - name: Install dependencies
         run: bun install
@@ -63,11 +74,45 @@ jobs:
           name: generated-pdfs
           path: generated-pdfs/
 
-      - name: Deploy to Vercel (Staging)
-        if: success() && github.ref == 'refs/heads/main'
-        uses: amondnet/vercel-deploy-action@v20
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--staging'
+      - name: Multi-Provider Deploy (Staging)
+        if: success() && github.ref == 'refs/heads/main' && (secrets.VERCEL_TOKEN || secrets.NETLIFY_AUTH_TOKEN || secrets.CLOUDFLARE_API_TOKEN)
+        id: deploy
+        run: |
+          if [ -n "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "Deploying to Vercel..."
+            npm install -g vercel
+            DEPLOY_URL=$(vercel deploy --token ${{ secrets.VERCEL_TOKEN }} --name ${{ github.event.repository.name }} --confirm)
+            echo "url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+          elif [ -n "${{ secrets.NETLIFY_AUTH_TOKEN }}" ]; then
+            echo "Deploying to Netlify..."
+            npm install -g netlify-cli
+            DEPLOY_URL=$(netlify deploy --dir=dist --prod --auth ${{ secrets.NETLIFY_AUTH_TOKEN }} --site ${{ secrets.NETLIFY_SITE_ID }} --json | jq -r '.deploy_url')
+            echo "url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+          elif [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+            echo "Deploying to Cloudflare Pages..."
+            npm install -g wrangler
+            wrangler pages deploy dist --project-name=${{ github.event.repository.name }}
+            echo "url=https://${{ github.event.repository.name }}.pages.dev" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Healthcheck & Version Validation
+        if: success() && steps.deploy.outputs.url != ''
+        run: |
+          URL=${{ steps.deploy.outputs.url }}
+          echo "Checking $URL..."
+          for i in {1..10}; do
+            RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" $URL)
+            if [ "$RESPONSE" == "200" ]; then
+              echo "Staging is UP!"
+              break
+            fi
+            echo "Waiting for staging... ($i/10)"
+            sleep 5
+          done
+
+      - name: Notify Failure (Discord/Slack)
+        if: failure() && secrets.NOTIFICATIONS_WEBHOOK
+        run: |
+          curl -X POST -H "Content-Type: application/json" \
+          -d "{\"content\": \"🚨 **Pipeline Failed!**\nProject: ${{ github.repository }}\nBranch: ${{ github.ref_name }}\n\nView Artifacts & Logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+          ${{ secrets.NOTIFICATIONS_WEBHOOK }}
