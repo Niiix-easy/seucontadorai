@@ -231,7 +231,7 @@ export default function Notificacoes() {
             doc.line(14, 18, 196, 18);
           }
           
-          const str = `Página ${doc.internal.getNumberOfPages()}`;
+          const str = `Página ${(doc.internal as any).getNumberOfPages()}`;
           doc.setFontSize(8);
           const pageSize = doc.internal.pageSize;
           const pageHeight = pageSize.height ? pageSize.height : pageSize.getHeight();
