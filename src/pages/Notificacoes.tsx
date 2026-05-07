@@ -440,11 +440,24 @@ export default function Notificacoes() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                {!notification.read && (
-                                  <DropdownMenuItem onClick={() => markAsReadMutation.mutate(notification.id)}>
-                                    <Check className="w-4 h-4 mr-2" /> Marcar como lida
-                                  </DropdownMenuItem>
-                                )}
+                                 <DropdownMenuItem onClick={() => {
+                                   const newStatus = !notification.read;
+                                   supabase
+                                     .from("notifications")
+                                     .update({ read: newStatus })
+                                     .eq("id", notification.id)
+                                     .then(() => {
+                                       queryClient.invalidateQueries({ queryKey: ["notifications"] });
+                                       queryClient.invalidateQueries({ queryKey: ["dashboard-notifications"] });
+                                       toast.success(newStatus ? "Marcada como lida" : "Marcada como não lida");
+                                     });
+                                 }}>
+                                   {notification.read ? (
+                                     <><Undo2 className="w-4 h-4 mr-2" /> Marcar como não lida</>
+                                   ) : (
+                                     <><Check className="w-4 h-4 mr-2" /> Marcar como lida</>
+                                   )}
+                                 </DropdownMenuItem>
                                 <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(notification.id)}>
                                   <Trash2 className="w-4 h-4 mr-2" /> Excluir
                                 </DropdownMenuItem>
