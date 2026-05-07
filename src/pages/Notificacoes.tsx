@@ -393,15 +393,24 @@ export default function Notificacoes() {
             </DialogContent>
           </Dialog>
 
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => markAllAsReadMutation.mutate()}
-            disabled={markAllAsReadMutation.isPending}
-          >
-            <CheckSquare className="w-4 h-4 mr-2" />
-            Marcar todas como lidas
-          </Button>
+           <DropdownMenu>
+             <DropdownMenuTrigger asChild>
+               <Button variant="outline" size="sm" disabled={markAllAsReadMutation.isPending || markAllAsUnreadMutation.isPending}>
+                 <CheckSquare className="w-4 h-4 mr-2" />
+                 Ações em Massa
+               </Button>
+             </DropdownMenuTrigger>
+             <DropdownMenuContent align="end">
+               <DropdownMenuItem onClick={() => markAllAsReadMutation.mutate()}>
+                 <CheckCircle2 className="w-4 h-4 mr-2" />
+                 Marcar {filter === "unread" ? "filtradas" : "todas"} como lidas
+               </DropdownMenuItem>
+               <DropdownMenuItem onClick={() => markAllAsUnreadMutation.mutate()}>
+                 <Undo2 className="w-4 h-4 mr-2" />
+                 Marcar todas como não lidas
+               </DropdownMenuItem>
+             </DropdownMenuContent>
+           </DropdownMenu>
         </div>
       </div>
 
