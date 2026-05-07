@@ -171,7 +171,7 @@ export default function Notificacoes() {
     } else {
       setSelectedIds(data?.notifications.map(n => n.id) || []);
     }
-  });
+  };
 
   const getIcon = (type: string) => {
     switch (type) {
