@@ -26,14 +26,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bun-npm-
 
-      - name: Cache Vite Build
-        uses: actions/cache@v4
-        with:
-          path: dist
-          key: ${{ runner.os }}-vite-build-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-vite-build-
-
       - name: Install dependencies
         run: bun install
 
@@ -46,8 +38,17 @@ jobs:
       - name: Lint
         run: bun run lint
 
+      - name: Cache Vite Build (Lockfile + Branch)
+        uses: actions/cache@v4
+        with:
+          path: dist
+          key: ${{ runner.os }}-vite-dist-${{ github.ref_name }}-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-vite-dist-${{ github.ref_name }}-
+            ${{ runner.os }}-vite-dist-
+
       - name: Typecheck & Build
-        run: bun run build
+        run: VITE_COMMIT_SHA=${{ github.sha }} bun run build
 
       - name: Unit Tests
         run: bun run test
@@ -74,45 +75,67 @@ jobs:
           name: generated-pdfs
           path: generated-pdfs/
 
-      - name: Multi-Provider Deploy (Staging)
+      - name: Advanced Multi-Provider Deploy (with Fallback)
         if: success() && github.ref == 'refs/heads/main' && (secrets.VERCEL_TOKEN || secrets.NETLIFY_AUTH_TOKEN || secrets.CLOUDFLARE_API_TOKEN)
         id: deploy
+        env:
+          VITE_COMMIT_SHA: ${{ github.sha }}
         run: |
-          if [ -n "${{ secrets.VERCEL_TOKEN }}" ]; then
-            echo "Deploying to Vercel..."
-            npm install -g vercel
-            DEPLOY_URL=$(vercel deploy --token ${{ secrets.VERCEL_TOKEN }} --name ${{ github.event.repository.name }} --confirm)
-            echo "url=$DEPLOY_URL" >> $GITHUB_OUTPUT
-          elif [ -n "${{ secrets.NETLIFY_AUTH_TOKEN }}" ]; then
-            echo "Deploying to Netlify..."
-            npm install -g netlify-cli
-            DEPLOY_URL=$(netlify deploy --dir=dist --prod --auth ${{ secrets.NETLIFY_AUTH_TOKEN }} --site ${{ secrets.NETLIFY_SITE_ID }} --json | jq -r '.deploy_url')
-            echo "url=$DEPLOY_URL" >> $GITHUB_OUTPUT
-          elif [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
-            echo "Deploying to Cloudflare Pages..."
-            npm install -g wrangler
-            wrangler pages deploy dist --project-name=${{ github.event.repository.name }}
-            echo "url=https://${{ github.event.repository.name }}.pages.dev" >> $GITHUB_OUTPUT
-          fi
+          deploy_vercel() {
+            if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then return 1; fi
+            echo "🚀 Deploying to Vercel..."
+            npm install -g vercel@latest
+            # Injecting SHA into the public health file before deploy
+            jq ".commit = \"$VITE_COMMIT_SHA\"" public/health.json > dist/health.json
+            vercel deploy --token ${{ secrets.VERCEL_TOKEN }} --name ${{ github.event.repository.name }} --confirm > deploy_output.txt
+            URL=$(cat deploy_output.txt | grep -o 'https://[^ ]*' | head -n 1)
+            echo "url=$URL" >> $GITHUB_OUTPUT
+            return 0
+          }
+          
+          deploy_netlify() {
+            if [ -z "${{ secrets.NETLIFY_AUTH_TOKEN }}" ]; then return 1; fi
+            echo "🚀 Deploying to Netlify..."
+            npm install -g netlify-cli@latest
+            jq ".commit = \"$VITE_COMMIT_SHA\"" public/health.json > dist/health.json
+            URL=$(netlify deploy --dir=dist --prod --auth ${{ secrets.NETLIFY_AUTH_TOKEN }} --site ${{ secrets.NETLIFY_SITE_ID }} --json | jq -r '.deploy_url')
+            echo "url=$URL" >> $GITHUB_OUTPUT
+            return 0
+          }
 
-      - name: Healthcheck & Version Validation
+          # Tenta Vercel primeiro, depois Netlify como fallback
+          deploy_vercel || deploy_netlify || { echo "❌ All deploy providers failed"; exit 1; }
+
+      - name: Healthcheck & SHA Validation
         if: success() && steps.deploy.outputs.url != ''
         run: |
           URL=${{ steps.deploy.outputs.url }}
-          echo "Checking $URL..."
+          EXPECTED_SHA=${{ github.sha }}
+          echo "🔍 Validating $URL/health.json for SHA: $EXPECTED_SHA"
           for i in {1..10}; do
-            RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" $URL)
-            if [ "$RESPONSE" == "200" ]; then
-              echo "Staging is UP!"
-              break
+            HTTP_CODE=$(curl -s -o response.json -w "%{http_code}" $URL/health.json)
+            if [ "$HTTP_CODE" == "200" ]; then
+              ACTUAL_SHA=$(cat response.json | jq -r '.commit')
+              if [ "$ACTUAL_SHA" == "$EXPECTED_SHA" ]; then
+                echo "✅ Staging is UP and version matches SHA: $ACTUAL_SHA"
+                exit 0
+              fi
+              echo "⚠️ Version mismatch. Found: $ACTUAL_SHA, Expected: $EXPECTED_SHA"
             fi
-            echo "Waiting for staging... ($i/10)"
+            echo "⏳ Waiting for propagation... ($i/10)"
             sleep 5
           done
+          echo "❌ Healthcheck failed or version mismatch"
+          exit 1
 
-      - name: Notify Failure (Discord/Slack)
-        if: failure() && secrets.NOTIFICATIONS_WEBHOOK
+      - name: Notify (Discord/Slack)
+        if: always() && secrets.NOTIFICATIONS_WEBHOOK
         run: |
-          curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"🚨 **Pipeline Failed!**\nProject: ${{ github.repository }}\nBranch: ${{ github.ref_name }}\n\nView Artifacts & Logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
-          ${{ secrets.NOTIFICATIONS_WEBHOOK }}
+          STATUS="✅ SUCCESS"
+          [ "${{ job.status }}" == "failure" ] && STATUS="🚨 FAILED"
+          
+          MSG="**$STATUS** - Pipeline: ${{ github.repository }}\nBranch: \`${{ github.ref_name }}\`"
+          [ -n "${{ steps.deploy.outputs.url }}" ] && MSG="$MSG\n🌍 Staging: ${{ steps.deploy.outputs.url }}"
+          [ "${{ job.status }}" == "failure" ] && MSG="$MSG\n🔍 Logs & Artifacts: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$MSG\"}" ${{ secrets.NOTIFICATIONS_WEBHOOK }}
