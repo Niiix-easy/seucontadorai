@@ -31,6 +31,7 @@ import Bancos from "./pages/Bancos";
 import Certificados from "./pages/Certificados";
 import CalculadoraICMSST from "./pages/CalculadoraICMSST";
 import Notificacoes from "./pages/Notificacoes";
+import NotificacaoDetalhes from "./pages/NotificacaoDetalhes";
 import Admin from "./pages/Admin";
 import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
@@ -75,6 +76,7 @@ function App() {
                 <Route path="/certificados" element={<Certificados />} />
                 <Route path="/calculadora-icms-st" element={<CalculadoraICMSST />} />
                 <Route path="/notificacoes" element={<Notificacoes />} />
+                <Route path="/notificacoes/:id" element={<NotificacaoDetalhes />} />
                 <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
               </Route>
               <Route path="*" element={<NotFound />} />
