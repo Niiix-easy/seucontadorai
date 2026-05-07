@@ -565,9 +565,9 @@ export default function Notificacoes() {
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                              <h4 className={cn("text-sm font-semibold truncate", !notification.read ? "text-foreground" : "text-muted-foreground")}>
-                                {notification.title}
-                              </h4>
+                             <h4 className={cn("text-sm font-semibold truncate", !notification.read ? "text-foreground font-bold" : "text-muted-foreground")}>
+                               {notification.title}
+                             </h4>
                               {!notification.read && <Badge className="h-1.5 w-1.5 rounded-full p-0 bg-primary border-none" />}
                             </div>
                             <p className="text-sm text-muted-foreground mt-1 leading-relaxed line-clamp-2">
