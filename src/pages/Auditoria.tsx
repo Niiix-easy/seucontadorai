@@ -2,12 +2,16 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ShieldAlert, Ban, FileEdit, RefreshCw, History, Loader2 } from "lucide-react";
+ import { ShieldAlert, Ban, FileEdit, RefreshCw, History, Loader2, Download } from "lucide-react";
+ import jsPDF from "jspdf";
+ import autoTable from "jspdf-autotable";
+ 
 
 type Evento = {
   id: string;
@@ -27,9 +31,9 @@ const tipoConfig: Record<string, { label: string; icon: any; color: string }> = 
   emissao: { label: "Emissão", icon: History, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
 };
 
-export default function Auditoria() {
-  const { user } = useAuth();
-  const [tipoFilter, setTipoFilter] = useState("all");
+ export default function Auditoria() {
+   const { user } = useAuth();
+   const [tipoFilter, setTipoFilter] = useState("all");
   const [notaFilter, setNotaFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -82,12 +86,80 @@ export default function Auditoria() {
     });
   }, [eventos, tipoFilter, dateFrom, dateTo, notaFilter, nfeMap, nfseMap]);
 
-  const stats = useMemo(() => ({
-    total: eventos.length,
-    cancelamentos: eventos.filter(e => e.tipo === "cancelamento").length,
-    cces: eventos.filter(e => e.tipo === "cce").length,
-    reenvios: eventos.filter(e => e.tipo === "reenvio").length,
-  }), [eventos]);
+   const stats = useMemo(() => ({
+     total: eventos.length,
+     cancelamentos: eventos.filter(e => e.tipo === "cancelamento").length,
+     cces: eventos.filter(e => e.tipo === "cce").length,
+     reenvios: eventos.filter(e => e.tipo === "reenvio").length,
+   }), [eventos]);
+ 
+   const exportPDF = () => {
+     const doc = new jsPDF({ unit: "mm", format: "a4" });
+     const W = doc.internal.pageSize.getWidth();
+ 
+     // Cabeçalho do Escritório
+     doc.setFillColor(37, 99, 235);
+     doc.rect(0, 0, W, 25, "F");
+     doc.setTextColor(255, 255, 255);
+     doc.setFont("helvetica", "bold");
+     doc.setFontSize(18);
+     doc.text("Seu Contador IA", 12, 12);
+     doc.setFontSize(9);
+     doc.setFont("helvetica", "normal");
+     doc.text("Relatório Mensal de Auditoria de Eventos Fiscais", 12, 18);
+     doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, W - 12, 12, { align: "right" });
+ 
+     doc.setTextColor(0, 0, 0);
+     let y = 35;
+ 
+     // Filtros Aplicados
+     doc.setFont("helvetica", "bold");
+     doc.setFontSize(10);
+     doc.text("Filtros Aplicados:", 12, y);
+     doc.setFont("helvetica", "normal");
+     doc.setFontSize(9);
+     const filtrosStr = [
+       tipoFilter !== "all" ? `Tipo: ${tipoConfig[tipoFilter]?.label}` : "Tipo: Todos",
+       notaFilter ? `Nota: ${notaFilter}` : null,
+       dateFrom ? `De: ${new Date(dateFrom).toLocaleDateString("pt-BR")}` : null,
+       dateTo ? `Até: ${new Date(dateTo).toLocaleDateString("pt-BR")}` : null,
+     ].filter(Boolean).join("  |  ");
+     doc.text(filtrosStr, 12, y + 5);
+     y += 15;
+ 
+     // Estatísticas
+     autoTable(doc, {
+       startY: y,
+       head: [["Total Eventos", "Cancelamentos", "CC-e", "Reenvios"]],
+       body: [[stats.total, stats.cancelamentos, stats.cces, stats.reenvios]],
+       styles: { fontSize: 9, halign: "center" },
+       headStyles: { fillColor: [71, 85, 105] },
+       margin: { left: 12, right: 12 },
+     });
+     y = (doc as any).lastAutoTable.finalY + 10;
+ 
+     // Tabela de Eventos
+     autoTable(doc, {
+       startY: y,
+       head: [["Data/Hora", "Tipo", "Referência", "Descrição/Protocolo"]],
+       body: filtered.map(ev => [
+         new Date(ev.created_at).toLocaleString("pt-BR"),
+         tipoConfig[ev.tipo]?.label || ev.tipo,
+         (ev.nfe_id ? nfeMap[ev.nfe_id] : nfseMap[ev.nfse_id || ""]) || "—",
+         `${ev.descricao || ""}${ev.protocolo ? " (Prot: " + ev.protocolo + ")" : ""}`
+       ]),
+       styles: { fontSize: 8 },
+       headStyles: { fillColor: [37, 99, 235] },
+       columnStyles: {
+         0: { cellWidth: 35 },
+         1: { cellWidth: 30 },
+         2: { cellWidth: 35 },
+       },
+       margin: { left: 12, right: 12 },
+     });
+ 
+     doc.save("auditoria-eventos.pdf");
+   };
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl space-y-6">
@@ -100,7 +172,13 @@ export default function Auditoria() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+       <div className="flex justify-end mb-2">
+         <Button onClick={exportPDF} variant="outline" size="sm" className="gap-2">
+           <Download className="w-4 h-4" /> Exportar PDF
+         </Button>
+       </div>
+ 
+       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground mb-1">Total eventos</p><p className="text-2xl font-bold font-display text-primary">{stats.total}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground mb-1">Cancelamentos</p><p className="text-2xl font-bold font-display text-destructive">{stats.cancelamentos}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground mb-1">Cartas de correção</p><p className="text-2xl font-bold font-display text-info">{stats.cces}</p></CardContent></Card>

@@ -56,10 +56,19 @@ export function NFSeForm({ userId, clients, onSuccess, onCancel }: Props) {
       iss_aliquota: iss, iss_valor: issValor, valor_liquido: valorLiquido,
       status: "autorizada",
     });
-    if (error) { toast.error("Erro: " + error.message); return; }
-    toast.success(`NFS-e nº ${numero} emitida!`);
-    onSuccess();
-  };
+     if (error) { toast.error("Erro: " + error.message); return; }
+     toast.success(`NFS-e nº ${numero} emitida!`);
+     
+     await supabase.from("notifications").insert({
+       user_id: userId,
+       title: "NFS-e Emitida",
+       message: `A NFS-e nº ${numero} foi autorizada com sucesso.`,
+       type: "success",
+       link: "/notas-fiscais"
+     });
+ 
+     onSuccess();
+   };
 
   return (
     <>

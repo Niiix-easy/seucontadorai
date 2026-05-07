@@ -74,11 +74,22 @@ export default function NotasFiscais() {
       status: "cancelada", cancelada_em: new Date().toISOString(), motivo_cancelamento: cancelMotivo,
     }).eq("id", cancelTarget.id);
     if (error) { toast.error("Erro: " + error.message); return; }
-    await supabase.from("nf_eventos").insert({
-      user_id: user.id,
-      [cancelTarget.tipo === "nfe" ? "nfe_id" : "nfse_id"]: cancelTarget.id,
-      tipo: "cancelamento", descricao: cancelMotivo,
-    });
+     const { data: evento } = await supabase.from("nf_eventos").insert({
+       user_id: user.id,
+       [cancelTarget.tipo === "nfe" ? "nfe_id" : "nfse_id"]: cancelTarget.id,
+       tipo: "cancelamento", descricao: cancelMotivo,
+     }).select().single();
+ 
+     if (evento) {
+       await supabase.from("notifications").insert({
+         user_id: user.id,
+         title: `${cancelTarget.tipo === "nfe" ? "NF-e" : "NFS-e"} Cancelada`,
+         message: `A nota ${cancelTarget.numero} foi cancelada: ${cancelMotivo.substring(0, 50)}...`,
+         type: "warning",
+         link: "/notas-fiscais"
+       });
+     }
+ 
     toast.success(`${cancelTarget.tipo === "nfe" ? "NF-e" : "NFS-e"} ${cancelTarget.numero} cancelada`);
     queryClient.invalidateQueries({ queryKey: [`${cancelTarget.tipo}-emitidas`] });
     setCancelTarget(null); setCancelMotivo("");
@@ -92,9 +103,20 @@ export default function NotasFiscais() {
       cce_texto: cceTexto, cce_data: new Date().toISOString(), cce_sequencia: novaSeq,
     }).eq("id", cceTarget.id);
     if (error) { toast.error("Erro: " + error.message); return; }
-    await supabase.from("nf_eventos").insert({
-      user_id: user.id, nfe_id: cceTarget.id, tipo: "cce", descricao: cceTexto, sequencia: novaSeq,
-    });
+     const { data: evento } = await supabase.from("nf_eventos").insert({
+       user_id: user.id, nfe_id: cceTarget.id, tipo: "cce", descricao: cceTexto, sequencia: novaSeq,
+     }).select().single();
+ 
+     if (evento) {
+       await supabase.from("notifications").insert({
+         user_id: user.id,
+         title: "Carta de Correção Registrada",
+         message: `Nova CC-e (#${novaSeq}) para a NF-e ${cceTarget.numero}: ${cceTexto.substring(0, 50)}...`,
+         type: "info",
+         link: "/notas-fiscais"
+       });
+     }
+ 
     toast.success(`CC-e #${novaSeq} registrada`);
     queryClient.invalidateQueries({ queryKey: ["nfe-emitidas"] });
     setCceTarget(null); setCceTexto("");
