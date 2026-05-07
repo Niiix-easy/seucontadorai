@@ -79,7 +79,16 @@ export function NFeForm({ userId, clients, onSuccess, onCancel }: Props) {
     const itensInsert = itens.map((it, idx) => ({ nfe_id: nfe.id, numero_item: idx + 1, ...it }));
     const { error: e2 } = await supabase.from("nfe_itens").insert(itensInsert);
     if (e2) toast.error("NF-e criada, mas itens falharam: " + e2.message);
-    else toast.success(`NF-e nº ${numero} emitida!`);
+     else {
+       toast.success(`NF-e nº ${numero} emitida!`);
+       await supabase.from("notifications").insert({
+         user_id: userId,
+         title: "NF-e Emitida",
+         message: `A NF-e nº ${numero} foi autorizada com sucesso.`,
+         type: "success",
+         link: "/notas-fiscais"
+       });
+     }
     onSuccess();
   };
 
