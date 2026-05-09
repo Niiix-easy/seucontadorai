@@ -1327,9 +1327,44 @@ export default function Sefaz() {
                 </div>
               </div>
               <div className="space-y-6 pt-4 border-t">
-                <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Package className="w-4 h-4" /> Backlog & Controle Granular (UF/Ambiente)
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Package className="w-4 h-4" /> Backlog & Controle Granular (UF/Ambiente)
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setShowAuditLogs(true)} className="gap-2 h-8 text-[10px]">
+                      <History className="w-3 h-3" /> Ver Auditoria
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/20 rounded-lg border">
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-3 h-3 text-muted-foreground" />
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground">Filtros:</Label>
+                  </div>
+                  <Select value={backlogFilters.uf} onValueChange={v => setBacklogFilters(p => ({ ...p, uf: v }))}>
+                    <SelectTrigger className="w-24 h-8 text-[10px]"><SelectValue placeholder="UF" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas UFs</SelectItem>
+                      {ufs.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={backlogFilters.env} onValueChange={v => setBacklogFilters(p => ({ ...p, env: v }))}>
+                    <SelectTrigger className="w-28 h-8 text-[10px]"><SelectValue placeholder="Ambiente" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos Amb.</SelectItem>
+                      <SelectItem value="homologacao">Homologação</SelectItem>
+                      <SelectItem value="producao">Produção</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-[10px] uppercase text-muted-foreground">A partir de:</Label>
+                    <Input type="date" value={backlogFilters.date} onChange={e => setBacklogFilters(p => ({ ...p, date: e.target.value }))} className="w-32 h-8 text-[10px]" />
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setBacklogFilters({ uf: "all", env: "all", date: "" })} title="Limpar Filtros"><X className="w-3 h-3" /></Button>
+                </div>
+
                 <div className="overflow-x-auto border rounded-lg">
                   <table className="w-full text-xs">
                     <thead className="bg-muted/50 uppercase">
