@@ -606,14 +606,6 @@ export default function Sefaz() {
       if (data) setExportHistory(data);
     };
 
-    const handleResendEmail = async (logId: string) => {
-      toast.info("Reenviando e-mail...");
-      // Simulate resend
-      setTimeout(() => {
-        toast.success("E-mail reenviado com sucesso!");
-      }, 1500);
-    };
-
     const loadUserPreferences = async () => {
       if (!user) return;
       const { data } = await supabase
