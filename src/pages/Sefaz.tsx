@@ -1002,16 +1002,28 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                      {docInDetail.xml_content}
                    </pre>
                  </TabsContent>
-                 <TabsContent value="logs" className="mt-2">
-                   <div className="space-y-2">
-                     {docInDetail.processing_log?.map((log: any, idx: number) => (
-                       <div key={idx} className="text-xs p-2 border-b last:border-0 flex justify-between">
-                         <span>{log.event}</span>
-                         <span className="text-muted-foreground">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                       </div>
-                     ))}
-                   </div>
-                 </TabsContent>
+                  <TabsContent value="logs" className="mt-2">
+                    <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                      {docInDetail.processing_log?.length ? (
+                        docInDetail.processing_log.map((log: any, idx: number) => (
+                          <div key={idx} className="p-3 border rounded-lg bg-muted/20 space-y-1">
+                            <div className="flex justify-between items-center">
+                              <span className="font-semibold text-[11px] text-primary">{log.event}</span>
+                              <span className="text-[10px] text-muted-foreground">{new Date(log.timestamp).toLocaleString()}</span>
+                            </div>
+                            {(log.cStat || log.xMotivo) && (
+                              <div className="text-[10px] bg-muted/50 p-1.5 rounded flex gap-2">
+                                <span className="font-bold">cStat: {log.cStat || '—'}</span>
+                                <span className="text-muted-foreground">{log.xMotivo || '—'}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-center text-muted-foreground py-8 text-sm">Sem registros de processamento.</p>
+                      )}
+                    </div>
+                  </TabsContent>
                </Tabs>
                
                <div className="flex justify-end gap-2">
