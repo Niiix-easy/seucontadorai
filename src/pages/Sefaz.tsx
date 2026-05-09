@@ -2815,10 +2815,15 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-4 border-t mt-4">
-                  <Button variant="outline" size="sm" onClick={() => downloadAuditSummary(showAuditDetailDialog)}>
-                    <Download className="w-4 h-4 mr-2" /> Baixar Resumo Consolidado
-                  </Button>
+                <div className="flex justify-end gap-2 pt-4 border-t mt-4 flex-wrap">
+                  <div className="flex gap-1">
+                    <Button variant="outline" size="sm" onClick={() => downloadAuditSummary(showAuditDetailDialog, 'json')}>
+                      <Download className="w-4 h-4 mr-2" /> Resumo JSON
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => downloadAuditSummary(showAuditDetailDialog, 'xlsx')}>
+                      <Download className="w-4 h-4 mr-2" /> Resumo XLSX
+                    </Button>
+                  </div>
                   <Button variant="default" size="sm" onClick={() => handleRunProofFromHistory(showAuditDetailDialog)}>
                     <Zap className="w-4 h-4 mr-2" /> Reexecutar Modo Prova
                   </Button>
