@@ -2834,29 +2834,52 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   <h4 className="text-sm font-bold flex items-center gap-2">
                     <FileCode className="w-4 h-4" /> Validação de Hashes (SHA-256)
                   </h4>
-                  <div className="border rounded-lg overflow-hidden">
-                    <table className="w-full text-xs">
-                      <thead className="bg-muted">
+                  <div className="border rounded-lg overflow-hidden bg-white">
+                    <table className="w-full text-[10px]">
+                      <thead className="bg-muted/50 border-b">
                         <tr>
-                          <th className="text-left py-2 px-3">Arquivo</th>
-                          <th className="text-left py-2 px-3">Hash Registrado</th>
-                          <th className="text-center py-2 px-3">Status</th>
+                          <th className="text-left py-1.5 px-3">Indicador</th>
+                          <th className="text-left py-1.5 px-3">Esperado (Pré-visualização)</th>
+                          <th className="text-left py-1.5 px-3">Obtido (Processado)</th>
+                          <th className="text-center py-1.5 px-3">Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr className="border-t">
-                          <td className="py-2 px-3 font-medium">CSV</td>
-                          <td className="py-2 px-3 font-mono text-[10px] break-all">{showAuditDetailDialog.csv_hash || 'N/A'}</td>
+                          <td className="py-2 px-3 font-medium">Contagem (Registros)</td>
+                          <td className="py-2 px-3 font-mono">{showAuditDetailDialog.expected_data?.count || '-'}</td>
+                          <td className="py-2 px-3 font-mono">{showAuditDetailDialog.record_count || '-'}</td>
                           <td className="py-2 px-3 text-center">
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">VALIDADO</Badge>
+                            <Badge variant={showAuditDetailDialog.expected_data?.count === showAuditDetailDialog.record_count ? "outline" : "destructive"} className="h-4 text-[8px]">
+                              {showAuditDetailDialog.expected_data?.count === showAuditDetailDialog.record_count ? 'OK' : 'DIVERGENTE'}
+                            </Badge>
                           </td>
                         </tr>
                         <tr className="border-t">
-                          <td className="py-2 px-3 font-medium">PDF</td>
-                          <td className="py-2 px-3 font-mono text-[10px] break-all">{showAuditDetailDialog.pdf_hash || 'N/A'}</td>
+                          <td className="py-2 px-3 font-medium">Hash CSV</td>
+                          <td className="py-2 px-3 font-mono text-[8px] break-all opacity-60">{showAuditDetailDialog.expected_data?.csv_hash || 'N/A'}</td>
+                          <td className="py-2 px-3 font-mono text-[8px] break-all">{showAuditDetailDialog.csv_hash || 'N/A'}</td>
                           <td className="py-2 px-3 text-center">
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">VALIDADO</Badge>
+                            <Badge variant={showAuditDetailDialog.expected_data?.csv_hash === showAuditDetailDialog.csv_hash ? "outline" : "destructive"} className="h-4 text-[8px]">
+                              {showAuditDetailDialog.expected_data?.csv_hash === showAuditDetailDialog.csv_hash ? 'OK' : 'FALHA'}
+                            </Badge>
                           </td>
+                        </tr>
+                        <tr className="border-t">
+                          <td className="py-2 px-3 font-medium">Hash PDF</td>
+                          <td className="py-2 px-3 font-mono text-[8px] break-all opacity-60">{showAuditDetailDialog.expected_data?.pdf_hash || 'N/A'}</td>
+                          <td className="py-2 px-3 font-mono text-[8px] break-all">{showAuditDetailDialog.pdf_hash || 'N/A'}</td>
+                          <td className="py-2 px-3 text-center">
+                            <Badge variant={showAuditDetailDialog.expected_data?.pdf_hash === showAuditDetailDialog.pdf_hash ? "outline" : "destructive"} className="h-4 text-[8px]">
+                              {showAuditDetailDialog.expected_data?.pdf_hash === showAuditDetailDialog.pdf_hash ? 'OK' : 'FALHA'}
+                            </Badge>
+                          </td>
+                        </tr>
+                        <tr className="border-t bg-muted/10">
+                          <td className="py-2 px-3 font-medium">Hash ZIP</td>
+                          <td className="py-2 px-3 font-mono text-[8px] italic opacity-60">Indisponível na Pré-viz</td>
+                          <td className="py-2 px-3 font-mono text-[8px] break-all">{showAuditDetailDialog.zip_hash || 'Pendente'}</td>
+                          <td className="py-2 px-3 text-center">-</td>
                         </tr>
                       </tbody>
                     </table>
