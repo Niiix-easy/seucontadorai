@@ -514,9 +514,11 @@ export default function Sefaz() {
                           {nfe.status === "autorizada" ? "Autorizada" : "Cancelada"}
                         </Badge>
                       </td>
-                      <td className="py-3 px-4 text-center">
-                        <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setNfeDetalhe(nfe)}><Eye className="w-3 h-3 mr-1" /> Ver</Button>
-                      </td>
+                       <td className="py-3 px-4 text-center">
+                         <div className="flex justify-center gap-1">
+                           <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setNfeDetalhe(nfe)}><Eye className="w-3 h-3 mr-1" /> Ver</Button>
+                         </div>
+                       </td>
                     </tr>
                   ))}</tbody>
                 </table>
