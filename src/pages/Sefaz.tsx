@@ -2690,6 +2690,118 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
           </DialogContent>
         </Dialog>
 
+        <Dialog open={!!showAuditDetailDialog} onOpenChange={() => setShowAuditDetailDialog(null)}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <History className="w-5 h-5 text-primary" />
+                Auditoria de Exportação - #{showAuditDetailDialog?.id?.substring(0, 8)}
+              </DialogTitle>
+              <DialogDescription>
+                Detalhes técnicos e validação de integridade da exportação.
+              </DialogDescription>
+            </DialogHeader>
+
+            {showAuditDetailDialog && (
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className={cn(
+                    "p-3 rounded-lg border",
+                    showAuditDetailDialog.validation_divergence ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"
+                  )}>
+                    <div className="flex items-center gap-2 mb-2">
+                      {showAuditDetailDialog.validation_divergence ? (
+                        <AlertCircle className="w-4 h-4 text-red-600" />
+                      ) : (
+                        <CheckCircle2 className="w-4 h-4 text-green-600" />
+                      )}
+                      <span className={cn("font-bold text-sm", showAuditDetailDialog.validation_divergence ? "text-red-700" : "text-green-700")}>
+                        Status de Integridade: {showAuditDetailDialog.validation_divergence ? 'Falha' : 'Sucesso'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {showAuditDetailDialog.validation_divergence 
+                        ? "Divergência detectada entre a pré-visualização e os registros finais incluídos no arquivo."
+                        : "Todos os registros e hashes foram validados com sucesso."}
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-lg border bg-muted/30">
+                    <span className="text-[10px] uppercase text-muted-foreground font-bold block mb-1">Identificador de Execução</span>
+                    <code className="text-xs font-mono break-all">{showAuditDetailDialog.technical_log?.execution_id || showAuditDetailDialog.id}</code>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-sm font-bold flex items-center gap-2">
+                    <FileCode className="w-4 h-4" /> Validação de Hashes (SHA-256)
+                  </h4>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted">
+                        <tr>
+                          <th className="text-left py-2 px-3">Arquivo</th>
+                          <th className="text-left py-2 px-3">Hash Registrado</th>
+                          <th className="text-center py-2 px-3">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-t">
+                          <td className="py-2 px-3 font-medium">CSV</td>
+                          <td className="py-2 px-3 font-mono text-[10px] break-all">{showAuditDetailDialog.csv_hash || 'N/A'}</td>
+                          <td className="py-2 px-3 text-center">
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">VALIDADO</Badge>
+                          </td>
+                        </tr>
+                        <tr className="border-t">
+                          <td className="py-2 px-3 font-medium">PDF</td>
+                          <td className="py-2 px-3 font-mono text-[10px] break-all">{showAuditDetailDialog.pdf_hash || 'N/A'}</td>
+                          <td className="py-2 px-3 text-center">
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">VALIDADO</Badge>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-sm font-bold flex items-center gap-2">
+                    <Settings className="w-4 h-4" /> Parâmetros Técnicos de Reprodução
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2 text-[11px] bg-muted/20 p-3 rounded-lg border">
+                    <div className="flex justify-between border-b pb-1">
+                      <span className="text-muted-foreground">Ordenação:</span>
+                      <span className="font-mono font-bold capitalize">{showAuditDetailDialog.technical_log?.field || showAuditDetailDialog.technical_log?.sorting?.field || '-'}</span>
+                    </div>
+                    <div className="flex justify-between border-b pb-1">
+                      <span className="text-muted-foreground">Direção:</span>
+                      <span className="font-mono font-bold uppercase">{showAuditDetailDialog.technical_log?.direction || showAuditDetailDialog.technical_log?.sorting?.order || '-'}</span>
+                    </div>
+                    <div className="flex justify-between border-b pb-1">
+                      <span className="text-muted-foreground">Página:</span>
+                      <span className="font-mono font-bold">{showAuditDetailDialog.technical_log?.page || '-'}</span>
+                    </div>
+                    <div className="flex justify-between border-b pb-1">
+                      <span className="text-muted-foreground">Tamanho:</span>
+                      <span className="font-mono font-bold">{showAuditDetailDialog.technical_log?.page_size || '10'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4 border-t mt-4">
+                  <Button variant="outline" size="sm" onClick={() => downloadAuditSummary(showAuditDetailDialog)}>
+                    <Download className="w-4 h-4 mr-2" /> Baixar Resumo Consolidado
+                  </Button>
+                  <Button variant="default" size="sm" onClick={() => handleRunProofFromHistory(showAuditDetailDialog)}>
+                    <Zap className="w-4 h-4 mr-2" /> Reexecutar Modo Prova
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
         {/* Schedule Report Dialog */}
         <Dialog open={!!showScheduleDialog} onOpenChange={() => setShowScheduleDialog(null)}>
           <DialogContent>
