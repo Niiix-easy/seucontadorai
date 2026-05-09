@@ -186,6 +186,15 @@ export default function Sefaz() {
     const [cStatFilter, setCStatFilter] = useState("");
     const [xMotivoFilter, setXMotivoFilter] = useState("");
     const [statusFilter, setStatusFilter] = useState<string>("all");
+    const [historyFilters, setHistoryFilters] = useState({
+      status: "all",
+      divergence: "all",
+      uf: "all",
+      env: "all",
+      dateStart: "",
+      dateEnd: "",
+      recipient: ""
+    });
     const [configLoading, setConfigLoading] = useState(false);
     const [certPassword, setCertPassword] = useState("");
     const [showCertPassword, setShowCertPassword] = useState(false);
@@ -559,11 +568,21 @@ export default function Sefaz() {
 
     const loadExportHistory = async () => {
       if (!user) return;
-      const { data } = await supabase
+      let query = supabase
         .from("fiscal_export_logs")
         .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50);
+        .order("created_at", { ascending: false });
+
+      if (historyFilters.status !== "all") query = query.eq("status", historyFilters.status);
+      if (historyFilters.divergence === "true") query = query.eq("validation_divergence", true);
+      if (historyFilters.divergence === "false") query = query.eq("validation_divergence", false);
+      if (historyFilters.uf !== "all") query = query.filter("filters->>uf", "eq", historyFilters.uf);
+      if (historyFilters.env !== "all") query = query.filter("filters->>env", "eq", historyFilters.env);
+      if (historyFilters.dateStart) query = query.gte("created_at", historyFilters.dateStart);
+      if (historyFilters.dateEnd) query = query.lte("created_at", historyFilters.dateEnd + "T23:59:59");
+      if (historyFilters.recipient) query = query.filter("recipients", "cs", `{"${historyFilters.recipient}"}`);
+
+      const { data } = await query.limit(50);
       if (data) setExportHistory(data);
     };
 
@@ -781,37 +800,41 @@ export default function Sefaz() {
       }
     };
 
-    const downloadAuditSummary = (log: any) => {
-      const summary = {
-        id_execucao: log.id,
-        report_id: log.report_id,
-        data_criacao: log.created_at,
-        tipo: log.report_type,
-        filtros: log.filters,
-        contagens: {
-          total: log.record_count,
-          csv: log.csv_count,
-          pdf: log.pdf_count
-        },
-        hashes: {
-          csv: log.csv_hash,
-          pdf: log.pdf_hash
-        },
-        destinatarios: log.recipients,
-        tecnico: log.technical_log,
-        status: log.status,
-        divergencia: log.validation_divergence
+    const downloadAuditSummary = (log: any, format: 'json' | 'xlsx' = 'json') => {
+      const summaryData = {
+        "ID Execução": log.id,
+        "Data Criação": new Date(log.created_at).toLocaleString(),
+        "Tipo": log.report_type,
+        "Status": log.status,
+        "Divergência": log.validation_divergence ? "SIM" : "NÃO",
+        "Registros Total": log.record_count,
+        "CSV Count": log.csv_count,
+        "PDF Count": log.pdf_count,
+        "Hash CSV": log.csv_hash,
+        "Hash PDF": log.pdf_hash,
+        "Filtros": JSON.stringify(log.filters),
+        "Destinatários": (log.recipients || []).join(", "),
+        "Tamanho Página": log.technical_log?.page_size || 10,
+        "Ordenação": log.technical_log?.field || "",
+        "Direção": log.technical_log?.direction || ""
       };
 
-      const blob = new Blob([JSON.stringify(summary, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `resumo_auditoria_${log.id.substring(0, 8)}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success("Resumo de auditoria exportado.");
+      if (format === 'json') {
+        const blob = new Blob([JSON.stringify(summaryData, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `resumo_auditoria_${log.id.substring(0, 8)}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        const ws = XLSX.utils.json_to_sheet([summaryData]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Resumo Auditoria");
+        XLSX.writeFile(wb, `resumo_auditoria_${log.id.substring(0, 8)}.xlsx`);
+      }
+      toast.success(`Resumo de auditoria (${format.toUpperCase()}) exportado.`);
     };
 
     const handleRunProofFromHistory = (log: any) => {
