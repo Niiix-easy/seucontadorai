@@ -100,6 +100,8 @@ function generateChave() {
     retry_delay_minutes?: number;
     is_suspended?: boolean;
     consecutive_validation_failures?: number;
+    auto_retry_on_reactivation?: boolean;
+    reactivation_throughput?: number;
   };
 
  type ProcessedDocument = {
@@ -135,8 +137,11 @@ export default function Sefaz() {
       max_retries: 5,
       retry_delay_minutes: 15,
       is_suspended: false,
-      consecutive_validation_failures: 0
+      consecutive_validation_failures: 0,
+      auto_retry_on_reactivation: false,
+      reactivation_throughput: 5
     });
+    const [deadLetterNotifs, setDeadLetterNotifs] = useState<any[]>([]);
     const [cStatFilter, setCStatFilter] = useState("");
     const [xMotivoFilter, setXMotivoFilter] = useState("");
    const [statusFilter, setStatusFilter] = useState<string>("all");
