@@ -354,7 +354,7 @@ export default function Sefaz() {
       let query = supabase
         .from("fiscal_action_logs")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order(auditSort.field, { ascending: auditSort.order === 'asc' });
 
       if (auditFilters.uf !== "all") query = query.eq("uf", auditFilters.uf);
       if (auditFilters.env !== "all") query = query.eq("environment", auditFilters.env);
@@ -362,7 +362,9 @@ export default function Sefaz() {
       if (auditFilters.dateStart) query = query.gte("created_at", `${auditFilters.dateStart}T00:00:00`);
       if (auditFilters.dateEnd) query = query.lte("created_at", `${auditFilters.dateEnd}T23:59:59`);
 
-      const { data } = await query.limit(100);
+      const from = (auditPage - 1) * 10;
+      const to = from + 9;
+      const { data } = await query.range(from, to);
       if (data) setAuditLogs(data);
     };
 
