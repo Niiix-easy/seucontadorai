@@ -1539,7 +1539,17 @@ export default function Sefaz() {
                      <Input placeholder="cStat" value={backlogFilters.cStat} onChange={e => setBacklogFilters(p => ({ ...p, cStat: e.target.value }))} className="w-20 h-8 text-[10px]" />
                      <Input placeholder="xMotivo" value={backlogFilters.xMotivo} onChange={e => setBacklogFilters(p => ({ ...p, xMotivo: e.target.value }))} className="w-32 h-8 text-[10px]" />
                    </div>
-                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setBacklogFilters({ uf: "all", env: "all", date: "", cStat: "", xMotivo: "" })} title="Limpar Filtros"><X className="w-3 h-3" /></Button>
+                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setBacklogFilters({ uf: "all", env: "all", date: "", cStat: "", xMotivo: "" })} title="Limpar Filtros">
+                     <X className="w-3 h-3" />
+                   </Button>
+                   <div className="ml-auto flex gap-1">
+                     <Button variant="outline" size="sm" onClick={handleExportBacklogCSV} title="Exportar CSV" className="h-8 px-2 text-[10px] gap-1">
+                       <Download className="w-3 h-3" /> CSV
+                     </Button>
+                     <Button variant="outline" size="sm" onClick={handleExportBacklogPDF} title="Exportar PDF" className="h-8 px-2 text-[10px] gap-1 border-red-100">
+                       <FileDown className="w-3 h-3 text-red-500" /> PDF
+                     </Button>
+                   </div>
                 </div>
 
                 <div className="overflow-x-auto border rounded-lg">
