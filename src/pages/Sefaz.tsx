@@ -475,7 +475,7 @@ export default function Sefaz() {
       if (user) {
         loadAuditLogs();
       }
-    }, [user, auditFilters]);
+    }, [user, auditFilters, auditSort, auditPage]);
 
     const loadFiscalConfig = async () => {
       const { data, error } = await supabase
