@@ -1671,9 +1671,18 @@ export default function Sefaz() {
                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setBacklogFilters({ uf: "all", env: "all", date: "", cStat: "", xMotivo: "" })} title="Limpar Filtros">
                      <X className="w-3 h-3" />
                    </Button>
+                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowSavePrefDialog({ type: 'backlog', filters: backlogFilters })} title="Salvar Filtro">
+                     <Settings className="w-3 h-3" />
+                   </Button>
+                   <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-500" onClick={() => setShowScheduleDialog({ type: 'backlog' })} title="Agendar Exportação">
+                     <Zap className="w-3 h-3" />
+                   </Button>
                    <div className="ml-auto flex gap-1">
                      <Button variant="outline" size="sm" onClick={handleExportBacklogCSV} title="Exportar CSV" className="h-8 px-2 text-[10px] gap-1">
                        <Download className="w-3 h-3" /> CSV
+                     </Button>
+                     <Button variant="outline" size="sm" onClick={handleExportBacklogXLSX} title="Exportar Excel" className="h-8 px-2 text-[10px] gap-1 border-green-100">
+                       <FileArchive className="w-3 h-3 text-green-500" /> XLSX
                      </Button>
                      <Button variant="outline" size="sm" onClick={handleExportBacklogPDF} title="Exportar PDF" className="h-8 px-2 text-[10px] gap-1 border-red-100">
                        <FileDown className="w-3 h-3 text-red-500" /> PDF
