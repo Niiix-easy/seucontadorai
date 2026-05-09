@@ -2826,6 +2826,12 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                       <span className="text-muted-foreground">Tamanho:</span>
                       <span className="font-mono font-bold">{showAuditDetailDialog.technical_log?.page_size || '10'}</span>
                     </div>
+                    <div className="flex justify-between col-span-2 pt-1">
+                      <span className="text-muted-foreground">Destinatários:</span>
+                      <span className="font-mono font-bold truncate max-w-[300px]" title={showAuditDetailDialog.recipients?.join(", ")}>
+                        {showAuditDetailDialog.recipients?.join(", ") || 'Nenhum'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
