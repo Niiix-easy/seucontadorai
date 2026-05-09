@@ -1031,11 +1031,25 @@ export default function Sefaz() {
                   </div>
                 </div>
               </div>
-              <div className="flex justify-end pt-4 border-t">
-                <Button onClick={handleSaveConfig} disabled={configLoading} className="gap-2">
-                  {configLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                  Salvar Configurações
-                </Button>
+              <div className="space-y-4 pt-4 border-t">
+                <p className="text-sm font-medium text-muted-foreground">Canais de Alerta (Dead-Letter)</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center justify-between p-3 rounded-md border bg-muted/20">
+                    <Label className="text-xs">Notificações no App</Label>
+                    <Switch checked={notifPrefs.push} onCheckedChange={c => setNotifPrefs(p => ({ ...p, push: c }))} />
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-md border bg-muted/20">
+                    <Label className="text-xs">Alertas por E-mail</Label>
+                    <Switch checked={notifPrefs.email} onCheckedChange={c => setNotifPrefs(p => ({ ...p, email: c }))} />
+                  </div>
+                </div>
+                <div className="flex justify-between items-center pt-2">
+                  <Button variant="outline" size="sm" onClick={handleSaveNotifPrefs} className="text-xs">Salvar Canais de Alerta</Button>
+                  <Button onClick={handleSaveConfig} disabled={configLoading} className="gap-2">
+                    {configLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                    Salvar Configurações
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
