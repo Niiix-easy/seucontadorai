@@ -16,6 +16,7 @@ import {
 import JSZip from "jszip";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 
 type ItemNFe = {
@@ -350,6 +351,24 @@ export default function Sefaz() {
         toast.success("Configurações salvas!");
       } catch (err: any) {
         toast.error("Erro ao salvar: " + err.message);
+      } finally {
+        setConfigLoading(false);
+      }
+    };
+
+    const handleReactivateEngine = async () => {
+      if (!user) return;
+      setConfigLoading(true);
+      try {
+        const { error } = await supabase
+          .from("fiscal_configurations")
+          .update({ is_suspended: false, consecutive_validation_failures: 0 })
+          .eq("user_id", user.id);
+        if (error) throw error;
+        toast.success("Motor fiscal reativado!");
+        loadFiscalConfig();
+      } catch (err: any) {
+        toast.error("Erro ao reativar: " + err.message);
       } finally {
         setConfigLoading(false);
       }
