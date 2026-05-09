@@ -1,0 +1,1 @@
+ALTER FUNCTION public.reset_fiscal_suspension() SET search_path = public;

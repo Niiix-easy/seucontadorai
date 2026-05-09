@@ -8,13 +8,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { 
-   Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
+    Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
     Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
-    FileDown, Play, CheckSquare, Square
+    FileDown, Play, CheckSquare, Square, FileArchive
  } from "lucide-react";
+import JSZip from "jszip";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 
 type ItemNFe = {
@@ -92,10 +95,12 @@ function generateChave() {
  type FiscalConfig = {
    uf: string;
    environment: "homologacao" | "producao";
-   certificate_filename: string | null;
-   max_retries?: number;
-   retry_delay_minutes?: number;
- };
+    certificate_filename: string | null;
+    max_retries?: number;
+    retry_delay_minutes?: number;
+    is_suspended?: boolean;
+    consecutive_validation_failures?: number;
+  };
 
  type ProcessedDocument = {
    id: string;
@@ -121,15 +126,19 @@ export default function Sefaz() {
   const [search, setSearch] = useState("");
   const [emitindo, setEmitindo] = useState(false);
   const [loading, setLoading] = useState(true);
-   const [nfes, setNfes] = useState<NFeEmitida[]>([]);
-   const [processedDocs, setProcessedDocs] = useState<ProcessedDocument[]>([]);
-   const [fiscalConfig, setFiscalConfig] = useState<FiscalConfig>({ 
-     uf: "SP", 
-     environment: "homologacao", 
-     certificate_filename: null,
-     max_retries: 5,
-     retry_delay_minutes: 15
-   });
+    const [nfes, setNfes] = useState<NFeEmitida[]>([]);
+    const [processedDocs, setProcessedDocs] = useState<ProcessedDocument[]>([]);
+    const [fiscalConfig, setFiscalConfig] = useState<FiscalConfig>({ 
+      uf: "SP", 
+      environment: "homologacao", 
+      certificate_filename: null,
+      max_retries: 5,
+      retry_delay_minutes: 15,
+      is_suspended: false,
+      consecutive_validation_failures: 0
+    });
+    const [cStatFilter, setCStatFilter] = useState("");
+    const [xMotivoFilter, setXMotivoFilter] = useState("");
    const [statusFilter, setStatusFilter] = useState<string>("all");
     const [configLoading, setConfigLoading] = useState(false);
     const [certPassword, setCertPassword] = useState("");
@@ -165,6 +174,28 @@ export default function Sefaz() {
       link.click();
       document.body.removeChild(link);
       toast.success("Relatório CSV exportado!");
+    };
+
+    const handleExportLog = (doc: ProcessedDocument) => {
+      if (!doc.processing_log) return;
+      const headers = ["Tentativa", "Horário", "Evento", "cStat", "xMotivo"];
+      const rows = doc.processing_log.map((log, index) => [
+        index + 1,
+        new Date(log.timestamp).toLocaleString(),
+        log.event,
+        log.cStat || "",
+        log.xMotivo || ""
+      ]);
+      const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `log_processamento_${doc.id}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Log de processamento exportado!");
     };
  
      const handleBatchRetry = async () => {
@@ -255,13 +286,65 @@ export default function Sefaz() {
      if (!error && data) setFiscalConfig(data);
    };
 
-   const loadProcessedDocs = async () => {
-     let query = supabase.from("processed_documents").select("*").order("created_at", { ascending: false });
-     if (periodo.de) query = query.gte("created_at", periodo.de);
-     if (periodo.ate) query = query.lte("created_at", periodo.ate);
-     const { data } = await query;
-     if (data) setProcessedDocs(data as ProcessedDocument[]);
-   };
+    const loadProcessedDocs = async () => {
+      let query = supabase.from("processed_documents").select("*").order("created_at", { ascending: false });
+      if (periodo.de) query = query.gte("created_at", `${periodo.de}T00:00:00`);
+      if (periodo.ate) query = query.lte("created_at", `${periodo.ate}T23:59:59`);
+      if (cStatFilter) query = query.ilike("sefaz_response_code", `%${cStatFilter}%`);
+      if (xMotivoFilter) query = query.ilike("sefaz_response_message", `%${xMotivoFilter}%`);
+      
+      const { data } = await query;
+      if (data) setProcessedDocs(data as ProcessedDocument[]);
+    };
+
+    const handleBatchDownloadZip = async () => {
+      if (selectedIds.length === 0) return;
+      
+      toast.info("Gerando arquivo ZIP...");
+      const zip = new JSZip();
+      const selectedDocs = processedDocs.filter(d => selectedIds.includes(d.id));
+      
+      selectedDocs.forEach(doc => {
+        if (doc.signed_xml_content) {
+          zip.file(`${doc.id}_assinado.xml`, doc.signed_xml_content);
+        } else {
+          zip.file(`${doc.id}_original.xml`, doc.xml_content);
+        }
+        // If there are other receipts or logs, they could be added here
+        if (doc.processing_log) {
+          zip.file(`${doc.id}_log.json`, JSON.stringify(doc.processing_log, null, 2));
+        }
+      });
+
+      const content = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(content);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `lote_fiscal_${new Date().getTime()}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Download ZIP iniciado!");
+    };
+
+    const [notifPrefs, setNotifPrefs] = useState({ email: true, push: true });
+
+    useEffect(() => {
+      if (user) {
+        supabase.from("notification_preferences").select("dead_letter_alerts_email, dead_letter_alerts_push").eq("user_id", user.id).maybeSingle().then(({ data }) => {
+          if (data) setNotifPrefs({ email: data.dead_letter_alerts_email ?? true, push: data.dead_letter_alerts_push ?? true });
+        });
+      }
+    }, [user]);
+
+    const handleSaveNotifPrefs = async () => {
+      if (!user) return;
+      const { error } = await supabase.from("notification_preferences").update({
+        dead_letter_alerts_email: notifPrefs.email,
+        dead_letter_alerts_push: notifPrefs.push
+      }).eq("user_id", user.id);
+      if (!error) toast.success("Canais de alerta atualizados!");
+    };
 
     const handleSaveConfig = async () => {
       if (!user) return;
@@ -288,6 +371,24 @@ export default function Sefaz() {
         toast.success("Configurações salvas!");
       } catch (err: any) {
         toast.error("Erro ao salvar: " + err.message);
+      } finally {
+        setConfigLoading(false);
+      }
+    };
+
+    const handleReactivateEngine = async () => {
+      if (!user) return;
+      setConfigLoading(true);
+      try {
+        const { error } = await supabase
+          .from("fiscal_configurations")
+          .update({ is_suspended: false, consecutive_validation_failures: 0 })
+          .eq("user_id", user.id);
+        if (error) throw error;
+        toast.success("Motor fiscal reativado!");
+        loadFiscalConfig();
+      } catch (err: any) {
+        toast.error("Erro ao reativar: " + err.message);
       } finally {
         setConfigLoading(false);
       }
@@ -502,17 +603,22 @@ export default function Sefaz() {
              <CardHeader>
                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                  <CardTitle className="font-display">Relatórios de Processamento</CardTitle>
-                 <div className="flex items-center gap-2">
-                   <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-2">
-                     <FileDown className="w-4 h-4" /> Exportar CSV
-                   </Button>
-                   {selectedIds.length > 0 && (
-                     <Button variant="default" size="sm" onClick={handleBatchRetry} disabled={isBatchProcessing} className="gap-2">
-                       {isBatchProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                       Reprocessar ({selectedIds.length})
-                     </Button>
-                   )}
-                 </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {selectedIds.length > 0 && (
+                      <>
+                        <Button variant="outline" size="sm" onClick={handleBatchDownloadZip} className="gap-2 text-primary border-primary/20 hover:bg-primary/5">
+                          <FileArchive className="w-4 h-4" /> ZIP ({selectedIds.length})
+                        </Button>
+                        <Button variant="default" size="sm" onClick={handleBatchRetry} disabled={isBatchProcessing} className="gap-2">
+                          {isBatchProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                          Reprocessar ({selectedIds.length})
+                        </Button>
+                      </>
+                    )}
+                    <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-2">
+                      <FileDown className="w-4 h-4" /> Exportar CSV
+                    </Button>
+                  </div>
                </div>
              </CardHeader>
              <CardContent className="space-y-4">
@@ -539,9 +645,17 @@ export default function Sefaz() {
                         <SelectItem value="authorized">Autorizado</SelectItem>
                         <SelectItem value="error">Erro</SelectItem>
                         <SelectItem value="pending">Pendente</SelectItem>
-                        <SelectItem value="failed_permanently">Dead-letter</SelectItem>
+                        <SelectItem value="dead-letter">Dead-letter</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs">cStat:</Label>
+                    <Input placeholder="Ex: 100" value={cStatFilter} onChange={e => setCStatFilter(e.target.value)} className="w-20 h-9 text-xs font-mono" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs">Motivo:</Label>
+                    <Input placeholder="Buscar..." value={xMotivoFilter} onChange={e => setXMotivoFilter(e.target.value)} className="w-32 h-9 text-xs" />
                   </div>
                   <Button variant="outline" size="sm" onClick={loadProcessedDocs}><Search className="w-4 h-4" /></Button>
                 </div>
@@ -873,31 +987,69 @@ export default function Sefaz() {
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <p className="text-sm font-medium text-muted-foreground">Políticas de Reprocessamento</p>
-                  <div className="space-y-2">
-                    <Label>Máximo de Tentativas (Dead-letter limit)</Label>
-                    <Input 
-                      type="number" 
-                      value={fiscalConfig.max_retries} 
-                      onChange={e => setFiscalConfig(p => ({ ...p, max_retries: Number(e.target.value) }))} 
-                    />
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <p className="text-sm font-medium text-muted-foreground">Status do Motor Fiscal</p>
+                    <div className={cn("p-4 rounded-lg border flex items-center justify-between", fiscalConfig.is_suspended ? "bg-destructive/10 border-destructive/20" : "bg-green-500/10 border-green-500/20")}>
+                      <div className="flex items-center gap-3">
+                        {fiscalConfig.is_suspended ? <AlertCircle className="w-5 h-5 text-destructive" /> : <CheckCircle2 className="w-5 h-5 text-green-500" />}
+                        <div>
+                          <p className="font-medium text-sm">{fiscalConfig.is_suspended ? "Motor Suspenso" : "Motor Ativo"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {fiscalConfig.is_suspended 
+                              ? `Suspenso após ${fiscalConfig.consecutive_validation_failures} falhas consecutivas.` 
+                              : "Processando documentos normalmente."}
+                          </p>
+                        </div>
+                      </div>
+                      {fiscalConfig.is_suspended && (
+                        <Button size="sm" variant="outline" onClick={handleReactivateEngine}>Reativar</Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Intervalo entre Tentativas (minutos)</Label>
-                    <Input 
-                      type="number" 
-                      value={fiscalConfig.retry_delay_minutes} 
-                      onChange={e => setFiscalConfig(p => ({ ...p, retry_delay_minutes: Number(e.target.value) }))} 
-                    />
+
+                  <div className="space-y-4">
+                    <p className="text-sm font-medium text-muted-foreground">Políticas de Reprocessamento</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Máximo de Tentativas</Label>
+                        <Input 
+                          type="number" 
+                          value={fiscalConfig.max_retries} 
+                          onChange={e => setFiscalConfig(p => ({ ...p, max_retries: Number(e.target.value) }))} 
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Intervalo (minutos)</Label>
+                        <Input 
+                          type="number" 
+                          value={fiscalConfig.retry_delay_minutes} 
+                          onChange={e => setFiscalConfig(p => ({ ...p, retry_delay_minutes: Number(e.target.value) }))} 
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-              <div className="flex justify-end pt-4 border-t">
-                <Button onClick={handleSaveConfig} disabled={configLoading} className="gap-2">
-                  {configLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                  Salvar Configurações
-                </Button>
+              <div className="space-y-4 pt-4 border-t">
+                <p className="text-sm font-medium text-muted-foreground">Canais de Alerta (Dead-Letter)</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center justify-between p-3 rounded-md border bg-muted/20">
+                    <Label className="text-xs">Notificações no App</Label>
+                    <Switch checked={notifPrefs.push} onCheckedChange={c => setNotifPrefs(p => ({ ...p, push: c }))} />
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-md border bg-muted/20">
+                    <Label className="text-xs">Alertas por E-mail</Label>
+                    <Switch checked={notifPrefs.email} onCheckedChange={c => setNotifPrefs(p => ({ ...p, email: c }))} />
+                  </div>
+                </div>
+                <div className="flex justify-between items-center pt-2">
+                  <Button variant="outline" size="sm" onClick={handleSaveNotifPrefs} className="text-xs">Salvar Canais de Alerta</Button>
+                  <Button onClick={handleSaveConfig} disabled={configLoading} className="gap-2">
+                    {configLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                    Salvar Configurações
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1027,8 +1179,11 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                </Tabs>
                
                <div className="flex justify-end gap-2">
-                 <Button variant="outline" onClick={() => handleDownloadXml(docInDetail)}>Download XML</Button>
-                 {docInDetail.status === 'error' && <Button onClick={() => handleRetry(docInDetail.id)}>Tentar Novamente</Button>}
+                <Button variant="outline" onClick={() => handleExportLog(docInDetail)} className="gap-2">
+                  <Download className="w-4 h-4" /> Exportar Log
+                </Button>
+                <Button variant="outline" onClick={() => handleDownloadXml(docInDetail)}>Download XML</Button>
+                {(docInDetail.status === 'error' || docInDetail.status === 'dead-letter') && <Button onClick={() => handleRetry(docInDetail.id)}>Tentar Novamente</Button>}
                </div>
              </div>
            )}

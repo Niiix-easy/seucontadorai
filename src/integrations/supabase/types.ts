@@ -354,9 +354,11 @@ export type Database = {
           certificate_password_encrypted: string | null
           certificate_password_hash: string | null
           certificate_path: string | null
+          consecutive_validation_failures: number | null
           created_at: string
           environment: Database["public"]["Enums"]["sefaz_environment"]
           id: string
+          is_suspended: boolean | null
           max_retries: number | null
           retry_delay_minutes: number | null
           uf: string
@@ -368,9 +370,11 @@ export type Database = {
           certificate_password_encrypted?: string | null
           certificate_password_hash?: string | null
           certificate_path?: string | null
+          consecutive_validation_failures?: number | null
           created_at?: string
           environment?: Database["public"]["Enums"]["sefaz_environment"]
           id?: string
+          is_suspended?: boolean | null
           max_retries?: number | null
           retry_delay_minutes?: number | null
           uf: string
@@ -382,9 +386,11 @@ export type Database = {
           certificate_password_encrypted?: string | null
           certificate_password_hash?: string | null
           certificate_path?: string | null
+          consecutive_validation_failures?: number | null
           created_at?: string
           environment?: Database["public"]["Enums"]["sefaz_environment"]
           id?: string
+          is_suspended?: boolean | null
           max_retries?: number | null
           retry_delay_minutes?: number | null
           uf?: string
@@ -702,6 +708,8 @@ export type Database = {
       notification_preferences: {
         Row: {
           audit: boolean | null
+          dead_letter_alerts_email: boolean | null
+          dead_letter_alerts_push: boolean | null
           email: boolean | null
           id: string
           nfe: boolean | null
@@ -712,6 +720,8 @@ export type Database = {
         }
         Insert: {
           audit?: boolean | null
+          dead_letter_alerts_email?: boolean | null
+          dead_letter_alerts_push?: boolean | null
           email?: boolean | null
           id?: string
           nfe?: boolean | null
@@ -722,6 +732,8 @@ export type Database = {
         }
         Update: {
           audit?: boolean | null
+          dead_letter_alerts_email?: boolean | null
+          dead_letter_alerts_push?: boolean | null
           email?: boolean | null
           id?: string
           nfe?: boolean | null
