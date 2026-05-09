@@ -421,14 +421,22 @@ export default function Notificacoes() {
                          disabled={updatePrefsMutation.isPending} 
                        />
                      </div>
-                     <div className="flex items-center justify-between">
-                       <span className="text-sm">CRM e Clientes</span>
-                       <Switch 
-                         checked={prefs?.nfse ?? true} 
-                         onCheckedChange={(c) => updatePrefsMutation.mutate({ nfse: c })}
-                         disabled={updatePrefsMutation.isPending} 
-                       />
-                     </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">CRM e Clientes</span>
+                        <Switch 
+                          checked={prefs?.nfse ?? true} 
+                          onCheckedChange={(c) => updatePrefsMutation.mutate({ nfse: c })}
+                          disabled={updatePrefsMutation.isPending} 
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">Documentos em Dead-Letter</span>
+                        <Switch 
+                          checked={prefs?.dead_letter_alerts_push ?? true} 
+                          onCheckedChange={(c) => updatePrefsMutation.mutate({ dead_letter_alerts_push: c })}
+                          disabled={updatePrefsMutation.isPending} 
+                        />
+                      </div>
                    </div>
                  </div>
                  <div className="space-y-4 pt-4 border-t">
@@ -442,14 +450,22 @@ export default function Notificacoes() {
                          disabled={updatePrefsMutation.isPending} 
                        />
                      </div>
-                     <div className="flex items-center justify-between">
-                       <span className="text-sm">Alertas por E-mail</span>
-                       <Switch 
-                         checked={prefs?.email ?? true} 
-                         onCheckedChange={(c) => updatePrefsMutation.mutate({ email: c })}
-                         disabled={updatePrefsMutation.isPending} 
-                       />
-                     </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">Alertas por E-mail</span>
+                        <Switch 
+                          checked={prefs?.email ?? true} 
+                          onCheckedChange={(c) => updatePrefsMutation.mutate({ email: c })}
+                          disabled={updatePrefsMutation.isPending} 
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">Alertas Dead-Letter (E-mail)</span>
+                        <Switch 
+                          checked={prefs?.dead_letter_alerts_email ?? true} 
+                          onCheckedChange={(c) => updatePrefsMutation.mutate({ dead_letter_alerts_email: c })}
+                          disabled={updatePrefsMutation.isPending} 
+                        />
+                      </div>
                    </div>
                  </div>
                   <Button className="w-full" onClick={() => setShowPreferences(false)}>Fechar</Button>
