@@ -11,8 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { 
     Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
-    Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
-    FileDown, Play, CheckSquare, Square, FileArchive
+     Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle, CheckCircle2,
+     FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X
  } from "lucide-react";
 import JSZip from "jszip";
 import { toast } from "sonner";
@@ -140,6 +140,13 @@ export default function Sefaz() {
     });
     const [suspensionStates, setSuspensionStates] = useState<any[]>([]);
     const [backlogData, setBacklogData] = useState<any[]>([]);
+    const [backlogFilters, setBacklogFilters] = useState({ uf: "all", env: "all", date: "" });
+    const [backlogSearch, setBacklogSearch] = useState("");
+    const [showPauseDialog, setShowPauseDialog] = useState<{ uf: string, env: string, paused: boolean } | null>(null);
+    const [pauseReason, setPauseReason] = useState("");
+    const [auditLogs, setAuditLogs] = useState<any[]>([]);
+    const [showAuditLogs, setShowAuditLogs] = useState(false);
+
     const [deadLetterNotifs, setDeadLetterNotifs] = useState<any[]>([]);
     const [dlSearch, setDlSearch] = useState("");
     const [dlPeriodo, setDlPeriodo] = useState({ de: "", ate: "" });
