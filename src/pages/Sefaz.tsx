@@ -815,7 +815,7 @@ export default function Sefaz() {
 
     const handleRunProofFromHistory = (log: any) => {
       toast.info("Iniciando Modo Prova a partir do histórico...");
-      handleExportZip(log.report_type as 'backlog' | 'audit', 'proof');
+      handleExportZip(log.report_type as 'backlog' | 'audit', 'proof', log.filters, log.technical_log?.sorting);
     };
 
      const handleExportZip = async (type: 'backlog' | 'audit', mode: 'full' | 'proof' = 'full') => {
