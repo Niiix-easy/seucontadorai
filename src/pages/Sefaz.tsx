@@ -2919,19 +2919,57 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-4 border-t mt-4 flex-wrap">
-                  <div className="flex gap-1">
-                    <Button variant="outline" size="sm" onClick={() => downloadAuditSummary(showAuditDetailDialog, 'json')}>
-                      <Download className="w-4 h-4 mr-2" /> Resumo JSON
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => downloadAuditSummary(showAuditDetailDialog, 'xlsx')}>
-                      <Download className="w-4 h-4 mr-2" /> Resumo XLSX
-                    </Button>
-                  </div>
-                  <Button variant="default" size="sm" onClick={() => handleRunProofFromHistory(showAuditDetailDialog)}>
-                    <Zap className="w-4 h-4 mr-2" /> Reexecutar Modo Prova
-                  </Button>
-                </div>
+                 <div className="flex justify-between items-center pt-4 border-t mt-4 flex-wrap gap-4">
+                   <div className="flex gap-2">
+                     <Button variant="outline" size="sm" className="h-8 text-[10px]" onClick={() => verifyAndDownloadFile(showAuditDetailDialog, 'csv')}>
+                       <FileDown className="w-3.5 h-3.5 mr-1.5" /> Baixar CSV
+                     </Button>
+                     <Button variant="outline" size="sm" className="h-8 text-[10px]" onClick={() => verifyAndDownloadFile(showAuditDetailDialog, 'pdf')}>
+                       <FileText className="w-3.5 h-3.5 mr-1.5" /> Baixar PDF
+                     </Button>
+                     <Button variant="outline" size="sm" className="h-8 text-[10px]" onClick={() => verifyAndDownloadFile(showAuditDetailDialog, 'zip')}>
+                       <FileArchive className="w-3.5 h-3.5 mr-1.5" /> Baixar ZIP
+                     </Button>
+                   </div>
+
+                   <div className="flex items-center gap-2">
+                     <div className="flex gap-1">
+                       <Button variant="outline" size="sm" onClick={() => downloadAuditSummary(showAuditDetailDialog, 'json')}>
+                         <Download className="w-4 h-4 mr-2" /> Resumo JSON
+                       </Button>
+                       <Button variant="outline" size="sm" onClick={() => downloadAuditSummary(showAuditDetailDialog, 'xlsx')}>
+                         <Download className="w-4 h-4 mr-2" /> Resumo XLSX
+                       </Button>
+                     </div>
+                     
+                     <div className="flex flex-col items-end gap-1">
+                       <Button 
+                         variant="default" 
+                         size="sm" 
+                         onClick={() => handleRunProofFromHistory(showAuditDetailDialog)}
+                         disabled={manualScheduleStatus?.status === 'running' || manualScheduleStatus?.status === 'initializing' || (manualScheduleStatus?.id === 'proof-rerun' && manualScheduleStatus?.status !== 'success' && manualScheduleStatus?.status !== 'error')}
+                       >
+                         {manualScheduleStatus?.status === 'running' || manualScheduleStatus?.status === 'initializing' || (manualScheduleStatus?.id === 'proof-rerun' && manualScheduleStatus?.status !== 'success' && manualScheduleStatus?.status !== 'error') ? (
+                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                         ) : (
+                           <Zap className="w-4 h-4 mr-2" />
+                         )}
+                         Reexecutar Modo Prova
+                       </Button>
+                       {manualScheduleStatus && manualScheduleStatus.id === 'proof-rerun' && (
+                         <div className="w-full min-w-[150px] space-y-1">
+                           <div className="flex justify-between text-[10px] text-muted-foreground">
+                             <span className="capitalize">{manualScheduleStatus.status.replace('_', ' ')}</span>
+                             <span>{manualScheduleStatus.progress}%</span>
+                           </div>
+                           <div className="w-full bg-muted rounded-full h-1 overflow-hidden">
+                             <div className="bg-primary h-full transition-all duration-300" style={{ width: `${manualScheduleStatus.progress}%` }} />
+                           </div>
+                         </div>
+                       )}
+                     </div>
+                   </div>
+                 </div>
               </div>
             )}
           </DialogContent>
