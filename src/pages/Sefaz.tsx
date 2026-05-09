@@ -95,13 +95,9 @@ function generateChave() {
  type FiscalConfig = {
    uf: string;
    environment: "homologacao" | "producao";
-    certificate_filename: string | null;
-    max_retries?: number;
-    retry_delay_minutes?: number;
-    is_suspended?: boolean;
-    consecutive_validation_failures?: number;
-    auto_retry_on_reactivation?: boolean;
-    reactivation_throughput?: number;
+    certificate_filename: string | null; max_retries?: number; retry_delay_minutes?: number;
+    is_suspended?: boolean; is_paused?: boolean; consecutive_validation_failures?: number;
+    auto_retry_on_reactivation?: boolean; reactivation_throughput?: number;
   };
 
  type ProcessedDocument = {
@@ -139,8 +135,11 @@ export default function Sefaz() {
       is_suspended: false,
       consecutive_validation_failures: 0,
       auto_retry_on_reactivation: false,
-      reactivation_throughput: 5
+      reactivation_throughput: 5,
+      is_paused: false
     });
+    const [suspensionStates, setSuspensionStates] = useState<any[]>([]);
+    const [backlogData, setBacklogData] = useState<any[]>([]);
     const [deadLetterNotifs, setDeadLetterNotifs] = useState<any[]>([]);
     const [dlSearch, setDlSearch] = useState("");
     const [dlPeriodo, setDlPeriodo] = useState({ de: "", ate: "" });
@@ -283,13 +282,53 @@ export default function Sefaz() {
     icmsAliquota: 18, ipiAliquota: 0, pisAliquota: 1.65, cofinsAliquota: 7.6
   }]);
 
-   useEffect(() => {
-     if (user) {
-       loadNfes();
-       loadFiscalConfig();
-       loadProcessedDocs();
-     }
-   }, [user]);
+    const loadBacklogData = async () => {
+      const { data: backlog } = await supabase
+        .from("processed_documents")
+        .select("uf, environment, status, next_retry_at")
+        .or('status.in.("pending","error")');
+      
+      if (backlog) {
+        const grouped = backlog.reduce((acc: any, curr: any) => {
+          const key = `${curr.uf}-${curr.environment}`;
+          if (!acc[key]) acc[key] = { uf: curr.uf, env: curr.environment, count: 0, next: curr.next_retry_at };
+          acc[key].count++;
+          if (curr.next_retry_at && (!acc[key].next || curr.next_retry_at < acc[key].next)) {
+            acc[key].next = curr.next_retry_at;
+          }
+          return acc;
+        }, {});
+        setBacklogData(Object.values(grouped));
+      }
+
+      const { data: states } = await supabase.from("fiscal_suspension_states").select("*");
+      if (states) setSuspensionStates(states);
+    };
+
+    const togglePause = async (uf: string, env: string, currentPaused: boolean) => {
+      const { error } = await supabase
+        .from("fiscal_suspension_states")
+        .upsert({ 
+          user_id: user?.id, 
+          uf, 
+          environment: env, 
+          is_paused: !currentPaused 
+        }, { onConflict: "user_id, uf, environment" });
+      
+      if (!error) {
+        toast.success(`Reprocessamento ${!currentPaused ? "pausado" : "retomado"} para ${uf}/${env}`);
+        loadBacklogData();
+      }
+    };
+
+    useEffect(() => {
+      if (user) {
+        loadNfes();
+        loadFiscalConfig();
+        loadProcessedDocs();
+        loadBacklogData();
+      }
+    }, [user]);
 
    const loadFiscalConfig = async () => {
      const { data, error } = await supabase.from("fiscal_configurations").select("*").single();
@@ -325,17 +364,19 @@ export default function Sefaz() {
 
     const handleExportDeadLetterCSV = () => {
       if (deadLetterNotifs.length === 0) return;
-      const headers = ["ID", "Documento ID", "Data", "Status Alerta", "Canais", "cStat", "xMotivo", "Retentativas", "Erro"];
+      const headers = ["ID", "Documento ID", "UF", "Ambiente", "Data", "Status Alerta", "Canais", "cStat", "xMotivo", "Retentativas", "Próximo Retry", "XML/Recibo"];
       const rows = deadLetterNotifs.map(n => [
         n.id,
         n.document_id,
+        n.processed_documents?.uf || "",
+        n.processed_documents?.environment || "",
         new Date(n.created_at).toLocaleString(),
         n.status,
         (n.channels || []).join(", "),
         n.cstat || "",
         n.xmotivo || "",
-        n.retry_count_at_failure || "",
-        n.error_message || ""
+        n.retry_count_at_failure || "", n.processed_documents?.next_retry_at || "",
+        `${n.last_xml_url || ""}; ${n.last_receipt_number || ""}`
       ]);
       const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -1173,14 +1214,22 @@ export default function Sefaz() {
                           onChange={e => setFiscalConfig(p => ({ ...p, retry_delay_minutes: Number(e.target.value) }))} 
                         />
                       </div>
-                      <div className="space-y-2 col-span-2">
+                      <div className="space-y-2 col-span-2 relative">
                         <Label>Throughput (Docs/Min)</Label>
                         <Input 
                           type="number" 
                           value={fiscalConfig.reactivation_throughput} 
-                          onChange={e => setFiscalConfig(p => ({ ...p, reactivation_throughput: Number(e.target.value) }))} 
+                           onChange={e => {
+                             const val = Number(e.target.value);
+                             if (val > 100) toast.warning("Throughput alto detectado. Verifique os limites da SEFAZ.");
+                             if (val < 1) toast.error("Throughput mínimo é 1.");
+                             setFiscalConfig(p => ({ ...p, reactivation_throughput: val }));
+                           }} 
                           placeholder="Vazão para esta UF/Ambiente"
                         />
+                        {fiscalConfig.reactivation_throughput && fiscalConfig.reactivation_throughput > 100 && (
+                          <p className="text-[10px] text-amber-600 mt-1 font-medium">Atenção: Valores acima de 100 podem causar bloqueios temporários.</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1207,7 +1256,67 @@ export default function Sefaz() {
                   </div>
                 </div>
               </div>
-              <div className="space-y-4 pt-4 border-t">
+              <div className="space-y-6 pt-4 border-t">
+                <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Package className="w-4 h-4" /> Backlog & Controle Granular (UF/Ambiente)
+                </p>
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/50 uppercase">
+                      <tr>
+                        <th className="text-left py-2 px-4">UF</th>
+                        <th className="text-left py-2 px-4">Ambiente</th>
+                        <th className="text-center py-2 px-4">Fila</th>
+                        <th className="text-left py-2 px-4">Próximo Envio</th>
+                        <th className="text-center py-2 px-4">Status</th>
+                        <th className="text-right py-2 px-4">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {backlogData.length > 0 ? backlogData.map(b => {
+                        const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
+                        const isPaused = state?.is_paused;
+                        const isSuspended = state?.is_suspended;
+                        return (
+                          <tr key={`${b.uf}-${b.env}`} className="border-t hover:bg-muted/30">
+                            <td className="py-2 px-4 font-bold">{b.uf}</td>
+                            <td className="py-2 px-4 capitalize">{b.env}</td>
+                            <td className="py-2 px-4 text-center">
+                              <Badge variant="secondary">{b.count} docs</Badge>
+                            </td>
+                            <td className="py-2 px-4 text-muted-foreground">
+                              {b.next ? new Date(b.next).toLocaleString() : "—"}
+                            </td>
+                            <td className="py-2 px-4 text-center">
+                              {isSuspended ? (
+                                <Badge variant="destructive" className="text-[9px]">Suspenso</Badge>
+                              ) : isPaused ? (
+                                <Badge variant="outline" className="text-[9px] bg-amber-50">Pausado</Badge>
+                              ) : (
+                                <Badge variant="default" className="text-[9px] bg-green-500">Ativo</Badge>
+                              )}
+                            </td>
+                            <td className="py-2 px-4 text-right">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className={cn("h-7 text-[10px]", isPaused ? "text-green-600" : "text-amber-600")}
+                                onClick={() => togglePause(b.uf, b.env, !!isPaused)}
+                              >
+                                {isPaused ? <Play className="w-3 h-3 mr-1" /> : <Square className="w-3 h-3 mr-1" />}
+                                {isPaused ? "Retomar" : "Pausar"}
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      }) : (
+                        <tr><td colSpan={6} className="py-4 text-center text-muted-foreground">Nenhum backlog pendente.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <p className="text-sm font-medium text-muted-foreground">Canais de Alerta (Dead-Letter)</p>
                 <p className="text-sm font-medium text-muted-foreground">Canais de Alerta (Dead-Letter)</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex items-center justify-between p-3 rounded-md border bg-muted/20">

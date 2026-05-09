@@ -464,6 +464,7 @@ export type Database = {
           created_at: string
           environment: Database["public"]["Enums"]["sefaz_environment"]
           id: string
+          is_paused: boolean | null
           is_suspended: boolean | null
           max_retries: number | null
           reactivation_throughput: number | null
@@ -482,6 +483,7 @@ export type Database = {
           created_at?: string
           environment?: Database["public"]["Enums"]["sefaz_environment"]
           id?: string
+          is_paused?: boolean | null
           is_suspended?: boolean | null
           max_retries?: number | null
           reactivation_throughput?: number | null
@@ -500,6 +502,7 @@ export type Database = {
           created_at?: string
           environment?: Database["public"]["Enums"]["sefaz_environment"]
           id?: string
+          is_paused?: boolean | null
           is_suspended?: boolean | null
           max_retries?: number | null
           reactivation_throughput?: number | null
@@ -515,6 +518,7 @@ export type Database = {
           consecutive_failures: number | null
           environment: string
           id: string
+          is_paused: boolean | null
           is_suspended: boolean | null
           last_failure_at: string | null
           throughput_per_minute: number | null
@@ -526,6 +530,7 @@ export type Database = {
           consecutive_failures?: number | null
           environment: string
           id?: string
+          is_paused?: boolean | null
           is_suspended?: boolean | null
           last_failure_at?: string | null
           throughput_per_minute?: number | null
@@ -537,6 +542,7 @@ export type Database = {
           consecutive_failures?: number | null
           environment?: string
           id?: string
+          is_paused?: boolean | null
           is_suspended?: boolean | null
           last_failure_at?: string | null
           throughput_per_minute?: number | null
@@ -984,6 +990,7 @@ export type Database = {
         Row: {
           created_at: string
           document_type: string
+          environment: string | null
           id: string
           is_processing: boolean | null
           last_error: string | null
@@ -997,6 +1004,7 @@ export type Database = {
           sefaz_response_message: string | null
           signed_xml_content: string | null
           status: string
+          uf: string | null
           updated_at: string
           user_id: string
           xml_content: string
@@ -1004,6 +1012,7 @@ export type Database = {
         Insert: {
           created_at?: string
           document_type: string
+          environment?: string | null
           id?: string
           is_processing?: boolean | null
           last_error?: string | null
@@ -1017,6 +1026,7 @@ export type Database = {
           sefaz_response_message?: string | null
           signed_xml_content?: string | null
           status?: string
+          uf?: string | null
           updated_at?: string
           user_id: string
           xml_content: string
@@ -1024,6 +1034,7 @@ export type Database = {
         Update: {
           created_at?: string
           document_type?: string
+          environment?: string | null
           id?: string
           is_processing?: boolean | null
           last_error?: string | null
@@ -1037,6 +1048,7 @@ export type Database = {
           sefaz_response_message?: string | null
           signed_xml_content?: string | null
           status?: string
+          uf?: string | null
           updated_at?: string
           user_id?: string
           xml_content?: string

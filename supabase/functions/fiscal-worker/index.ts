@@ -12,16 +12,8 @@ serve(async (req) => {
     const { data: docs, error: fetchError } = await supabaseClient
       .from("processed_documents")
       .select(`
-        id,
-        user_id,
-        uf,
-        environment,
-        status,
-        fiscal_configurations (
-          is_suspended,
-          auto_retry_on_reactivation,
-          reactivation_throughput
-        )
+        id, user_id, uf, environment, status,
+        fiscal_configurations (is_suspended, is_paused, auto_retry_on_reactivation, reactivation_throughput)
       `)
       .or('status.in.("error","pending"),and(status.eq.dead-letter,next_retry_at.lte.now())')
       .lte("next_retry_at", new Date().toISOString())
@@ -36,12 +28,12 @@ serve(async (req) => {
       for (const doc of docs) {
         const { data: susp } = await supabaseClient
           .from("fiscal_suspension_states")
-          .select("is_suspended, throughput_per_minute")
+          .select("is_suspended, is_paused, throughput_per_minute")
           .match({ user_id: doc.user_id, uf: doc.uf || 'SP', environment: doc.environment || 'homologacao' })
           .maybeSingle();
 
-        if (susp?.is_suspended) {
-          console.log(`Skipping doc ${doc.id} - suspended for ${doc.uf}/${doc.environment}`);
+        if (susp?.is_suspended || susp?.is_paused || doc.fiscal_configurations?.is_paused) {
+          console.log(`Skipping doc ${doc.id} - suspended/paused for ${doc.uf}/${doc.environment}`);
           continue;
         }
 
