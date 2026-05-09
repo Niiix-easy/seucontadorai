@@ -87,21 +87,42 @@ async function signXml(xml: string, privateKeyPem: string, certPem: string) {
 
 async function sendToSefaz(signedXml: string, uf: string, env: string) {
   const endpoint = env === 'producao' 
-    ? `https://nfe.sefaz.${uf.toLowerCase()}.gov.br/ws/NFeAutorizacao4`
-    : `https://homologacao.nfe.sefaz.${uf.toLowerCase()}.gov.br/ws/NFeAutorizacao4`;
+    ? \`https://nfe.sefaz.\${uf.toLowerCase()}.gov.br/ws/NFeAutorizacao4\`
+    : \`https://homologacao.nfe.sefaz.\${uf.toLowerCase()}.gov.br/ws/NFeAutorizacao4\`;
 
-  const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
+  const soapEnvelope = \`<?xml version="1.0" encoding="utf-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
-    <nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">${signedXml}</nfeDadosMsg>
+    <nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">\${signedXml}</nfeDadosMsg>
   </soap12:Body>
-</soap12:Envelope>`;
+</soap12:Envelope>\`;
 
   return await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/soap+xml; charset=utf-8' },
     body: soapEnvelope
   });
+}
+
+async function sendDeadLetterNotification(supabase: any, userId: string, docId: string, maxRetries: number) {
+  const { data: prefs } = await supabase
+    .from("notification_preferences")
+    .select("dead_letter_alerts_email, dead_letter_alerts_push")
+    .eq("user_id", userId)
+    .single();
+
+  if (prefs?.dead_letter_alerts_push !== false) {
+    await supabase.from("notifications").insert({
+      user_id: userId,
+      title: "Documento em Dead-Letter",
+      message: \`O documento \${docId} excedeu o limite de \${maxRetries} tentativas e foi movido para dead-letter.\`,
+      type: "error"
+    });
+  }
+
+  if (prefs?.dead_letter_alerts_email) {
+    console.log(\`[EMAIL ALERT] Sending dead-letter email to user \${userId} for doc \${docId}\`);
+  }
 }
 
 serve(async (req) => {
@@ -113,56 +134,77 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-     const { action, documentId, password, uf, environment } = await req.json();
+    const { action, documentId, password, uf, environment, userId: forcedUserId } = await req.json();
 
-     if (action === "validate") {
-       const authHeader = req.headers.get("Authorization");
-       const { data: { user } } = await supabaseClient.auth.getUser(authHeader?.split(" ")[1] ?? "");
-       if (!user) throw new Error("Não autorizado");
- 
-       const { data: config } = await supabaseClient
-         .from("fiscal_configurations")
-         .select("*")
-         .eq("user_id", user.id)
-         .single();
- 
-       if (!config || !config.certificate_path) {
-         return new Response(JSON.stringify({ valid: false, error: "Certificado não configurado" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-       }
- 
-       const { data: pfxData, error: downloadError } = await supabaseClient.storage
-         .from("certificates")
-         .download(config.certificate_path);
- 
-       if (downloadError) return new Response(JSON.stringify({ valid: false, error: "Erro ao acessar arquivo do certificado" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
- 
-       try {
-         const decryptedPass = await decryptPassword(config.certificate_password_encrypted);
-         const pfxArrayBuffer = await pfxData.arrayBuffer();
-         const pfxBytes = new Uint8Array(pfxArrayBuffer);
-         const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(pfxBytes as any).getBytes());
-         const p12 = forge.pkcs12.fromP12(p12Asn1, decryptedPass);
-         
-         const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
-         const cert = certBags[forge.pki.oids.certBag]?.[0]?.cert;
- 
-         if (!cert) throw new Error("Certificado não encontrado no arquivo");
- 
-         const now = new Date();
-         if (new Date(cert.validity.notAfter) < now) {
-           return new Response(JSON.stringify({ valid: false, error: "Certificado expirado em " + cert.validity.notAfter }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-         }
- 
-         return new Response(JSON.stringify({ 
-           valid: true, 
-           expiry: cert.validity.notAfter,
-           subject: cert.subject.getField('CN')?.value
-         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-       } catch (e) {
-         return new Response(JSON.stringify({ valid: false, error: "Senha incorreta ou certificado corrompido" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-       }
-     }
- 
+    if (action === "validate") {
+      const authHeader = req.headers.get("Authorization");
+      let userId = forcedUserId;
+      if (!userId) {
+        const { data: { user } } = await supabaseClient.auth.getUser(authHeader?.split(" ")[1] ?? "");
+        if (!user) throw new Error("Não autorizado");
+        userId = user.id;
+      }
+
+      const { data: config } = await supabaseClient
+        .from("fiscal_configurations")
+        .select("*")
+        .eq("user_id", userId)
+        .single();
+
+      if (!config || !config.certificate_path) {
+        return new Response(JSON.stringify({ valid: false, error: "Certificado não configurado" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const { data: pfxData, error: downloadError } = await supabaseClient.storage
+        .from("certificates")
+        .download(config.certificate_path);
+
+      if (downloadError) return new Response(JSON.stringify({ valid: false, error: "Erro ao acessar arquivo do certificado" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+      try {
+        const decryptedPass = await decryptPassword(config.certificate_password_encrypted);
+        const pfxArrayBuffer = await pfxData.arrayBuffer();
+        const pfxBytes = new Uint8Array(pfxArrayBuffer);
+        const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(pfxBytes as any).getBytes());
+        const p12 = forge.pkcs12.fromP12(p12Asn1, decryptedPass);
+        
+        const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
+        const cert = certBags[forge.pki.oids.certBag]?.[0]?.cert;
+
+        if (!cert) throw new Error("Certificado não encontrado no arquivo");
+
+        const now = new Date();
+        if (new Date(cert.validity.notAfter) < now) {
+          return new Response(JSON.stringify({ valid: false, error: "Certificado expirado em " + cert.validity.notAfter }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        // Success: reset failures
+        await supabaseClient.from("fiscal_configurations").update({
+          consecutive_validation_failures: 0,
+          is_suspended: false
+        }).eq("user_id", userId);
+
+        return new Response(JSON.stringify({ 
+          valid: true, 
+          expiry: cert.validity.notAfter,
+          subject: cert.subject.getField('CN')?.value
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (e) {
+        const newFailCount = (config.consecutive_validation_failures || 0) + 1;
+        const isSuspended = newFailCount >= 5;
+        await supabaseClient.from("fiscal_configurations").update({
+          consecutive_validation_failures: newFailCount,
+          is_suspended: isSuspended
+        }).eq("user_id", userId);
+
+        return new Response(JSON.stringify({ 
+          valid: false, 
+          error: "Senha incorreta ou certificado corrompido",
+          suspended: isSuspended
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
+
     if (action === "update_password") {
       const encrypted = await encryptPassword(password);
       const authHeader = req.headers.get("Authorization");
@@ -172,7 +214,7 @@ serve(async (req) => {
 
       const { error } = await supabaseClient
         .from("fiscal_configurations")
-        .update({ certificate_password_encrypted: encrypted })
+        .update({ certificate_password_encrypted: encrypted, is_suspended: false, consecutive_validation_failures: 0 })
         .eq("user_id", user.id);
       
       if (error) throw error;
@@ -191,6 +233,11 @@ serve(async (req) => {
       if (docError || !doc) throw new Error("Documento não encontrado");
 
       const config = doc.fiscal_configurations;
+      if (config.is_suspended) {
+        await supabaseClient.from("processed_documents").update({ is_processing: false, last_error: "Motor suspenso" }).eq("id", documentId);
+        throw new Error("Motor fiscal suspenso por falhas consecutivas.");
+      }
+
       if (!config.certificate_path || !config.certificate_password_encrypted) {
         throw new Error("Certificado ou senha não configurados");
       }
@@ -206,36 +253,41 @@ serve(async (req) => {
       const pfxArrayBuffer = await pfxData.arrayBuffer();
       const pfxBytes = new Uint8Array(pfxArrayBuffer);
       
-      const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(pfxBytes as any).getBytes());
-      const p12 = forge.pkcs12.fromP12(p12Asn1, decryptedPass);
-      
-      const bags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
-      const keyBag = bags[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0];
-      const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
-      const certBag = certBags[forge.pki.oids.certBag]?.[0];
-
-      if (!keyBag || !certBag) throw new Error("Certificado inválido ou senha incorreta");
-
-      const privateKeyPem = forge.pki.privateKeyToPem(keyBag.key);
-      const certPem = forge.pki.certificateToPem(certBag.cert);
-
-      const signedXml = await signXml(doc.xml_content, privateKeyPem, certPem);
-
       try {
+        const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(pfxBytes as any).getBytes());
+        const p12 = forge.pkcs12.fromP12(p12Asn1, decryptedPass);
+        
+        const bags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
+        const keyBag = bags[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0];
+        const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
+        const certBag = certBags[forge.pki.oids.certBag]?.[0];
+
+        if (!keyBag || !certBag) throw new Error("Certificado inválido ou senha incorreta");
+
+        // Reset failure count on success
+        await supabaseClient.from("fiscal_configurations").update({
+          consecutive_validation_failures: 0,
+          is_suspended: false
+        }).eq("user_id", doc.user_id);
+
+        const privateKeyPem = forge.pki.privateKeyToPem(keyBag.key);
+        const certPem = forge.pki.certificateToPem(certBag.cert);
+
+        const signedXml = await signXml(doc.xml_content, privateKeyPem, certPem);
+
         const response = await sendToSefaz(signedXml, config.uf, config.environment);
-         const responseText = await response.text();
-         console.log("SEFAZ Response:", responseText);
- 
-         const getTag = (tag: string) => {
-           const match = responseText.match(new RegExp(`<${tag}[^>]*>(.*?)<\/${tag}>`, 'i'));
-           return match ? match[1] : null;
-         };
- 
-         const cStat = getTag("cStat");
-         const xMotivo = getTag("xMotivo");
-         const nProt = getTag("nProt");
- 
-         if (cStat === "100" || cStat === "101" || cStat === "102") {
+        const responseText = await response.text();
+
+        const getTag = (tag: string) => {
+          const match = responseText.match(new RegExp(\`<\${tag}[^>]*>(.*?)</\${tag}>\`, 'i'));
+          return match ? match[1] : null;
+        };
+
+        const cStat = getTag("cStat");
+        const xMotivo = getTag("xMotivo");
+        const nProt = getTag("nProt");
+
+        if (cStat === "100" || cStat === "101" || cStat === "102") {
           await supabaseClient.from("processed_documents").update({
             status: "authorized",
             signed_xml_content: signedXml,
@@ -243,38 +295,48 @@ serve(async (req) => {
             sefaz_response_code: cStat,
             sefaz_response_message: xMotivo,
             is_processing: false,
-             processing_log: [...(doc.processing_log || []), { timestamp: new Date().toISOString(), event: "Autorizado pela SEFAZ", cStat, xMotivo }]
+            processing_log: [...(doc.processing_log || []), { timestamp: new Date().toISOString(), event: "Autorizado pela SEFAZ", cStat, xMotivo }]
           }).eq("id", documentId);
         } else {
-           throw new Error(`SEFAZ [${cStat || 'ERRO'}]: ${xMotivo || 'Erro desconhecido'}`);
+          throw new Error(\`SEFAZ [\${cStat || 'ERRO'}]: \${xMotivo || 'Erro desconhecido'}\`);
         }
       } catch (error) {
+        const isValidationError = error.message.includes("Certificado inválido") || error.message.includes("senha incorreta") || error.message.includes("Decryption error");
+        
+        if (isValidationError) {
+          const newFailCount = (config.consecutive_validation_failures || 0) + 1;
+          const isSuspended = newFailCount >= 5;
+          await supabaseClient.from("fiscal_configurations").update({
+            consecutive_validation_failures: newFailCount,
+            is_suspended: isSuspended
+          }).eq("user_id", doc.user_id);
+        }
+
         const newRetryCount = (doc.retry_count || 0) + 1;
         const maxRetries = config.max_retries || 5;
         const delay = config.retry_delay_minutes || 15;
         
-         const status = newRetryCount >= maxRetries ? "dead-letter" : "error";
+        const status = newRetryCount >= maxRetries ? "dead-letter" : "error";
         const nextRetry = status === "error" 
           ? new Date(Date.now() + 1000 * 60 * delay).toISOString() 
           : null;
 
-         await supabaseClient.from("processed_documents").update({
-           status,
-           last_error: error.message,
-           retry_count: newRetryCount,
-           next_retry_at: nextRetry,
-           is_processing: false,
-           processing_log: [...(doc.processing_log || []), { timestamp: new Date().toISOString(), event: `Tentativa ${newRetryCount}: ${error.message}` }]
-         }).eq("id", documentId);
- 
-         if (status === "dead-letter") {
-           await supabaseClient.from("notifications").insert({
-             user_id: doc.user_id,
-             title: "Documento em Dead-Letter",
-             message: `O documento ${documentId} excedeu o limite de ${maxRetries} tentativas e foi movido para dead-letter.`,
-             type: "error"
-           });
-         }
+        await supabaseClient.from("processed_documents").update({
+          status,
+          last_error: error.message,
+          retry_count: newRetryCount,
+          next_retry_at: nextRetry,
+          is_processing: false,
+          processing_log: [...(doc.processing_log || []), { 
+            timestamp: new Date().toISOString(), 
+            event: \`Tentativa \${newRetryCount}: \${error.message}\`,
+            cStat: error.message.match(/\\[(.*?)\\]/)?.[1] || null
+          }]
+        }).eq("id", documentId);
+
+        if (status === "dead-letter") {
+          await sendDeadLetterNotification(supabaseClient, doc.user_id, documentId, maxRetries);
+        }
       }
 
       return new Response(JSON.stringify({ success: true }), {
