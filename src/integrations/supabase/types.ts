@@ -543,6 +543,48 @@ export type Database = {
         }
         Relationships: []
       }
+      fiscal_scheduled_reports: {
+        Row: {
+          created_at: string
+          email_recipients: string[]
+          filters: Json
+          format: string
+          frequency: string
+          id: string
+          is_active: boolean
+          last_run_at: string | null
+          report_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_recipients: string[]
+          filters: Json
+          format: string
+          frequency: string
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          report_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email_recipients?: string[]
+          filters?: Json
+          format?: string
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          report_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       fiscal_suspension_states: {
         Row: {
           consecutive_failures: number | null
@@ -582,6 +624,36 @@ export type Database = {
           uf?: string
           updated_at?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      fiscal_user_preferences: {
+        Row: {
+          created_at: string
+          filters: Json
+          id: string
+          preference_key: string
+          preference_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          filters: Json
+          id?: string
+          preference_key: string
+          preference_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          preference_key?: string
+          preference_name?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
