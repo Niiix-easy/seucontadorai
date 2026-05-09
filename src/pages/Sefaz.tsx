@@ -876,7 +876,13 @@ export default function Sefaz() {
        // Pre-calculate hashes for preview/proof
        let csvContent = "";
        let rows: any[] = [];
-       if (type === 'backlog') {
+         let finalCsvHash = "";
+         let finalPdfHash = "";
+         let finalRecordCount = 0;
+         let finalTechLog: any = null;
+         let finalDivergence = false;
+
+         if (type === 'backlog') {
          const sortedData = [...backlogData].sort((a: any, b: any) => {
            const field = sort.field;
            const modifier = sort.order === 'asc' ? 1 : -1;
@@ -1003,8 +1009,8 @@ export default function Sefaz() {
           });
            const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
             setManualScheduleStatus(prev => prev ? { ...prev, status: 'generating_csv', progress: 20 } : null);
-            const csvHash = await calculateHash(csvContent);
-            zip.file(`backlog_fiscal_${dateStr}.csv`, csvContent);
+             finalCsvHash = await calculateHash(csvContent);
+             zip.file(`backlog_fiscal_${dateStr}.csv`, csvContent);
             
             setManualScheduleStatus(prev => prev ? { ...prev, status: 'generating_pdf', progress: 50 } : null);
 
@@ -1012,23 +1018,25 @@ export default function Sefaz() {
            doc.text("Backlog Fiscal", 14, 15);
            autoTable(doc, { head: [headers], body: rows, startY: 25 });
            const pdfContent = doc.output('blob');
-            const pdfHash = await calculateHash(pdfContent);
-            zip.file(`backlog_fiscal_${dateStr}.pdf`, pdfContent);
+             finalPdfHash = await calculateHash(pdfContent);
+             zip.file(`backlog_fiscal_${dateStr}.pdf`, pdfContent);
 
             setManualScheduleStatus(prev => prev ? { ...prev, status: 'calculating_hashes', progress: 80 } : null);
-            const techLog = { 
-              execution_id: crypto.randomUUID(),
-              sorting: sort, 
-              page: backlogPage, 
-              page_size: 10,
-              direction: sort.order,
-              field: sort.field,
-              timestamp: new Date().toISOString(), 
-              csv_hash: csvHash, 
-              pdf_hash: pdfHash, 
-              preview_count: previewCount, 
-              final_count: rows.length 
-            };
+             finalTechLog = { 
+               execution_id: crypto.randomUUID(),
+               sorting: sort, 
+               page: backlogPage, 
+               page_size: 10,
+               direction: sort.order,
+               field: sort.field,
+               timestamp: new Date().toISOString(), 
+               csv_hash: finalCsvHash, 
+               pdf_hash: finalPdfHash, 
+               preview_count: previewCount, 
+               final_count: rows.length 
+             };
+             finalRecordCount = rows.length;
+             finalDivergence = previewCount !== rows.length;
            zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(techLog, null, 2));
            const divergence = previewCount !== rows.length;
           } else {
@@ -1036,8 +1044,8 @@ export default function Sefaz() {
            const rows = auditLogs.map(log => [new Date(log.created_at).toLocaleString(), log.action.toUpperCase(), log.uf, log.environment, log.reason || "", log.cstat || "", log.xmotivo || ""]);
            const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
             setManualScheduleStatus(prev => prev ? { ...prev, status: 'generating_csv', progress: 20 } : null);
-            const csvHash = await calculateHash(csvContent);
-            zip.file(`auditoria_fiscal_${dateStr}.csv`, csvContent);
+             finalCsvHash = await calculateHash(csvContent);
+             zip.file(`auditoria_fiscal_${dateStr}.csv`, csvContent);
             
             setManualScheduleStatus(prev => prev ? { ...prev, status: 'generating_pdf', progress: 50 } : null);
 
@@ -1045,24 +1053,26 @@ export default function Sefaz() {
            doc.text("Auditoria Fiscal", 14, 15);
            autoTable(doc, { head: [headers], body: rows, startY: 25 });
            const pdfContent = doc.output('blob');
-            const pdfHash = await calculateHash(pdfContent);
-            zip.file(`auditoria_fiscal_${dateStr}.pdf`, pdfContent);
+             finalPdfHash = await calculateHash(pdfContent);
+             zip.file(`auditoria_fiscal_${dateStr}.pdf`, pdfContent);
 
             setManualScheduleStatus(prev => prev ? { ...prev, status: 'calculating_hashes', progress: 80 } : null);
 
-            const techLog = { 
-              execution_id: crypto.randomUUID(),
-              sorting: sort, 
-              page: auditPage, 
-              page_size: 10,
-              direction: sort.order,
-              field: sort.field,
-              timestamp: new Date().toISOString(), 
-              csv_hash: csvHash, 
-              pdf_hash: pdfHash, 
-              preview_count: previewCount, 
-              final_count: rows.length 
-            };
+             finalTechLog = { 
+               execution_id: crypto.randomUUID(),
+               sorting: sort, 
+               page: auditPage, 
+               page_size: 10,
+               direction: sort.order,
+               field: sort.field,
+               timestamp: new Date().toISOString(), 
+               csv_hash: finalCsvHash, 
+               pdf_hash: finalPdfHash, 
+               preview_count: previewCount, 
+               final_count: rows.length 
+             };
+             finalRecordCount = rows.length;
+             finalDivergence = previewCount !== rows.length;
            zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(techLog, null, 2));
            const divergence = previewCount !== rows.length;
           }
