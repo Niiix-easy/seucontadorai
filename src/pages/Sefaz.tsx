@@ -14,6 +14,7 @@ import {
      Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
      FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X
  } from "lucide-react";
+ import { Zap } from "lucide-react";
 import JSZip from "jszip";
  import * as XLSX from "xlsx";
  import jsPDF from "jspdf";
