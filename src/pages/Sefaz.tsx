@@ -1008,10 +1008,22 @@ export default function Sefaz() {
            const content = await zip.file(csvFile)?.async("string");
            if (content) {
              const currentHash = await calculateHash(content);
-             if (log.csv_hash && currentHash !== log.csv_hash) {
-               toast.error("ERRO: Hash do CSV não coincide!", { duration: 10000 });
-               return;
-             }
+              if (log.csv_hash && currentHash !== log.csv_hash) {
+                const newEvent = {
+                  timestamp: new Date().toISOString(),
+                  stage: 'download_validation',
+                  message: 'Falha crítica de integridade no download!',
+                  status: 'error',
+                  reason: `Hash obtido (${currentHash.substring(0, 8)}) não bate com o esperado.`
+                };
+                await supabase.from("fiscal_export_logs").update({
+                  audit_events: [...(log.audit_events || []), newEvent],
+                  validation_divergence: true
+                }).eq("id", log.id);
+                loadExportHistory();
+                toast.error("ERRO: Hash do CSV não coincide!", { duration: 10000 });
+                return;
+              }
            }
          }
          const link = document.createElement("a");
