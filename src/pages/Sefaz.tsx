@@ -397,10 +397,17 @@ export default function Sefaz() {
       }
     }, [user, backlogFilters]);
 
-   const loadFiscalConfig = async () => {
-     const { data, error } = await supabase.from("fiscal_configurations").select("*").single();
-     if (!error && data) setFiscalConfig(data);
-   };
+    const loadFiscalConfig = async () => {
+      const { data, error } = await supabase
+        .from("fiscal_configurations")
+        .select("*")
+        .match({ uf: fiscalConfig.uf, environment: fiscalConfig.environment })
+        .maybeSingle();
+      
+      if (!error && data) {
+        setFiscalConfig(data);
+      }
+    };
 
     const loadProcessedDocs = async () => {
       let query = supabase.from("processed_documents").select("*").order("created_at", { ascending: false });
