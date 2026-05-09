@@ -2675,5 +2675,4 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
           </DialogContent>
         </Dialog>
       </div>
-   );
- }
+    );
