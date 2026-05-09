@@ -919,14 +919,16 @@ export default function Sefaz() {
        } : null);
 
         if (mode === 'proof') {
-          const divergence = previewCount !== (type === 'backlog' ? backlogData.reduce((acc, b) => acc + b.count, 0) : auditLogs.length);
+          const currentActualCount = type === 'backlog' ? backlogData.reduce((acc, b) => acc + b.count, 0) : auditLogs.length;
+          const divergence = count !== currentActualCount;
           await supabase.from("fiscal_export_logs").insert([{
             user_id: user.id, report_type: type, format: 'proof', status: 'success', 
             record_count: count, csv_count: count, pdf_count: count, 
             csv_hash: csvHash, pdf_hash: pdfHash,
             validation_divergence: divergence, filters: filters, 
             technical_log: { mode: 'proof', sorting: sort, timestamp: new Date().toISOString() } as any,
-            expected_data: { csv_hash: csvHash, pdf_hash: pdfHash, count: count }
+            expected_data: { csv_hash: csvHash, pdf_hash: pdfHash, count: count },
+            recipients: []
           }]);
           loadExportHistory();
           toast.success("Modo Prova concluído e registrado no histórico.");
