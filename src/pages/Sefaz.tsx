@@ -92,10 +92,12 @@ function generateChave() {
  type FiscalConfig = {
    uf: string;
    environment: "homologacao" | "producao";
-   certificate_filename: string | null;
-   max_retries?: number;
-   retry_delay_minutes?: number;
- };
+    certificate_filename: string | null;
+    max_retries?: number;
+    retry_delay_minutes?: number;
+    is_suspended?: boolean;
+    consecutive_validation_failures?: number;
+  };
 
  type ProcessedDocument = {
    id: string;
@@ -121,15 +123,19 @@ export default function Sefaz() {
   const [search, setSearch] = useState("");
   const [emitindo, setEmitindo] = useState(false);
   const [loading, setLoading] = useState(true);
-   const [nfes, setNfes] = useState<NFeEmitida[]>([]);
-   const [processedDocs, setProcessedDocs] = useState<ProcessedDocument[]>([]);
-   const [fiscalConfig, setFiscalConfig] = useState<FiscalConfig>({ 
-     uf: "SP", 
-     environment: "homologacao", 
-     certificate_filename: null,
-     max_retries: 5,
-     retry_delay_minutes: 15
-   });
+    const [nfes, setNfes] = useState<NFeEmitida[]>([]);
+    const [processedDocs, setProcessedDocs] = useState<ProcessedDocument[]>([]);
+    const [fiscalConfig, setFiscalConfig] = useState<FiscalConfig>({ 
+      uf: "SP", 
+      environment: "homologacao", 
+      certificate_filename: null,
+      max_retries: 5,
+      retry_delay_minutes: 15,
+      is_suspended: false,
+      consecutive_validation_failures: 0
+    });
+    const [cStatFilter, setCStatFilter] = useState("");
+    const [xMotivoFilter, setXMotivoFilter] = useState("");
    const [statusFilter, setStatusFilter] = useState<string>("all");
     const [configLoading, setConfigLoading] = useState(false);
     const [certPassword, setCertPassword] = useState("");
