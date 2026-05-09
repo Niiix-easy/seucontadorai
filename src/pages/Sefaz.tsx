@@ -290,10 +290,16 @@ export default function Sefaz() {
   }]);
 
     const loadBacklogData = async () => {
-      const { data: backlog } = await supabase
+      let query = supabase
         .from("processed_documents")
         .select("uf, environment, status, next_retry_at")
         .or('status.in.("pending","error")');
+      
+      if (backlogFilters.uf !== "all") query = query.eq("uf", backlogFilters.uf);
+      if (backlogFilters.env !== "all") query = query.eq("environment", backlogFilters.env);
+      if (backlogFilters.date) query = query.gte("next_retry_at", `${backlogFilters.date}T00:00:00`);
+
+      const { data: backlog } = await query;
       
       if (backlog) {
         const grouped = backlog.reduce((acc: any, curr: any) => {
@@ -310,6 +316,28 @@ export default function Sefaz() {
 
       const { data: states } = await supabase.from("fiscal_suspension_states").select("*");
       if (states) setSuspensionStates(states);
+    };
+
+    const loadAuditLogs = async () => {
+      const { data } = await supabase
+        .from("fiscal_action_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (data) setAuditLogs(data);
+    };
+
+    const handleManualRetryBatch = async (uf: string, env: string) => {
+      try {
+        const { data, error } = await supabase.functions.invoke("fiscal-engine", {
+          body: { action: "manual_retry_batch", uf, environment: env, userId: user?.id }
+        });
+        if (error) throw error;
+        toast.success(`${data.count || 0} documentos colocados na fila para reprocessamento imediato.`);
+        loadBacklogData();
+      } catch (err: any) {
+        toast.error("Erro ao disparar reprocessamento: " + err.message);
+      }
     };
 
     const togglePause = async (uf: string, env: string, currentPaused: boolean) => {
