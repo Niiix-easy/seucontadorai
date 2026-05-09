@@ -95,13 +95,9 @@ function generateChave() {
  type FiscalConfig = {
    uf: string;
    environment: "homologacao" | "producao";
-    certificate_filename: string | null;
-    max_retries?: number;
-    retry_delay_minutes?: number;
-    is_suspended?: boolean;
-    consecutive_validation_failures?: number;
-    auto_retry_on_reactivation?: boolean;
-    reactivation_throughput?: number;
+    certificate_filename: string | null; max_retries?: number; retry_delay_minutes?: number;
+    is_suspended?: boolean; is_paused?: boolean; consecutive_validation_failures?: number;
+    auto_retry_on_reactivation?: boolean; reactivation_throughput?: number;
   };
 
  type ProcessedDocument = {
@@ -139,7 +135,10 @@ export default function Sefaz() {
       is_suspended: false,
       consecutive_validation_failures: 0,
       auto_retry_on_reactivation: false,
-      reactivation_throughput: 5
+    reactivation_throughput: 5,
+    is_paused: false
+    const [suspensionStates, setSuspensionStates] = useState<any[]>([]);
+    const [backlogData, setBacklogData] = useState<any[]>([]);
     });
     const [deadLetterNotifs, setDeadLetterNotifs] = useState<any[]>([]);
     const [dlSearch, setDlSearch] = useState("");
@@ -286,8 +285,46 @@ export default function Sefaz() {
    useEffect(() => {
      if (user) {
        loadNfes();
-       loadFiscalConfig();
-       loadProcessedDocs();
+        loadFiscalConfig(); loadProcessedDocs(); loadBacklogData();
+    const loadBacklogData = async () => {
+      const { data: backlog } = await supabase
+        .from("processed_documents")
+        .select("uf, environment, status, next_retry_at")
+        .or('status.in.("pending","error")');
+      
+      if (backlog) {
+        const grouped = backlog.reduce((acc: any, curr: any) => {
+          const key = `${curr.uf}-${curr.environment}`;
+          if (!acc[key]) acc[key] = { uf: curr.uf, env: curr.environment, count: 0, next: curr.next_retry_at };
+          acc[key].count++;
+          if (curr.next_retry_at && (!acc[key].next || curr.next_retry_at < acc[key].next)) {
+            acc[key].next = curr.next_retry_at;
+          }
+          return acc;
+        }, {});
+        setBacklogData(Object.values(grouped));
+      }
+
+      const { data: states } = await supabase.from("fiscal_suspension_states").select("*");
+      if (states) setSuspensionStates(states);
+    };
+
+    const togglePause = async (uf: string, env: string, currentPaused: boolean) => {
+      const { error } = await supabase
+        .from("fiscal_suspension_states")
+        .upsert({ 
+          user_id: user?.id, 
+          uf, 
+          environment: env, 
+          is_paused: !currentPaused 
+        }, { onConflict: "user_id, uf, environment" });
+      
+      if (!error) {
+        toast.success(`Reprocessamento ${!currentPaused ? "pausado" : "retomado"} para ${uf}/${env}`);
+        loadBacklogData();
+      }
+    };
+
      }
    }, [user]);
 
@@ -325,7 +362,7 @@ export default function Sefaz() {
 
     const handleExportDeadLetterCSV = () => {
       if (deadLetterNotifs.length === 0) return;
-      const headers = ["ID", "Documento ID", "Data", "Status Alerta", "Canais", "cStat", "xMotivo", "Retentativas", "Erro"];
+      const headers = ["ID", "Documento ID", "UF", "Ambiente", "Data", "Status Alerta", "Canais", "cStat", "xMotivo", "Retentativas", "Próximo Retry", "XML/Recibo"];
       const rows = deadLetterNotifs.map(n => [
         n.id,
         n.document_id,
@@ -334,8 +371,8 @@ export default function Sefaz() {
         (n.channels || []).join(", "),
         n.cstat || "",
         n.xmotivo || "",
-        n.retry_count_at_failure || "",
-        n.error_message || ""
+        n.retry_count_at_failure || "", n.processed_documents?.next_retry_at || "",
+        `${n.last_xml_url || ""}; ${n.last_receipt_number || ""}`
       ]);
       const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
