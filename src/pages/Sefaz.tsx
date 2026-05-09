@@ -859,13 +859,19 @@ export default function Sefaz() {
     };
 
     const handleRunProofFromHistory = async (log: any) => {
+      setManualScheduleStatus({ id: 'proof-rerun', status: 'initializing', progress: 10 });
       toast.info("Iniciando Modo Prova a partir do histórico...");
       
-      // We reuse handleExportZip but we'll modify it to return values or we can just implement the proof logging here
-      // To keep it clean, let's just trigger handleExportZip with 'proof' mode
-      // But handleExportZip currently doesn't insert for proof mode. 
-      // Let's modify handleExportZip to handle logging for proof mode too.
-      handleExportZip(log.report_type as 'backlog' | 'audit', 'proof', log.filters, log.technical_log?.sorting);
+      try {
+        // Using the same logic as handleExportZip but focused on proof from history
+        await handleExportZip(log.report_type as 'backlog' | 'audit', 'proof', log.filters, log.technical_log?.sorting);
+        
+        setManualScheduleStatus(prev => prev ? { ...prev, status: 'success', progress: 100 } : null);
+        toast.success("Reexecução (Prova) concluída com sucesso!");
+      } catch (err: any) {
+        setManualScheduleStatus(prev => prev ? { ...prev, status: 'error', progress: 100 } : null);
+        toast.error("Erro na reexecução: " + err.message);
+      }
     };
 
       const handleExportZip = async (type: 'backlog' | 'audit', mode: 'full' | 'proof' = 'full', overrideFilters?: any, overrideSort?: any) => {
