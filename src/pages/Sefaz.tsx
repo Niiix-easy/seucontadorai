@@ -113,6 +113,7 @@ function generateChave() {
    retry_count?: number;
    next_retry_at?: string | null;
    processing_log?: any[];
+   is_processing?: boolean;
  };
 
 export default function Sefaz() {
