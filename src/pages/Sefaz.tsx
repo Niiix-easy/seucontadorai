@@ -655,49 +655,82 @@ export default function Sefaz() {
         <TabsContent value="alertas">
           <Card>
             <CardHeader>
-              <CardTitle className="font-display flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-destructive" /> Fila de Alertas Dead-Letter
-              </CardTitle>
-              <CardDescription>Visualize o histórico de notificações de erros fatais.</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="font-display flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-destructive" /> Fila Dead-Letter
+                  </CardTitle>
+                  <CardDescription>Documentos que excederam o limite de retentativas.</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleExportDeadLetterCSV} className="gap-2">
+                  <Download className="w-4 h-4" /> Exportar CSV
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto border rounded-lg">
-                <table className="w-full text-xs">
-                  <thead className="bg-muted/50 uppercase">
-                    <tr>
-                      <th className="text-left py-3 px-4">Documento</th>
-                      <th className="text-left py-3 px-4">Data</th>
-                      <th className="text-left py-3 px-4">cStat/Motivo</th>
-                      <th className="text-center py-3 px-4">Canais</th>
-                      <th className="text-right py-3 px-4">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {deadLetterNotifs.length > 0 ? deadLetterNotifs.map(n => (
-                      <tr key={n.id} className="border-t hover:bg-muted/30">
-                        <td className="py-3 px-4 font-mono">{n.document_id.slice(0, 8)}</td>
-                        <td className="py-3 px-4">{new Date(n.created_at).toLocaleString()}</td>
-                        <td className="py-3 px-4 max-w-[200px] truncate">
-                          <span className="font-bold">[{n.cstat}]</span> {n.xmotivo}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <div className="flex justify-center gap-1">
-                            {n.channels?.map((c: string) => (
-                              <Badge key={c} variant="outline" className="text-[9px]">{c}</Badge>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <Badge variant={n.status === 'sent' ? 'default' : n.status === 'error' ? 'destructive' : 'secondary'}>
-                            {n.status}
-                          </Badge>
-                        </td>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input 
+                      placeholder="ID Documento..." 
+                      value={dlSearch} 
+                      onChange={e => setDlSearch(e.target.value)} 
+                      className="pl-9 h-9"
+                    />
+                  </div>
+                  <Input type="date" value={dlPeriodo.de} onChange={e => setDlPeriodo(p => ({ ...p, de: e.target.value }))} className="h-9" />
+                  <Input type="date" value={dlPeriodo.ate} onChange={e => setDlPeriodo(p => ({ ...p, ate: e.target.value }))} className="h-9" />
+                  <div className="flex gap-2">
+                    <Input placeholder="cStat" value={dlCStatFilter} onChange={e => setDlCStatFilter(e.target.value)} className="h-9 w-20" />
+                    <Button variant="ghost" size="sm" onClick={loadProcessedDocs} className="h-9">Filtrar</Button>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/50 uppercase">
+                      <tr>
+                        <th className="text-left py-3 px-4">Documento</th>
+                        <th className="text-left py-3 px-4">Data</th>
+                        <th className="text-left py-3 px-4">cStat/Motivo</th>
+                        <th className="text-center py-3 px-4">Canais</th>
+                        <th className="text-right py-3 px-4">Status</th>
+                        <th className="text-center py-3 px-4 w-10"></th>
                       </tr>
-                    )) : (
-                      <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">Nenhum alerta registrado.</td></tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {deadLetterNotifs.length > 0 ? deadLetterNotifs.map(n => (
+                        <tr key={n.id} className="border-t hover:bg-muted/30">
+                          <td className="py-3 px-4 font-mono">{n.document_id.slice(0, 8)}</td>
+                          <td className="py-3 px-4">{new Date(n.created_at).toLocaleString()}</td>
+                          <td className="py-3 px-4 max-w-[200px] truncate">
+                            <span className="font-bold">[{n.cstat}]</span> {n.xmotivo}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex justify-center gap-1">
+                              {n.channels?.map((c: string) => (
+                                <Badge key={c} variant="outline" className="text-[9px]">{c}</Badge>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <Badge variant={n.status === 'sent' ? 'default' : n.status === 'error' ? 'destructive' : 'secondary'}>
+                              {n.status}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDlSelectedNotif(n)}>
+                              <Eye className="w-3 h-3" />
+                            </Button>
+                          </td>
+                        </tr>
+                      )) : (
+                        <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhum alerta registrado.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </CardContent>
           </Card>
