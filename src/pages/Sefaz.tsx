@@ -166,24 +166,46 @@ export default function Sefaz() {
       toast.success("Relatório CSV exportado!");
     };
  
-    const handleBatchRetry = async () => {
-      if (selectedIds.length === 0) return;
-      setIsBatchProcessing(true);
-      setBatchProgress(0);
-      let completed = 0;
-      for (const id of selectedIds) {
-        try {
-          await supabase.from("processed_documents").update({ status: "pending", last_error: null }).eq("id", id);
-          await supabase.functions.invoke("fiscal-engine", { body: { action: "sign_and_send", documentId: id } });
-        } catch (e) { console.error(e); }
-        completed++;
-        setBatchProgress(Math.round((completed / selectedIds.length) * 100));
-      }
-      toast.success(`${completed} documentos em reprocessamento.`);
-      setIsBatchProcessing(false);
-      setSelectedIds([]);
-      loadProcessedDocs();
-    };
+     const handleBatchRetry = async () => {
+       if (selectedIds.length === 0) return;
+       
+       setIsBatchProcessing(true);
+       setBatchProgress(0);
+ 
+       try {
+         toast.info("Validando certificado e ambiente...");
+         const { data: valData, error: valError } = await supabase.functions.invoke("fiscal-engine", { 
+           body: { action: "validate" } 
+         });
+ 
+         if (valError || !valData.valid) {
+           toast.error(`Falha na validação: ${valData?.error || "Certificado ou ambiente inválido"}`);
+           setIsBatchProcessing(false);
+           return;
+         }
+ 
+         toast.success(`Certificado válido: ${valData.subject}. Iniciando lote...`);
+ 
+         let completed = 0;
+         for (const id of selectedIds) {
+           try {
+             await supabase.from("processed_documents").update({ status: "pending", last_error: null, is_processing: true }).eq("id", id);
+             await supabase.functions.invoke("fiscal-engine", { body: { action: "sign_and_send", documentId: id } });
+           } catch (e) { 
+             console.error(`Erro no documento ${id}:`, e); 
+           }
+           completed++;
+           setBatchProgress(Math.round((completed / selectedIds.length) * 100));
+         }
+         toast.success(`${completed} documentos processados.`);
+       } catch (err: any) {
+         toast.error("Erro no processamento em lote: " + err.message);
+       } finally {
+         setIsBatchProcessing(false);
+         setSelectedIds([]);
+         loadProcessedDocs();
+       }
+     };
  
     const toggleSelectAll = () => {
       if (selectedIds.length === processedDocs.length) setSelectedIds([]);
