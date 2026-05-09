@@ -611,9 +611,60 @@ export default function Sefaz() {
           <TabsTrigger value="webservices">WebServices</TabsTrigger>
           <TabsTrigger value="consultas">Consultas</TabsTrigger>
            <TabsTrigger value="integradores">Integradores</TabsTrigger>
-           <TabsTrigger value="processamento">Relatórios de Processamento</TabsTrigger>
-            <TabsTrigger value="config_avancada">Config. Certificado</TabsTrigger>
+           <TabsTrigger value="processamento">Processamento</TabsTrigger>
+           <TabsTrigger value="alertas">Alertas Dead-Letter</TabsTrigger>
+           <TabsTrigger value="config_avancada">Configurações</TabsTrigger>
         </TabsList>
+        <TabsContent value="alertas">
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-display flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-destructive" /> Fila de Alertas Dead-Letter
+              </CardTitle>
+              <CardDescription>Visualize o histórico de notificações de erros fatais.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/50 uppercase">
+                    <tr>
+                      <th className="text-left py-3 px-4">Documento</th>
+                      <th className="text-left py-3 px-4">Data</th>
+                      <th className="text-left py-3 px-4">cStat/Motivo</th>
+                      <th className="text-center py-3 px-4">Canais</th>
+                      <th className="text-right py-3 px-4">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deadLetterNotifs.length > 0 ? deadLetterNotifs.map(n => (
+                      <tr key={n.id} className="border-t hover:bg-muted/30">
+                        <td className="py-3 px-4 font-mono">{n.document_id.slice(0, 8)}</td>
+                        <td className="py-3 px-4">{new Date(n.created_at).toLocaleString()}</td>
+                        <td className="py-3 px-4 max-w-[200px] truncate">
+                          <span className="font-bold">[{n.cstat}]</span> {n.xmotivo}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex justify-center gap-1">
+                            {n.channels?.map((c: string) => (
+                              <Badge key={c} variant="outline" className="text-[9px]">{c}</Badge>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <Badge variant={n.status === 'sent' ? 'default' : n.status === 'error' ? 'destructive' : 'secondary'}>
+                            {n.status}
+                          </Badge>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">Nenhum alerta registrado.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
          <TabsContent value="processamento">
            <Card>
