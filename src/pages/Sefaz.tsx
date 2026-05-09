@@ -957,9 +957,10 @@ export default function Sefaz() {
       const confirmExportZip = async () => {
          if (!showZipPreviewDialog || !user) return;
          const { type, previewCount, filters, sort } = showZipPreviewDialog;
+        
+        setManualScheduleStatus({ id: 'manual-zip', status: 'initializing', progress: 5 });
         setShowZipPreviewDialog(null);
         
-        toast.info("Gerando pacote ZIP...");
         const zip = new JSZip();
         const dateStr = new Date().toISOString().split('T')[0];
         
@@ -980,16 +981,20 @@ export default function Sefaz() {
             return [b.uf, b.env.toUpperCase(), b.count, b.next ? new Date(b.next).toLocaleString() : "—", status];
           });
            const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
-           const csvHash = await calculateHash(csvContent);
-           zip.file(`backlog_fiscal_${dateStr}.csv`, csvContent);
+            setManualScheduleStatus(prev => prev ? { ...prev, status: 'generating_csv', progress: 20 } : null);
+            const csvHash = await calculateHash(csvContent);
+            zip.file(`backlog_fiscal_${dateStr}.csv`, csvContent);
+            
+            setManualScheduleStatus(prev => prev ? { ...prev, status: 'generating_pdf', progress: 50 } : null);
 
            const doc = new jsPDF();
            doc.text("Backlog Fiscal", 14, 15);
            autoTable(doc, { head: [headers], body: rows, startY: 25 });
            const pdfContent = doc.output('blob');
-           const pdfHash = await calculateHash(pdfContent);
-           zip.file(`backlog_fiscal_${dateStr}.pdf`, pdfContent);
+            const pdfHash = await calculateHash(pdfContent);
+            zip.file(`backlog_fiscal_${dateStr}.pdf`, pdfContent);
 
+            setManualScheduleStatus(prev => prev ? { ...prev, status: 'calculating_hashes', progress: 80 } : null);
             const techLog = { 
               execution_id: crypto.randomUUID(),
               sorting: sort, 
@@ -1012,15 +1017,20 @@ export default function Sefaz() {
            const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "cStat", "xMotivo"];
            const rows = auditLogs.map(log => [new Date(log.created_at).toLocaleString(), log.action.toUpperCase(), log.uf, log.environment, log.reason || "", log.cstat || "", log.xmotivo || ""]);
            const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
-           const csvHash = await calculateHash(csvContent);
-           zip.file(`auditoria_fiscal_${dateStr}.csv`, csvContent);
+            setManualScheduleStatus(prev => prev ? { ...prev, status: 'generating_csv', progress: 20 } : null);
+            const csvHash = await calculateHash(csvContent);
+            zip.file(`auditoria_fiscal_${dateStr}.csv`, csvContent);
+            
+            setManualScheduleStatus(prev => prev ? { ...prev, status: 'generating_pdf', progress: 50 } : null);
 
            const doc = new jsPDF();
            doc.text("Auditoria Fiscal", 14, 15);
            autoTable(doc, { head: [headers], body: rows, startY: 25 });
            const pdfContent = doc.output('blob');
-           const pdfHash = await calculateHash(pdfContent);
-           zip.file(`auditoria_fiscal_${dateStr}.pdf`, pdfContent);
+            const pdfHash = await calculateHash(pdfContent);
+            zip.file(`auditoria_fiscal_${dateStr}.pdf`, pdfContent);
+
+            setManualScheduleStatus(prev => prev ? { ...prev, status: 'calculating_hashes', progress: 80 } : null);
 
             const techLog = { 
               execution_id: crypto.randomUUID(),
@@ -1042,6 +1052,7 @@ export default function Sefaz() {
             }]);
          }
   
+        setManualScheduleStatus(prev => prev ? { ...prev, status: 'finalizing_zip', progress: 95 } : null);
         const content = await zip.generateAsync({ type: "blob" });
         const url = URL.createObjectURL(content);
         const link = document.createElement("a");
@@ -1050,6 +1061,8 @@ export default function Sefaz() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        
+        setManualScheduleStatus(prev => prev ? { ...prev, status: 'success', progress: 100, zipUrl: url } : null);
         toast.success("Pacote ZIP exportado!");
       };
     const handleExportAuditXLSX = () => {
