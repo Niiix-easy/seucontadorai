@@ -1637,6 +1637,21 @@ export default function Sefaz() {
                       {ufs.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}
                     </SelectContent>
                   </Select>
+
+                  <Select 
+                    onValueChange={v => {
+                      const pref = savedPreferences.find(p => p.id === v);
+                      if (pref) setBacklogFilters(pref.filters);
+                    }}
+                  >
+                    <SelectTrigger className="w-32 h-8 text-[10px]"><SelectValue placeholder="Filtros Salvos" /></SelectTrigger>
+                    <SelectContent>
+                      {savedPreferences.filter(p => p.preference_key === 'backlog_filters').map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.preference_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
                   <Select value={backlogFilters.env} onValueChange={v => setBacklogFilters(p => ({ ...p, env: v }))}>
                     <SelectTrigger className="w-28 h-8 text-[10px]"><SelectValue placeholder="Ambiente" /></SelectTrigger>
                     <SelectContent>
