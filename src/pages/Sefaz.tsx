@@ -579,12 +579,13 @@ export default function Sefaz() {
                          </td>
                          <td className="py-3 px-4 font-mono">{doc.protocol_number || '—'}</td>
                          <td className="py-3 px-4 text-center">{doc.retry_count || 0}</td>
-                         <td className="py-3 px-4 text-right">
-                           <div className="flex justify-end gap-1">
-                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDocInDetail(doc)} title="Ver Detalhes"><Eye className="w-3 h-3" /></Button>
-                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDownloadXml(doc)} title="Download XML"><Download className="w-3 h-3" /></Button>
-                           </div>
-                         </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex justify-center gap-1">
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDocInDetail(doc)} title="Ver Detalhes"><Eye className="w-3 h-3" /></Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDownloadXml(doc)} title="Download XML"><Download className="w-3 h-3" /></Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRetry(doc.id)} disabled={doc.status === 'authorized' || doc.is_processing} title="Reprocessar"><RefreshCw className={`w-3 h-3 ${doc.is_processing ? 'animate-spin' : ''}`} /></Button>
+                            </div>
+                          </td>
                        </tr>
                      ))}
                    </tbody>
