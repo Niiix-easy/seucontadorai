@@ -142,9 +142,14 @@ export default function Sefaz() {
       reactivation_throughput: 5
     });
     const [deadLetterNotifs, setDeadLetterNotifs] = useState<any[]>([]);
+    const [dlSearch, setDlSearch] = useState("");
+    const [dlPeriodo, setDlPeriodo] = useState({ de: "", ate: "" });
+    const [dlCStatFilter, setDlCStatFilter] = useState("");
+    const [dlXMotivoFilter, setDlXMotivoFilter] = useState("");
+    const [dlSelectedNotif, setDlSelectedNotif] = useState<any | null>(null);
     const [cStatFilter, setCStatFilter] = useState("");
     const [xMotivoFilter, setXMotivoFilter] = useState("");
-   const [statusFilter, setStatusFilter] = useState<string>("all");
+    const [statusFilter, setStatusFilter] = useState<string>("all");
     const [configLoading, setConfigLoading] = useState(false);
     const [certPassword, setCertPassword] = useState("");
     const [showCertPassword, setShowCertPassword] = useState(false);
@@ -301,15 +306,47 @@ export default function Sefaz() {
       const { data } = await query;
       if (data) setProcessedDocs(data as ProcessedDocument[]);
       
-      // Load dead-letter notifications
+      // Load dead-letter notifications with filters
       if (user) {
-        const { data: dlNotifs } = await supabase
+        let dlQuery = supabase
           .from("dead_letter_notifications")
-          .select("*, processed_documents(id, document_type)")
-          .order("created_at", { ascending: false })
-          .limit(50);
+          .select("*, processed_documents(*)")
+          .order("created_at", { ascending: false });
+        
+        if (dlPeriodo.de) dlQuery = dlQuery.gte("created_at", `${dlPeriodo.de}T00:00:00`);
+        if (dlPeriodo.ate) dlQuery = dlQuery.lte("created_at", `${dlPeriodo.ate}T23:59:59`);
+        if (dlCStatFilter) dlQuery = dlQuery.ilike("cstat", `%${dlCStatFilter}%`);
+        if (dlXMotivoFilter) dlQuery = dlQuery.ilike("xmotivo", `%${dlXMotivoFilter}%`);
+        
+        const { data: dlNotifs } = await dlQuery.limit(100);
         if (dlNotifs) setDeadLetterNotifs(dlNotifs);
       }
+    };
+
+    const handleExportDeadLetterCSV = () => {
+      if (deadLetterNotifs.length === 0) return;
+      const headers = ["ID", "Documento ID", "Data", "Status Alerta", "Canais", "cStat", "xMotivo", "Retentativas", "Erro"];
+      const rows = deadLetterNotifs.map(n => [
+        n.id,
+        n.document_id,
+        new Date(n.created_at).toLocaleString(),
+        n.status,
+        (n.channels || []).join(", "),
+        n.cstat || "",
+        n.xmotivo || "",
+        n.retry_count_at_failure || "",
+        n.error_message || ""
+      ]);
+      const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `fila_dead_letter_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Fila Dead-Letter exportada!");
     };
 
     const handleBatchDownloadZip = async () => {
