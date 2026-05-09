@@ -139,7 +139,7 @@ export default function Sefaz() {
     const handleExportCSV = () => {
       const filtered = statusFilter === "all" ? processedDocs : processedDocs.filter(d => d.status === statusFilter);
       if (filtered.length === 0) return;
-      const headers = ["ID", "Data", "Tipo", "Status", "Total", "Recibo", "Protocolo", "Erros", "Retentativas", "Download XML"];
+      const headers = ["ID", "Data", "Tipo", "Status", "Total", "Recibo", "Protocolo", "Sefaz Status", "Sefaz Mensagem", "Erros", "Retentativas"];
       const rows = filtered.map(doc => [
         doc.id, 
         new Date(doc.created_at).toLocaleString(), 
@@ -150,7 +150,8 @@ export default function Sefaz() {
         doc.protocol_number || "",
         doc.last_error || "", 
         doc.retry_count || 0,
-        doc.signed_xml_content ? "Sim (signed)" : "Não"
+        doc.sefaz_response_code || "",
+        doc.sefaz_response_message || ""
       ]);
       const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
