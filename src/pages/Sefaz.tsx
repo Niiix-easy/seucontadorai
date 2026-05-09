@@ -15,6 +15,7 @@ import {
      FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X
  } from "lucide-react";
 import JSZip from "jszip";
+ import * as XLSX from "xlsx";
  import jsPDF from "jspdf";
  import autoTable from "jspdf-autotable";
 import { toast } from "sonner";
