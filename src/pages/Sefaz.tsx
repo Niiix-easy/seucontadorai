@@ -3065,8 +3065,12 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                 
                 <div className="text-center space-y-1">
                   <p className="font-medium">
-                    {manualScheduleStatus.status === 'initializing' && 'Validando agendamento...'}
+                    {manualScheduleStatus.status === 'initializing' && 'Inicializando...'}
                     {manualScheduleStatus.status === 'running' && 'Processando dados no servidor...'}
+                    {manualScheduleStatus.status === 'generating_csv' && 'Gerando arquivo CSV...'}
+                    {manualScheduleStatus.status === 'generating_pdf' && 'Gerando arquivo PDF...'}
+                    {manualScheduleStatus.status === 'calculating_hashes' && 'Calculando Hashes de integridade...'}
+                    {manualScheduleStatus.status === 'finalizing_zip' && 'Finalizando pacote ZIP...'}
                     {manualScheduleStatus.status === 'success' && 'Exportação concluída!'}
                     {manualScheduleStatus.status === 'error' && 'Erro no processamento'}
                   </p>
