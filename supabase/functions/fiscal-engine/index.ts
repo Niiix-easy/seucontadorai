@@ -113,8 +113,56 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { action, documentId, password } = await req.json();
+     const { action, documentId, password, uf, environment } = await req.json();
 
+     if (action === "validate") {
+       const authHeader = req.headers.get("Authorization");
+       const { data: { user } } = await supabaseClient.auth.getUser(authHeader?.split(" ")[1] ?? "");
+       if (!user) throw new Error("Não autorizado");
+ 
+       const { data: config } = await supabaseClient
+         .from("fiscal_configurations")
+         .select("*")
+         .eq("user_id", user.id)
+         .single();
+ 
+       if (!config || !config.certificate_path) {
+         return new Response(JSON.stringify({ valid: false, error: "Certificado não configurado" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+       }
+ 
+       const { data: pfxData, error: downloadError } = await supabaseClient.storage
+         .from("certificates")
+         .download(config.certificate_path);
+ 
+       if (downloadError) return new Response(JSON.stringify({ valid: false, error: "Erro ao acessar arquivo do certificado" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+ 
+       try {
+         const decryptedPass = await decryptPassword(config.certificate_password_encrypted);
+         const pfxArrayBuffer = await pfxData.arrayBuffer();
+         const pfxBytes = new Uint8Array(pfxArrayBuffer);
+         const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(pfxBytes as any).getBytes());
+         const p12 = forge.pkcs12.fromP12(p12Asn1, decryptedPass);
+         
+         const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
+         const cert = certBags[forge.pki.oids.certBag]?.[0]?.cert;
+ 
+         if (!cert) throw new Error("Certificado não encontrado no arquivo");
+ 
+         const now = new Date();
+         if (new Date(cert.validity.notAfter) < now) {
+           return new Response(JSON.stringify({ valid: false, error: "Certificado expirado em " + cert.validity.notAfter }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+         }
+ 
+         return new Response(JSON.stringify({ 
+           valid: true, 
+           expiry: cert.validity.notAfter,
+           subject: cert.subject.getField('CN')?.value
+         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+       } catch (e) {
+         return new Response(JSON.stringify({ valid: false, error: "Senha incorreta ou certificado corrompido" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+       }
+     }
+ 
     if (action === "update_password") {
       const encrypted = await encryptPassword(password);
       const authHeader = req.headers.get("Authorization");
