@@ -621,15 +621,13 @@ export default function Sefaz() {
     const handleExportAuditPDF = () => {
       if (auditLogs.length === 0) return;
       const doc = new jsPDF();
+      const pageHeight = doc.internal.pageSize.height;
+      
+      doc.setFontSize(16);
       doc.text("Auditoria de Ações Fiscais", 14, 15);
       doc.setFontSize(8);
       doc.text(`Gerado em: ${new Date().toLocaleString()}`, 14, 22);
-      
-      if (auditLogs.length > 0) {
-        doc.setFontSize(7);
-        doc.setTextColor(100);
-        doc.text("Links e IDs de Referência (Ações Manuais):", 14, 28);
-      }
+      doc.text(`Filtros: UF=${auditFilters.uf}, Período=${auditFilters.dateStart || 'Início'} até ${auditFilters.dateEnd || 'Hoje'}`, 14, 27);
       
       const tableData = auditLogs.map(log => [
         new Date(log.created_at).toLocaleString(),
@@ -642,10 +640,25 @@ export default function Sefaz() {
       autoTable(doc, {
         head: [["Data/Hora", "Ação", "UF/Amb", "Motivo", "Usuário"]],
         body: tableData,
-        startY: 32,
+        startY: 35,
         theme: 'grid',
         styles: { fontSize: 8 },
         headStyles: { fillColor: [66, 66, 66] }
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY || 40;
+      doc.setFontSize(10);
+      doc.text("Referências e Links de Acesso:", 14, finalY + 10);
+      doc.setFontSize(7);
+      doc.setTextColor(0, 0, 255);
+      
+      auditLogs.slice(0, 10).forEach((log, index) => {
+        const yPos = finalY + 15 + (index * 5);
+        if (yPos < pageHeight - 10) {
+          const text = `Ação ${log.action} em ${log.uf}/${log.environment} - Ver no Portal Sefaz`;
+          doc.text(text, 14, yPos);
+          doc.link(14, yPos - 3, doc.getTextWidth(text), 4, { url: `https://www.nfe.fazenda.gov.br/portal/consultaRecaptcha.aspx?tipoConsulta=completa&tipoConteudo=XbSeqAa9daU=` });
+        }
       });
 
       doc.save(`auditoria_fiscal_${new Date().toISOString().split('T')[0]}.pdf`);
@@ -681,13 +694,13 @@ export default function Sefaz() {
     const handleExportBacklogPDF = () => {
       if (backlogData.length === 0) return;
       const doc = new jsPDF();
+      const pageHeight = doc.internal.pageSize.height;
+      
+      doc.setFontSize(16);
       doc.text("Backlog de Processamento Fiscal", 14, 15);
       doc.setFontSize(8);
-      doc.text(`Filtros: UF=${backlogFilters.uf}, Amb=${backlogFilters.env}, Data=${backlogFilters.date || 'Todas'}`, 14, 22);
-      
-      doc.setFontSize(7);
-      doc.setTextColor(100);
-      doc.text("Referências de Lote e links de consulta SEFAZ:", 14, 28);
+      doc.text(`Gerado em: ${new Date().toLocaleString()}`, 14, 22);
+      doc.text(`Filtros: UF=${backlogFilters.uf}, Amb=${backlogFilters.env}, Data=${backlogFilters.date || 'Todas'}`, 14, 27);
       
       const tableData = backlogData.map(b => {
         const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
@@ -704,10 +717,26 @@ export default function Sefaz() {
       autoTable(doc, {
         head: [["UF", "Ambiente", "Fila", "Próximo Envio", "Status"]],
         body: tableData,
-        startY: 32,
+        startY: 35,
         theme: 'grid',
         styles: { fontSize: 8 },
         headStyles: { fillColor: [41, 128, 185] }
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY || 40;
+      doc.setFontSize(10);
+      doc.text("Links Diretos para Consulta SEFAZ (Últimos Eventos):", 14, finalY + 10);
+      doc.setFontSize(7);
+      doc.setTextColor(0, 0, 255);
+
+      backlogData.forEach((b, index) => {
+        const yPos = finalY + 15 + (index * 5);
+        if (yPos < pageHeight - 10) {
+          const linkText = `Consultar Status de Serviço ${b.uf} (${b.env.toUpperCase()})`;
+          doc.text(linkText, 14, yPos);
+          // Simulating a real SEFAZ link structure
+          doc.link(14, yPos - 3, doc.getTextWidth(linkText), 4, { url: `https://www.nfe.fazenda.gov.br/portal/disponibilidade.aspx` });
+        }
       });
 
       doc.save(`backlog_fiscal_${new Date().toISOString().split('T')[0]}.pdf`);
