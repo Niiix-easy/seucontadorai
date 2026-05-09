@@ -651,6 +651,81 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
           )}
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
+       {/* Document Detail Dialog */}
+       <Dialog open={!!docInDetail} onOpenChange={() => setDocInDetail(null)}>
+         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+           <DialogHeader>
+             <DialogTitle className="font-display flex items-center gap-2">
+               <FileText className="w-5 h-5 text-primary" /> Detalhes do Documento {docInDetail?.id.slice(0, 8)}
+             </DialogTitle>
+           </DialogHeader>
+           {docInDetail && (
+             <div className="space-y-6">
+               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                 <div className="p-3 bg-muted/30 rounded-lg">
+                   <p className="text-xs text-muted-foreground">Status</p>
+                   <Badge variant={docInDetail.status === 'authorized' ? 'default' : 'secondary'} className="mt-1 uppercase text-[9px]">{docInDetail.status}</Badge>
+                 </div>
+                 <div className="p-3 bg-muted/30 rounded-lg">
+                   <p className="text-xs text-muted-foreground">Protocolo</p>
+                   <p className="font-mono text-sm mt-1">{docInDetail.protocol_number || '—'}</p>
+                 </div>
+                 <div className="p-3 bg-muted/30 rounded-lg">
+                   <p className="text-xs text-muted-foreground">Data</p>
+                   <p className="text-sm mt-1">{new Date(docInDetail.created_at).toLocaleString('pt-BR')}</p>
+                 </div>
+                 <div className="p-3 bg-muted/30 rounded-lg">
+                   <p className="text-xs text-muted-foreground">Tentativas</p>
+                   <p className="text-sm mt-1">{docInDetail.retry_count || 0}</p>
+                 </div>
+               </div>
+
+               {docInDetail.last_error && (
+                 <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex items-start gap-3">
+                   <AlertCircle className="w-5 h-5 text-destructive shrink-0" />
+                   <div>
+                     <p className="text-sm font-medium text-destructive">Último Erro</p>
+                     <p className="text-xs text-destructive/80 mt-1">{docInDetail.last_error}</p>
+                   </div>
+                 </div>
+               )}
+
+               <Tabs defaultValue="xml_assinado">
+                 <TabsList>
+                   <TabsTrigger value="xml_assinado">XML Assinado</TabsTrigger>
+                   <TabsTrigger value="xml_bruto">XML Bruto</TabsTrigger>
+                   <TabsTrigger value="logs">Logs</TabsTrigger>
+                 </TabsList>
+                 <TabsContent value="xml_assinado" className="mt-2">
+                   <pre className="bg-muted p-4 rounded-lg text-[10px] font-mono overflow-auto max-h-[300px]">
+                     {docInDetail.signed_xml_content || 'Aguardando assinatura...'}
+                   </pre>
+                 </TabsContent>
+                 <TabsContent value="xml_bruto" className="mt-2">
+                   <pre className="bg-muted p-4 rounded-lg text-[10px] font-mono overflow-auto max-h-[300px]">
+                     {docInDetail.xml_content}
+                   </pre>
+                 </TabsContent>
+                 <TabsContent value="logs" className="mt-2">
+                   <div className="space-y-2">
+                     {docInDetail.processing_log?.map((log: any, idx: number) => (
+                       <div key={idx} className="text-xs p-2 border-b last:border-0 flex justify-between">
+                         <span>{log.event}</span>
+                         <span className="text-muted-foreground">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                       </div>
+                     ))}
+                   </div>
+                 </TabsContent>
+               </Tabs>
+               
+               <div className="flex justify-end gap-2">
+                 <Button variant="outline" onClick={() => handleDownloadXml(docInDetail)}>Download XML</Button>
+                 {docInDetail.status === 'error' && <Button onClick={() => handleRetry(docInDetail.id)}>Tentar Novamente</Button>}
+               </div>
+             </div>
+           )}
+         </DialogContent>
+       </Dialog>
+     </div>
+   );
+ }
