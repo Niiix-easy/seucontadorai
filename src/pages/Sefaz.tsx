@@ -977,7 +977,7 @@ export default function Sefaz() {
              technical_log: { mode: 'proof', sorting: sort, timestamp: new Date().toISOString(), execution_id: crypto.randomUUID() } as any,
              expected_data: { csv_hash: csvHash, pdf_hash: pdfHash, count: count },
              recipients: [],
-             audit_events: [
+             audit_events: ([
                { timestamp: new Date().toISOString(), stage: 'initializing', message: 'Iniciando Modo Prova a partir de dados históricos.' },
                { timestamp: new Date().toISOString(), stage: 'csv_gen', message: `Dados CSV recalculados (${count} registros).` },
                { timestamp: new Date().toISOString(), stage: 'pdf_gen', message: 'PDF simulado para auditoria de hash.' },
@@ -988,7 +988,7 @@ export default function Sefaz() {
                  message: divergence ? 'Divergência detectada entre snapshot e dados atuais.' : 'Integridade confirmada. Dados idênticos ao snapshot.',
                  status: divergence ? 'warning' : 'success'
                }
-             ]
+             ] as any[])
           }]);
           loadExportHistory();
           toast.success("Modo Prova concluído e registrado no histórico.");
@@ -1167,7 +1167,7 @@ export default function Sefaz() {
         
         const url = URL.createObjectURL(content);
 
-         const auditEvents = [
+         const auditEvents: any[] = [
            { timestamp: new Date().toISOString(), stage: 'initializing', message: 'Iniciando exportação completa do relatório.' },
            { timestamp: new Date().toISOString(), stage: 'csv_gen', message: `Arquivo CSV gerado com ${finalRecordCount} registros.` },
            { timestamp: new Date().toISOString(), stage: 'pdf_gen', message: 'Documento PDF formatado e pronto.' },
