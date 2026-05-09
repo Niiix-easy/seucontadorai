@@ -95,7 +95,7 @@ async function sendToSefaz(signedXml: string, uf: string, env: string) {
   <soap12:Body>
     <nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">${signedXml}</nfeDadosMsg>
   </soap12:Body>
-</soap12:Envelope>\`;
+</soap12:Envelope>`;
 
   return await fetch(endpoint, {
     method: 'POST',
