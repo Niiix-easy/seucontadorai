@@ -1394,6 +1394,9 @@ export default function Sefaz() {
                     <Package className="w-4 h-4" /> Backlog & Controle Granular (UF/Ambiente)
                   </p>
                   <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={handleExportAuditCSV} className="gap-2 h-8 text-[10px]">
+                      <Download className="w-3 h-3" /> Exportar Auditoria
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => setShowAuditLogs(true)} className="gap-2 h-8 text-[10px]">
                       <History className="w-3 h-3" /> Ver Auditoria
                     </Button>
