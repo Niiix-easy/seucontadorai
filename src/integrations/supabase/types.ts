@@ -543,6 +543,62 @@ export type Database = {
         }
         Relationships: []
       }
+      fiscal_export_logs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          filters: Json
+          format: string
+          id: string
+          period_end: string | null
+          period_start: string | null
+          recipients: string[]
+          record_count: number
+          report_id: string | null
+          report_type: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          filters: Json
+          format: string
+          id?: string
+          period_end?: string | null
+          period_start?: string | null
+          recipients: string[]
+          record_count?: number
+          report_id?: string | null
+          report_type: string
+          status: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          filters?: Json
+          format?: string
+          id?: string
+          period_end?: string | null
+          period_start?: string | null
+          recipients?: string[]
+          record_count?: number
+          report_id?: string | null
+          report_type?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiscal_export_logs_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "fiscal_scheduled_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fiscal_scheduled_reports: {
         Row: {
           created_at: string
