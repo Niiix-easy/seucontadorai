@@ -2010,7 +2010,7 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   <span className="text-muted-foreground text-[8px]">até</span>
                   <Input type="date" value={auditFilters.dateEnd} onChange={e => setAuditFilters(p => ({ ...p, dateEnd: e.target.value }))} className="w-28 h-7 text-[9px]" />
                 </div>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setAuditFilters({ dateStart: "", dateEnd: "", uf: "all", env: "all", action: "all" })} title="Limpar Filtros">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setAuditFilters({ dateStart: "", dateEnd: "", uf: "all", env: "all", action: "all", cStat: "", xMotivo: "" })} title="Limpar Filtros">
                   <X className="w-3 h-3" />
                 </Button>
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowSavePrefDialog({ type: 'audit', filters: auditFilters })} title="Salvar Filtro">
