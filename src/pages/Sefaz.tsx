@@ -2562,8 +2562,15 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                 <FileArchive className="w-5 h-5 text-purple-500" /> Histórico de Exportações Agendadas
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="overflow-x-auto border rounded-lg">
+             <div className="space-y-4">
+               <Tabs defaultValue="history">
+                 <TabsList className="grid w-full grid-cols-2">
+                   <TabsTrigger value="history">Execuções Recentes</TabsTrigger>
+                   <TabsTrigger value="schedules">Agendamentos Ativos</TabsTrigger>
+                 </TabsList>
+                 
+                 <TabsContent value="history" className="mt-4">
+                   <div className="overflow-x-auto border rounded-lg">
                 <table className="w-full text-xs">
                   <thead className="bg-muted uppercase">
                     <tr>
@@ -2606,20 +2613,63 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                         </td>
                       </tr>
                     ))}
-                    {exportHistory.length === 0 && (
-                      <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhuma exportação registrada.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-                <div className="flex items-center justify-between p-2 border-t bg-muted/10">
-                  <span className="text-[10px] text-muted-foreground">Página {auditPage}</span>
-                  <div className="flex gap-1">
-                    <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setAuditPage(p => Math.max(1, p - 1))} disabled={auditPage === 1}><ArrowLeft className="w-3 h-3" /></Button>
-                    <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setAuditPage(p => p + 1)} disabled={auditLogs.length < 10}><ArrowLeft className="w-3 h-3 rotate-180" /></Button>
-                  </div>
-                </div>
-              </div>
-            </div>
+                     {exportHistory.length === 0 && (
+                       <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhuma exportação registrada.</td></tr>
+                     )}
+                   </tbody>
+                 </table>
+                 <div className="flex items-center justify-between p-2 border-t bg-muted/10">
+                   <span className="text-[10px] text-muted-foreground">Página {auditPage}</span>
+                   <div className="flex gap-1">
+                     <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setAuditPage(p => Math.max(1, p - 1))} disabled={auditPage === 1}><ArrowLeft className="w-3 h-3" /></Button>
+                     <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setAuditPage(p => p + 1)} disabled={auditLogs.length < 10}><ArrowLeft className="w-3 h-3 rotate-180" /></Button>
+                   </div>
+                 </div>
+               </div>
+             </TabsContent>
+ 
+             <TabsContent value="schedules" className="mt-4">
+               <div className="overflow-x-auto border rounded-lg">
+                 <table className="w-full text-xs">
+                   <thead className="bg-muted uppercase">
+                     <tr>
+                       <th className="text-left py-2 px-4">Relatório</th>
+                       <th className="text-left py-2 px-4">Frequência</th>
+                       <th className="text-left py-2 px-4">Formato</th>
+                       <th className="text-left py-2 px-4">Destinatários</th>
+                       <th className="text-right py-2 px-4">Ação</th>
+                     </tr>
+                   </thead>
+                   <tbody>
+                     {scheduledReports.map(schedule => (
+                       <tr key={schedule.id} className="border-t hover:bg-muted/30">
+                         <td className="py-2 px-4 capitalize font-medium">{schedule.report_type}</td>
+                         <td className="py-2 px-4 capitalize">{schedule.frequency}</td>
+                         <td className="py-2 px-4 uppercase">{schedule.format}</td>
+                         <td className="py-2 px-4">
+                           <div className="flex flex-wrap gap-1">
+                             {(schedule.email_recipients || []).slice(0, 2).map((e: string) => (
+                               <span key={e} className="bg-muted px-1.5 py-0.5 rounded text-[10px] border">{e}</span>
+                             ))}
+                             {(schedule.email_recipients || []).length > 2 && <span className="text-[9px] text-muted-foreground">+{schedule.email_recipients.length - 2}</span>}
+                           </div>
+                         </td>
+                         <td className="py-2 px-4 text-right">
+                           <Button variant="outline" size="sm" onClick={() => handleRunScheduleNow(schedule)} className="h-7 text-[10px] gap-1 px-2 border-primary/20 hover:bg-primary/10">
+                             <Play className="w-2.5 h-2.5" /> Executar Agora
+                           </Button>
+                         </td>
+                       </tr>
+                     ))}
+                     {scheduledReports.length === 0 && (
+                       <tr><td colSpan={5} className="py-8 text-center text-muted-foreground italic">Nenhum agendamento ativo.</td></tr>
+                     )}
+                   </tbody>
+                 </table>
+               </div>
+             </TabsContent>
+           </Tabs>
+         </div>
           </DialogContent>
         </Dialog>
       </div>
