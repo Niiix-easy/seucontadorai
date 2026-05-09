@@ -598,12 +598,23 @@ export default function Sefaz() {
 
     const handleCreateSchedule = async () => {
       if (!user || !showScheduleDialog || !newSchedule.email) return;
+      
+      const currentFilters = showScheduleDialog.type === 'backlog' ? backlogFilters : auditFilters;
+      const hasUF = currentFilters.uf && currentFilters.uf !== 'all';
+      const hasEnv = (currentFilters as any).env && (currentFilters as any).env !== 'all';
+      const hasDate = showScheduleDialog.type === 'backlog' ? !!(currentFilters as any).date : (!!(currentFilters as any).dateStart || !!(currentFilters as any).dateEnd);
+
+      if (!hasUF || !hasEnv || !hasDate) {
+        toast.error("Validação falhou: Selecione UF, Ambiente e um Período válido para agendar.");
+        return;
+      }
+
       const { error } = await supabase.from("fiscal_scheduled_reports").insert({
         user_id: user.id,
         report_type: showScheduleDialog.type,
         format: newSchedule.format,
         frequency: newSchedule.frequency,
-        filters: showScheduleDialog.type === 'backlog' ? backlogFilters : auditFilters,
+        filters: currentFilters,
         email_recipients: [newSchedule.email],
         is_active: true
       });
@@ -613,7 +624,7 @@ export default function Sefaz() {
         loadScheduledReports();
         setShowScheduleDialog(null);
       } else {
-        toast.error("Erro ao criar agendamento");
+        toast.error("Erro ao criar agendamento: " + error.message);
       }
     };
 
