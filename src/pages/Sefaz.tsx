@@ -135,11 +135,11 @@ export default function Sefaz() {
       is_suspended: false,
       consecutive_validation_failures: 0,
       auto_retry_on_reactivation: false,
-    reactivation_throughput: 5,
-    is_paused: false
+      reactivation_throughput: 5,
+      is_paused: false
+    });
     const [suspensionStates, setSuspensionStates] = useState<any[]>([]);
     const [backlogData, setBacklogData] = useState<any[]>([]);
-    });
     const [deadLetterNotifs, setDeadLetterNotifs] = useState<any[]>([]);
     const [dlSearch, setDlSearch] = useState("");
     const [dlPeriodo, setDlPeriodo] = useState({ de: "", ate: "" });
