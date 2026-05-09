@@ -1499,6 +1499,12 @@ export default function Sefaz() {
                     <Button variant="outline" size="sm" onClick={handleExportAuditCSV} className="gap-2 h-8 text-[10px]">
                       <Download className="w-3 h-3" /> Exportar Auditoria
                     </Button>
+                    <Button variant="outline" size="sm" onClick={handleExportAuditPDF} title="PDF Auditoria" className="h-8 w-8 p-0 border-red-200 hover:bg-red-50">
+                      <FileDown className="w-3 h-3 text-red-500" />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleExportBacklogPDF} title="PDF Backlog" className="h-8 w-8 p-0 border-blue-200 hover:bg-blue-50">
+                      <FileDown className="w-3 h-3 text-blue-500" />
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => setShowAuditLogs(true)} className="gap-2 h-8 text-[10px]">
                       <History className="w-3 h-3" /> Ver Auditoria
                     </Button>
