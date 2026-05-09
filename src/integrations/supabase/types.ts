@@ -348,6 +348,42 @@ export type Database = {
           },
         ]
       }
+      fiscal_configurations: {
+        Row: {
+          certificate_filename: string | null
+          certificate_password_hash: string | null
+          certificate_path: string | null
+          created_at: string
+          environment: Database["public"]["Enums"]["sefaz_environment"]
+          id: string
+          uf: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          certificate_filename?: string | null
+          certificate_password_hash?: string | null
+          certificate_path?: string | null
+          created_at?: string
+          environment?: Database["public"]["Enums"]["sefaz_environment"]
+          id?: string
+          uf: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          certificate_filename?: string | null
+          certificate_password_hash?: string | null
+          certificate_path?: string | null
+          created_at?: string
+          environment?: Database["public"]["Enums"]["sefaz_environment"]
+          id?: string
+          uf?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       nf_eventos: {
         Row: {
           created_at: string
@@ -776,6 +812,57 @@ export type Database = {
           },
         ]
       }
+      processed_documents: {
+        Row: {
+          created_at: string
+          document_type: string
+          id: string
+          period_date: string
+          processing_log: Json | null
+          protocol_number: string | null
+          receipt_number: string | null
+          sefaz_response_code: string | null
+          sefaz_response_message: string | null
+          signed_xml_content: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          xml_content: string
+        }
+        Insert: {
+          created_at?: string
+          document_type: string
+          id?: string
+          period_date?: string
+          processing_log?: Json | null
+          protocol_number?: string | null
+          receipt_number?: string | null
+          sefaz_response_code?: string | null
+          sefaz_response_message?: string | null
+          signed_xml_content?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          xml_content: string
+        }
+        Update: {
+          created_at?: string
+          document_type?: string
+          id?: string
+          period_date?: string
+          processing_log?: Json | null
+          protocol_number?: string | null
+          receipt_number?: string | null
+          sefaz_response_code?: string | null
+          sefaz_response_message?: string | null
+          signed_xml_content?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          xml_content?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -943,6 +1030,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "contador" | "auxiliar"
+      sefaz_environment: "homologacao" | "producao"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1071,6 +1159,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "contador", "auxiliar"],
+      sefaz_environment: ["homologacao", "producao"],
     },
   },
 } as const

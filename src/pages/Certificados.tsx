@@ -102,24 +102,35 @@ export default function Certificados() {
 
     setUploading(true);
     try {
-      const filePath = `${user.id}/certificados/${Date.now()}_${selectedFile.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from("documents")
-        .upload(filePath, selectedFile, { contentType: "application/x-pkcs12" });
-      if (uploadError) throw uploadError;
+       const fileName = `${Date.now()}_${selectedFile.name}`;
+       const filePath = `${user.id}/${fileName}`;
+       const { error: uploadError } = await supabase.storage
+         .from("certificates")
+         .upload(filePath, selectedFile, { contentType: "application/x-pkcs12" });
+       if (uploadError) throw uploadError;
 
-      const { error: dbError } = await supabase.from("certificados_digitais").insert({
-        user_id: user.id,
-        nome_arquivo: selectedFile.name,
-        tipo: tipoCert,
-        cnpj: cnpjUpload,
-        razao_social: razaoUpload,
-        validade: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-        status: "valido",
-        emissor: "Aguardando validação",
-        file_path: filePath,
-      });
-      if (dbError) throw dbError;
+       const { error: dbError } = await supabase.from("certificados_digitais").insert({
+         user_id: user.id,
+         nome_arquivo: selectedFile.name,
+         tipo: tipoCert,
+         cnpj: cnpjUpload,
+         razao_social: razaoUpload,
+         validade: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+         status: "valido",
+         emissor: "Aguardando validação",
+         file_path: filePath,
+       });
+       if (dbError) throw dbError;
+
+       // Also update fiscal_configurations if it's A1
+       if (tipoCert === "A1") {
+         await supabase.from("fiscal_configurations").upsert({
+           user_id: user.id,
+           certificate_filename: selectedFile.name,
+           certificate_path: filePath,
+           uf: "SP", // Default UF, user can change in settings
+         }, { onConflict: "user_id" });
+       }
 
       toast.success("Certificado enviado com sucesso!");
       setSelectedFile(null); setSenha(""); setCnpjUpload(""); setRazaoUpload("");
