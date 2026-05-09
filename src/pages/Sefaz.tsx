@@ -2736,7 +2736,16 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                     {exportHistory.map(log => (
                       <tr key={log.id} className="border-t hover:bg-muted/30">
                         <td className="py-2 px-4 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
-                        <td className="py-2 px-4 capitalize">{log.report_type}</td>
+                         <td className="py-2 px-4">
+                           <div className="flex flex-col">
+                             <span className="capitalize font-medium">{log.report_type}</span>
+                             {log.filters && (
+                               <span className="text-[8px] text-muted-foreground truncate max-w-[120px]">
+                                 UF: {log.filters.uf || 'Todas'} | Env: {log.filters.env || 'Todos'}
+                               </span>
+                             )}
+                           </div>
+                         </td>
                         <td className="py-2 px-4 uppercase font-bold">{log.format}</td>
                         <td className="py-2 px-4 text-center">{log.record_count}</td>
                         <td className="py-2 px-4">
@@ -2755,11 +2764,17 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                               Etapa: Geração {'→'} Falha: {log.error_message || 'Desconhecido'}
                             </div>
                           )}
-                          {log.status === 'success' && (
-                            <div className="text-[8px] text-green-600">
-                              Etapas: Geração (OK) {'→'} Anexo (OK) {'→'} Envio (OK)
-                            </div>
-                          )}
+                           <div className="text-[8px] mt-1">
+                             {log.status === 'success' ? (
+                               <span className="text-green-600">
+                                 Geração ({log.record_count} reg) {'→'} ZIP {'→'} Envio (OK)
+                               </span>
+                             ) : (
+                               <span className="text-destructive">
+                                 Falha: {log.error_message || 'Erro inesperado'}
+                               </span>
+                             )}
+                           </div>
                         </td>
                       </tr>
                     ))}
