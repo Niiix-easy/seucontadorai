@@ -14,7 +14,9 @@ import {
      Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
      FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X
  } from "lucide-react";
+ import { Zap } from "lucide-react";
 import JSZip from "jszip";
+ import * as XLSX from "xlsx";
  import jsPDF from "jspdf";
  import autoTable from "jspdf-autotable";
 import { toast } from "sonner";
@@ -148,6 +150,12 @@ export default function Sefaz() {
      const [manualRetryProgress, setManualRetryProgress] = useState<{ [key: string]: { status: 'queued' | 'processing' | 'done' | 'error', count: number, total: number } }>({});
     const [pauseReason, setPauseReason] = useState("");
     const [auditLogs, setAuditLogs] = useState<any[]>([]);
+    const [savedPreferences, setSavedPreferences] = useState<any[]>([]);
+    const [showSavePrefDialog, setShowSavePrefDialog] = useState<{ type: 'backlog' | 'audit', filters: any } | null>(null);
+    const [newPrefName, setNewPrefName] = useState("");
+    const [scheduledReports, setScheduledReports] = useState<any[]>([]);
+    const [showScheduleDialog, setShowScheduleDialog] = useState<{ type: 'backlog' | 'audit' } | null>(null);
+    const [newSchedule, setNewSchedule] = useState({ format: 'pdf', frequency: 'daily', email: "" });
     const [showAuditLogs, setShowAuditLogs] = useState(false);
 
     const [deadLetterNotifs, setDeadLetterNotifs] = useState<any[]>([]);
@@ -415,6 +423,8 @@ export default function Sefaz() {
         loadProcessedDocs();
         loadBacklogData();
         loadAuditLogs();
+        loadUserPreferences();
+        loadScheduledReports();
 
         const channel = supabase
           .channel('fiscal_monitoring')
@@ -507,12 +517,113 @@ export default function Sefaz() {
       toast.success("Auditoria exportada!");
     };
 
+    const loadUserPreferences = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from("fiscal_user_preferences")
+        .select("*")
+        .eq("user_id", user.id);
+      if (data) setSavedPreferences(data);
+    };
+
+    const handleSavePreference = async () => {
+      if (!user || !showSavePrefDialog || !newPrefName.trim()) return;
+      const { error } = await supabase.from("fiscal_user_preferences").upsert({
+        user_id: user.id,
+        preference_key: `${showSavePrefDialog.type}_filters`,
+        preference_name: newPrefName.trim(),
+        filters: showSavePrefDialog.filters
+      }, { onConflict: "user_id, preference_key, preference_name" });
+
+      if (!error) {
+        toast.success(`Filtro "${newPrefName}" salvo!`);
+        loadUserPreferences();
+        setShowSavePrefDialog(null);
+        setNewPrefName("");
+      } else {
+        toast.error("Erro ao salvar filtro");
+      }
+    };
+
+    const loadScheduledReports = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from("fiscal_scheduled_reports")
+        .select("*")
+        .eq("user_id", user.id);
+      if (data) setScheduledReports(data);
+    };
+
+    const handleCreateSchedule = async () => {
+      if (!user || !showScheduleDialog || !newSchedule.email) return;
+      const { error } = await supabase.from("fiscal_scheduled_reports").insert({
+        user_id: user.id,
+        report_type: showScheduleDialog.type,
+        format: newSchedule.format,
+        frequency: newSchedule.frequency,
+        filters: showScheduleDialog.type === 'backlog' ? backlogFilters : auditFilters,
+        email_recipients: [newSchedule.email],
+        is_active: true
+      });
+
+      if (!error) {
+        toast.success("Agendamento criado com sucesso!");
+        loadScheduledReports();
+        setShowScheduleDialog(null);
+      } else {
+        toast.error("Erro ao criar agendamento");
+      }
+    };
+
+    const handleExportAuditXLSX = () => {
+      if (auditLogs.length === 0) return;
+      const data = auditLogs.map(log => ({
+        "Data/Hora": new Date(log.created_at).toLocaleString(),
+        "Ação": log.action.toUpperCase(),
+        "UF": log.uf,
+        "Ambiente": log.environment,
+        "Motivo": log.reason || "",
+        "Usuário ID": log.user_id
+      }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Auditoria");
+      XLSX.writeFile(wb, `auditoria_fiscal_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success("Auditoria Excel exportada!");
+    };
+
+    const handleExportBacklogXLSX = () => {
+      if (backlogData.length === 0) return;
+      const data = backlogData.map(b => {
+        const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
+        const status = state?.is_suspended ? "Suspenso" : (state?.is_paused ? "Pausado" : "Ativo");
+        return {
+          "UF": b.uf,
+          "Ambiente": b.env.toUpperCase(),
+          "Quantidade": b.count,
+          "Próximo Envio": b.next ? new Date(b.next).toLocaleString() : "—",
+          "Status": status
+        };
+      });
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Backlog");
+      XLSX.writeFile(wb, `backlog_fiscal_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success("Backlog Excel exportada!");
+    };
+
     const handleExportAuditPDF = () => {
       if (auditLogs.length === 0) return;
       const doc = new jsPDF();
       doc.text("Auditoria de Ações Fiscais", 14, 15);
       doc.setFontSize(8);
       doc.text(`Gerado em: ${new Date().toLocaleString()}`, 14, 22);
+      
+      if (auditLogs.length > 0) {
+        doc.setFontSize(7);
+        doc.setTextColor(100);
+        doc.text("Links e IDs de Referência (Ações Manuais):", 14, 28);
+      }
       
       const tableData = auditLogs.map(log => [
         new Date(log.created_at).toLocaleString(),
@@ -525,7 +636,7 @@ export default function Sefaz() {
       autoTable(doc, {
         head: [["Data/Hora", "Ação", "UF/Amb", "Motivo", "Usuário"]],
         body: tableData,
-        startY: 25,
+        startY: 32,
         theme: 'grid',
         styles: { fontSize: 8 },
         headStyles: { fillColor: [66, 66, 66] }
@@ -568,6 +679,10 @@ export default function Sefaz() {
       doc.setFontSize(8);
       doc.text(`Filtros: UF=${backlogFilters.uf}, Amb=${backlogFilters.env}, Data=${backlogFilters.date || 'Todas'}`, 14, 22);
       
+      doc.setFontSize(7);
+      doc.setTextColor(100);
+      doc.text("Referências de Lote e links de consulta SEFAZ:", 14, 28);
+      
       const tableData = backlogData.map(b => {
         const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
         const status = state?.is_suspended ? "Suspenso" : (state?.is_paused ? "Pausado" : "Ativo");
@@ -583,7 +698,7 @@ export default function Sefaz() {
       autoTable(doc, {
         head: [["UF", "Ambiente", "Fila", "Próximo Envio", "Status"]],
         body: tableData,
-        startY: 28,
+        startY: 32,
         theme: 'grid',
         styles: { fontSize: 8 },
         headStyles: { fillColor: [41, 128, 185] }
@@ -1523,6 +1638,21 @@ export default function Sefaz() {
                       {ufs.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}
                     </SelectContent>
                   </Select>
+
+                  <Select 
+                    onValueChange={v => {
+                      const pref = savedPreferences.find(p => p.id === v);
+                      if (pref) setBacklogFilters(pref.filters);
+                    }}
+                  >
+                    <SelectTrigger className="w-32 h-8 text-[10px]"><SelectValue placeholder="Filtros Salvos" /></SelectTrigger>
+                    <SelectContent>
+                      {savedPreferences.filter(p => p.preference_key === 'backlog_filters').map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.preference_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
                   <Select value={backlogFilters.env} onValueChange={v => setBacklogFilters(p => ({ ...p, env: v }))}>
                     <SelectTrigger className="w-28 h-8 text-[10px]"><SelectValue placeholder="Ambiente" /></SelectTrigger>
                     <SelectContent>
@@ -1542,9 +1672,18 @@ export default function Sefaz() {
                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setBacklogFilters({ uf: "all", env: "all", date: "", cStat: "", xMotivo: "" })} title="Limpar Filtros">
                      <X className="w-3 h-3" />
                    </Button>
+                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowSavePrefDialog({ type: 'backlog', filters: backlogFilters })} title="Salvar Filtro">
+                     <Settings className="w-3 h-3" />
+                   </Button>
+                   <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-500" onClick={() => setShowScheduleDialog({ type: 'backlog' })} title="Agendar Exportação">
+                     <Zap className="w-3 h-3" />
+                   </Button>
                    <div className="ml-auto flex gap-1">
                      <Button variant="outline" size="sm" onClick={handleExportBacklogCSV} title="Exportar CSV" className="h-8 px-2 text-[10px] gap-1">
                        <Download className="w-3 h-3" /> CSV
+                     </Button>
+                     <Button variant="outline" size="sm" onClick={handleExportBacklogXLSX} title="Exportar Excel" className="h-8 px-2 text-[10px] gap-1 border-green-100">
+                       <FileArchive className="w-3 h-3 text-green-500" /> XLSX
                      </Button>
                      <Button variant="outline" size="sm" onClick={handleExportBacklogPDF} title="Exportar PDF" className="h-8 px-2 text-[10px] gap-1 border-red-100">
                        <FileDown className="w-3 h-3 text-red-500" /> PDF
@@ -1748,6 +1887,21 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   </Select>
                 </div>
                 <div className="flex items-center gap-1">
+                  <Select 
+                    onValueChange={v => {
+                      const pref = savedPreferences.find(p => p.id === v);
+                      if (pref) setAuditFilters(pref.filters);
+                    }}
+                  >
+                    <SelectTrigger className="w-24 h-7 text-[9px]"><SelectValue placeholder="Filtros" /></SelectTrigger>
+                    <SelectContent>
+                      {savedPreferences.filter(p => p.preference_key === 'audit_filters').map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.preference_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-1">
                   <Label className="text-[9px] uppercase font-bold text-muted-foreground">Ação:</Label>
                   <Select value={auditFilters.action} onValueChange={v => setAuditFilters(p => ({ ...p, action: v }))}>
                     <SelectTrigger className="w-24 h-7 text-[9px]"><SelectValue /></SelectTrigger>
@@ -1768,9 +1922,18 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setAuditFilters({ dateStart: "", dateEnd: "", uf: "all", env: "all", action: "all" })} title="Limpar Filtros">
                   <X className="w-3 h-3" />
                 </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowSavePrefDialog({ type: 'audit', filters: auditFilters })} title="Salvar Filtro">
+                  <Settings className="w-3 h-3" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-500" onClick={() => setShowScheduleDialog({ type: 'audit' })} title="Agendar Exportação">
+                  <Zap className="w-3 h-3" />
+                </Button>
                 <div className="ml-auto flex gap-1">
                   <Button variant="outline" size="sm" onClick={handleExportAuditCSV} className="h-7 text-[9px] gap-1 px-2">
                     <Download className="w-2.5 h-2.5" /> CSV
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleExportAuditXLSX} className="h-7 text-[9px] gap-1 px-2 border-green-100">
+                    <FileArchive className="w-2.5 h-2.5 text-green-500" /> XLSX
                   </Button>
                   <Button variant="outline" size="sm" onClick={handleExportAuditPDF} className="h-7 text-[9px] gap-1 px-2 border-red-100">
                     <FileDown className="w-2.5 h-2.5 text-red-500" /> PDF
@@ -1985,6 +2148,78 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
            )}
          </DialogContent>
        </Dialog>
-     </div>
+
+        {/* Save Preference Dialog */}
+        <Dialog open={!!showSavePrefDialog} onOpenChange={() => setShowSavePrefDialog(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Salvar Filtros</DialogTitle>
+              <DialogDescription>Dê um nome para identificar este conjunto de filtros.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label>Nome do Filtro</Label>
+                <Input 
+                  placeholder="Ex: Pendentes SP, Erros Homologação..." 
+                  value={newPrefName}
+                  onChange={e => setNewPrefName(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowSavePrefDialog(null)}>Cancelar</Button>
+                <Button onClick={handleSavePreference}>Salvar Filtro</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Schedule Report Dialog */}
+        <Dialog open={!!showScheduleDialog} onOpenChange={() => setShowScheduleDialog(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Agendar Exportação Automática</DialogTitle>
+              <DialogDescription>Configure o envio recorrente por e-mail.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Formato</Label>
+                  <Select value={newSchedule.format} onValueChange={v => setNewSchedule(p => ({ ...p, format: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pdf">PDF</SelectItem>
+                      <SelectItem value="csv">CSV</SelectItem>
+                      <SelectItem value="xlsx">Excel (XLSX)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Frequência</Label>
+                  <Select value={newSchedule.frequency} onValueChange={v => setNewSchedule(p => ({ ...p, frequency: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Diário</SelectItem>
+                      <SelectItem value="weekly">Semanal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>E-mail do Destinatário</Label>
+                <Input 
+                  type="email" 
+                  placeholder="email@exemplo.com"
+                  value={newSchedule.email}
+                  onChange={e => setNewSchedule(p => ({ ...p, email: e.target.value }))}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowScheduleDialog(null)}>Cancelar</Button>
+                <Button onClick={handleCreateSchedule}>Criar Agendamento</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
    );
  }
