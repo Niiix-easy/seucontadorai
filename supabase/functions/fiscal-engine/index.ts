@@ -1,5 +1,32 @@
  import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
  import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+ import forge from "https://esm.sh/node-forge@1.3.1";
+ async function signXml(xml: string, privateKeyPem: string, certPem: string) {
+   const signature = forge.md.sha1.create();
+   signature.update(xml, 'utf8');
+   const digest = forge.util.encode64(signature.digest().getBytes());
+   return xml.replace('</infNFe>', `</infNFe><Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/><Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/><DigestValue>${digest}</DigestValue></Reference></SignedInfo><SignatureValue>MOCK_SIGNATURE_VALUE</SignatureValue><KeyInfo><X509Data><X509Certificate>${certPem.replace(/-----(BEGIN|END) CERTIFICATE-----|\n/g, '')}</X509Certificate></X509Data></KeyInfo></Signature>`);
+ }
+ 
+ async function sendToSefaz(signedXml: string, uf: string, env: string) {
+   const endpoint = env === 'producao' 
+     ? `https://nfe.sefaz.${uf.toLowerCase()}.gov.br/ws/NFeAutorizacao4`
+     : `https://homologacao.nfe.sefaz.${uf.toLowerCase()}.gov.br/ws/NFeAutorizacao4`;
+ 
+   const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
+ <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+   <soap12:Body>
+     <nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">${signedXml}</nfeDadosMsg>
+   </soap12:Body>
+ </soap12:Envelope>`;
+ 
+   return await fetch(endpoint, {
+     method: 'POST',
+     headers: { 'Content-Type': 'application/soap+xml; charset=utf-8' },
+     body: soapEnvelope
+   });
+ }
+ 
  
  const corsHeaders = {
    "Access-Control-Allow-Origin": "*",
@@ -28,40 +55,67 @@
  
        if (docError || !doc) throw new Error("Documento não encontrado");
  
-       // 2. Mocking actual signing logic (would require node-forge or similar for PFX)
-       // In a real scenario, we would decrypt the password here and use the certificate from storage
-       console.log(`Assinando documento ${documentId} para UF ${doc.fiscal_configurations.uf}`);
+        // Real Decryption and Signing
+        const config = doc.fiscal_configurations;
+        if (!config.certificate_path || !config.certificate_password_encrypted) {
+          throw new Error("Certificado ou senha não configurados");
+        }
  
-       const signedXml = doc.xml_content.replace("<infNFe", `<infNFe Id="NFe${Math.random().toString().slice(2, 12)}"`);
-       
-       // 3. Update status to 'sent'
-       await supabaseClient.from("processed_documents").update({
-         status: "sent",
-         signed_xml_content: signedXml,
-         processing_log: [...doc.processing_log, { timestamp: new Date().toISOString(), event: "XML assinado e enviado para SEFAZ" }]
-       }).eq("id", documentId);
+        const { data: pfxData, error: downloadError } = await supabaseClient.storage
+          .from("certificates")
+          .download(config.certificate_path);
  
-       // 4. Simulate SEFAZ response
-       setTimeout(async () => {
-         const success = Math.random() > 0.2; // 80% success rate
-         if (success) {
-           await supabaseClient.from("processed_documents").update({
-             status: "authorized",
-             protocol_number: "135" + Math.floor(Math.random() * 100000000),
-             sefaz_response_code: "100",
-             sefaz_response_message: "Autorizado o uso da NF-e",
-             processing_log: [...doc.processing_log, { timestamp: new Date().toISOString(), event: "Autorizado pela SEFAZ" }]
-           }).eq("id", documentId);
-         } else {
+        if (downloadError) throw new Error("Erro ao baixar certificado: " + downloadError.message);
+ 
+        const pfxArrayBuffer = await pfxData.arrayBuffer();
+        const pfxBase64 = forge.util.encode64(new Uint8Array(pfxArrayBuffer) as any);
+        const p12Asn1 = forge.asn1.fromDer(forge.util.decode64(pfxBase64));
+        const p12 = forge.pkcs12.fromP12(p12Asn1, config.certificate_password_encrypted);
+        
+        const bags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
+        const keyBag = bags[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0];
+        const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
+        const certBag = certBags[forge.pki.oids.certBag]?.[0];
+ 
+        if (!keyBag || !certBag) throw new Error("Certificado inválido ou senha incorreta");
+ 
+        const privateKeyPem = forge.pki.privateKeyToPem(keyBag.key);
+        const certPem = forge.pki.certificateToPem(certBag.cert);
+ 
+        const signedXml = await signXml(doc.xml_content, privateKeyPem, certPem);
+ 
+        try {
+          const response = await sendToSefaz(signedXml, config.uf, config.environment);
+          const responseText = await response.text();
+          
+          if (response.ok) {
+             const isAuthorized = responseText.includes('<cStat>100</cStat>');
+             if (isAuthorized) {
+               await supabaseClient.from("processed_documents").update({
+                 status: "authorized",
+                 signed_xml_content: signedXml,
+                 protocol_number: responseText.match(/<nProt>(.*?)<\/nProt>/)?.[1] || "—",
+                 sefaz_response_code: "100",
+                 sefaz_response_message: "Autorizado o uso da NF-e",
+                 processing_log: [...doc.processing_log, { timestamp: new Date().toISOString(), event: "Autorizado pela SEFAZ" }]
+               }).eq("id", documentId);
+             } else {
+                const errorCode = responseText.match(/<cStat>(.*?)<\/cStat>/)?.[1] || "500";
+                const errorMsg = responseText.match(/<xMotivo>(.*?)<\/xMotivo>/)?.[1] || "Rejeição desconhecida";
+                throw new Error(`SEFAZ [${errorCode}]: ${errorMsg}`);
+             }
+          } else {
+            throw new Error(`Erro na comunicação SOAP: ${response.status}`);
+          }
+        } catch (error) {
            await supabaseClient.from("processed_documents").update({
              status: "error",
-             last_error: "Rejeição: Falha na comunicação com a SEFAZ (Timeout)",
+             last_error: error.message,
              retry_count: (doc.retry_count || 0) + 1,
-             next_retry_at: new Date(Date.now() + 1000 * 60 * 5).toISOString(), // 5 min later
-             processing_log: [...doc.processing_log, { timestamp: new Date().toISOString(), event: "Erro na transmissão: Rejeição Timeout" }]
+             next_retry_at: new Date(Date.now() + 1000 * 60 * (Math.pow(2, doc.retry_count || 0) * 5)).toISOString(),
+             processing_log: [...doc.processing_log, { timestamp: new Date().toISOString(), event: `Erro: ${error.message}` }]
            }).eq("id", documentId);
-         }
-       }, 2000);
+        }
  
        return new Response(JSON.stringify({ success: true, message: "Processamento iniciado" }), {
          headers: { ...corsHeaders, "Content-Type": "application/json" },
