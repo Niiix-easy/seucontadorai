@@ -119,7 +119,10 @@ export default function Sefaz() {
   const [nfes, setNfes] = useState<NFeEmitida[]>([]);
    const [processedDocs, setProcessedDocs] = useState<ProcessedDocument[]>([]);
    const [fiscalConfig, setFiscalConfig] = useState<FiscalConfig>({ uf: "SP", environment: "homologacao", certificate_filename: null });
-   const [configLoading, setConfigLoading] = useState(false);
+    const [configLoading, setConfigLoading] = useState(false);
+    const [certPassword, setCertPassword] = useState("");
+    const [showCertPassword, setShowCertPassword] = useState(false);
+    const [docInDetail, setDocInDetail] = useState<ProcessedDocument | null>(null);
   const [nfeDetalhe, setNfeDetalhe] = useState<NFeEmitida | null>(null);
   const [showXmlPreview, setShowXmlPreview] = useState(false);
    const [periodo, setPeriodo] = useState({ de: "", ate: "" });
