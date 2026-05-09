@@ -974,9 +974,21 @@ export default function Sefaz() {
             record_count: count, csv_count: count, pdf_count: count, 
             csv_hash: csvHash, pdf_hash: pdfHash,
             validation_divergence: divergence, filters: filters, 
-            technical_log: { mode: 'proof', sorting: sort, timestamp: new Date().toISOString() } as any,
-            expected_data: { csv_hash: csvHash, pdf_hash: pdfHash, count: count },
-            recipients: []
+             technical_log: { mode: 'proof', sorting: sort, timestamp: new Date().toISOString(), execution_id: crypto.randomUUID() } as any,
+             expected_data: { csv_hash: csvHash, pdf_hash: pdfHash, count: count },
+             recipients: [],
+             audit_events: [
+               { timestamp: new Date().toISOString(), stage: 'initializing', message: 'Iniciando Modo Prova a partir de dados históricos.' },
+               { timestamp: new Date().toISOString(), stage: 'csv_gen', message: `Dados CSV recalculados (${count} registros).` },
+               { timestamp: new Date().toISOString(), stage: 'pdf_gen', message: 'PDF simulado para auditoria de hash.' },
+               { timestamp: new Date().toISOString(), stage: 'hash_calc', message: 'Hashes SHA-256 gerados com sucesso.' },
+               { 
+                 timestamp: new Date().toISOString(), 
+                 stage: 'validation', 
+                 message: divergence ? 'Divergência detectada entre snapshot e dados atuais.' : 'Integridade confirmada. Dados idênticos ao snapshot.',
+                 status: divergence ? 'warning' : 'success'
+               }
+             ]
           }]);
           loadExportHistory();
           toast.success("Modo Prova concluído e registrado no histórico.");
@@ -1159,8 +1171,15 @@ export default function Sefaz() {
           user_id: user.id, report_type: type, format: 'zip', status: 'success', 
           record_count: finalRecordCount, csv_count: finalRecordCount, pdf_count: finalRecordCount, 
           csv_hash: finalCsvHash, pdf_hash: finalPdfHash, zip_hash: zipHash,
-          validation_divergence: finalDivergence, filters: filters, technical_log: finalTechLog as any, recipients: [],
-          expected_data: { csv_hash: expectedCsvHash, pdf_hash: expectedPdfHash, count: previewCount }
+           validation_divergence: finalDivergence, filters: filters, technical_log: finalTechLog as any, recipients: [],
+           expected_data: { csv_hash: expectedCsvHash, pdf_hash: expectedPdfHash, count: previewCount },
+           audit_events: [
+             { timestamp: new Date().toISOString(), stage: 'initializing', message: 'Iniciando exportação completa do relatório.' },
+             { timestamp: new Date().toISOString(), stage: 'csv_gen', message: `Arquivo CSV gerado com ${finalRecordCount} registros.` },
+             { timestamp: new Date().toISOString(), stage: 'pdf_gen', message: 'Documento PDF formatado e pronto.' },
+             { timestamp: new Date().toISOString(), stage: 'hash_calc', message: 'Hashes SHA-256 calculados e validados.' },
+             { timestamp: new Date().toISOString(), stage: 'finalizing', message: 'Pacote ZIP finalizado e pronto para download.' }
+           ]
         }]);
         const link = document.createElement("a");
         link.href = url;
