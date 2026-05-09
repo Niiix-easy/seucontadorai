@@ -818,9 +818,11 @@ export default function Sefaz() {
       handleExportZip(log.report_type as 'backlog' | 'audit', 'proof', log.filters, log.technical_log?.sorting);
     };
 
-     const handleExportZip = async (type: 'backlog' | 'audit', mode: 'full' | 'proof' = 'full') => {
-       const filters = type === 'backlog' ? backlogFilters : auditFilters;
-       const count = type === 'backlog' 
+      const handleExportZip = async (type: 'backlog' | 'audit', mode: 'full' | 'proof' = 'full', overrideFilters?: any, overrideSort?: any) => {
+        const filters = overrideFilters || (type === 'backlog' ? backlogFilters : auditFilters);
+        const sort = overrideSort || (type === 'backlog' ? backlogSort : auditSort);
+        
+        const count = type === 'backlog' 
          ? backlogData.reduce((acc, b) => acc + b.count, 0) 
          : auditLogs.length;
        
@@ -831,8 +833,8 @@ export default function Sefaz() {
        let rows: any[] = [];
        if (type === 'backlog') {
          const sortedData = [...backlogData].sort((a: any, b: any) => {
-           const field = backlogSort.field;
-           const modifier = backlogSort.order === 'asc' ? 1 : -1;
+           const field = sort.field;
+           const modifier = sort.order === 'asc' ? 1 : -1;
            if (a[field] < b[field]) return -1 * modifier;
            if (a[field] > b[field]) return 1 * modifier;
            return 0;
