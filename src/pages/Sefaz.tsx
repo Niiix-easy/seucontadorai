@@ -701,7 +701,7 @@ export default function Sefaz() {
        }
      };
  
-     const handleResendExportEmail = async (logId: string) => {
+     const handleResendEmail = async (logId: string) => {
        toast.info("Reenviando e-mail...");
        const { error } = await supabase.functions.invoke("fiscal-scheduler", {
          body: { action: "resend_email", log_id: logId }
