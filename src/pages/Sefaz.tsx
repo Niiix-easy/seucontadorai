@@ -9,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { 
-  Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
-   Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle
-} from "lucide-react";
+   Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
+    Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
+    FileDown, Play, CheckSquare, Square
+ } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -122,7 +123,58 @@ export default function Sefaz() {
     const [configLoading, setConfigLoading] = useState(false);
     const [certPassword, setCertPassword] = useState("");
     const [showCertPassword, setShowCertPassword] = useState(false);
-    const [docInDetail, setDocInDetail] = useState<ProcessedDocument | null>(null);
+     const [docInDetail, setDocInDetail] = useState<ProcessedDocument | null>(null);
+     const [selectedIds, setSelectedIds] = useState<string[]>([]);
+     const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+     const [batchProgress, setBatchProgress] = useState(0);
+    const handleExportCSV = () => {
+      if (processedDocs.length === 0) return;
+      const headers = ["ID", "Data", "Tipo", "Status", "Total", "Recibo", "Protocolo", "Erros", "Retentativas"];
+      const rows = processedDocs.map(doc => [
+        doc.id, new Date(doc.created_at).toLocaleString(), doc.document_type, doc.status,
+        doc.valor_total || 0, doc.receipt_number || "", doc.protocol_number || "",
+        doc.last_error || "", doc.retry_count || 0
+      ]);
+      const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `relatorio_fiscal_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Relatório CSV exportado!");
+    };
+ 
+    const handleBatchRetry = async () => {
+      if (selectedIds.length === 0) return;
+      setIsBatchProcessing(true);
+      setBatchProgress(0);
+      let completed = 0;
+      for (const id of selectedIds) {
+        try {
+          await supabase.from("processed_documents").update({ status: "pending", last_error: null }).eq("id", id);
+          await supabase.functions.invoke("fiscal-engine", { body: { action: "sign_and_send", documentId: id } });
+        } catch (e) { console.error(e); }
+        completed++;
+        setBatchProgress(Math.round((completed / selectedIds.length) * 100));
+      }
+      toast.success(`${completed} documentos em reprocessamento.`);
+      setIsBatchProcessing(false);
+      setSelectedIds([]);
+      loadProcessedDocs();
+    };
+ 
+    const toggleSelectAll = () => {
+      if (selectedIds.length === processedDocs.length) setSelectedIds([]);
+      else setSelectedIds(processedDocs.map(d => d.id));
+    };
+ 
+    const toggleSelect = (id: string) => {
+      setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    };
+ 
   const [nfeDetalhe, setNfeDetalhe] = useState<NFeEmitida | null>(null);
   const [showXmlPreview, setShowXmlPreview] = useState(false);
    const [periodo, setPeriodo] = useState({ de: "", ate: "" });
@@ -381,7 +433,87 @@ export default function Sefaz() {
           <TabsTrigger value="notas">Notas ({nfes.length})</TabsTrigger>
           <TabsTrigger value="webservices">WebServices</TabsTrigger>
           <TabsTrigger value="consultas">Consultas</TabsTrigger>
-          <TabsTrigger value="integradores">Integradores</TabsTrigger>
+           <TabsTrigger value="integradores">Integradores</TabsTrigger>
+           <TabsTrigger value="processamento">Relatórios de Processamento</TabsTrigger>
+         <TabsContent value="processamento">
+           <Card>
+             <CardHeader>
+               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                 <CardTitle className="font-display">Relatórios de Processamento</CardTitle>
+                 <div className="flex items-center gap-2">
+                   <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-2">
+                     <FileDown className="w-4 h-4" /> Exportar CSV
+                   </Button>
+                   {selectedIds.length > 0 && (
+                     <Button variant="default" size="sm" onClick={handleBatchRetry} disabled={isBatchProcessing} className="gap-2">
+                       {isBatchProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                       Reprocessar ({selectedIds.length})
+                     </Button>
+                   )}
+                 </div>
+               </div>
+             </CardHeader>
+             <CardContent className="space-y-4">
+               {isBatchProcessing && (
+                 <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                   <div className="bg-primary h-full transition-all duration-300" style={{ width: `${batchProgress}%` }} />
+                 </div>
+               )}
+               <div className="flex flex-wrap items-center gap-2">
+                 <Input type="date" value={periodo.de} onChange={e => setPeriodo(prev => ({ ...prev, de: e.target.value }))} className="w-32 h-9" />
+                 <span className="text-muted-foreground text-xs">até</span>
+                 <Input type="date" value={periodo.ate} onChange={e => setPeriodo(prev => ({ ...prev, ate: e.target.value }))} className="w-32 h-9" />
+                 <Button variant="outline" size="sm" onClick={loadProcessedDocs}><Search className="w-4 h-4" /></Button>
+               </div>
+ 
+               <div className="overflow-x-auto border rounded-lg">
+                 <table className="w-full text-xs">
+                   <thead className="bg-muted/50 uppercase">
+                     <tr>
+                       <th className="w-10 py-3 px-4">
+                         <button onClick={toggleSelectAll}>
+                           {selectedIds.length === processedDocs.length && processedDocs.length > 0 
+                             ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                         </button>
+                       </th>
+                       <th className="text-left py-3 px-4">Data</th>
+                       <th className="text-left py-3 px-4">Status</th>
+                       <th className="text-left py-3 px-4">Protocolo</th>
+                       <th className="text-center py-3 px-4">Tentativas</th>
+                       <th className="text-right py-3 px-4">Ações</th>
+                     </tr>
+                   </thead>
+                   <tbody>
+                     {processedDocs.map(doc => (
+                       <tr key={doc.id} className={`border-t hover:bg-muted/30 ${selectedIds.includes(doc.id) ? 'bg-primary/5' : ''}`}>
+                         <td className="py-3 px-4 text-center">
+                           <button onClick={() => toggleSelect(doc.id)}>
+                             {selectedIds.includes(doc.id) 
+                               ? <CheckSquare className="w-4 h-4 text-primary" /> : <Square className="w-4 h-4" />}
+                           </button>
+                         </td>
+                         <td className="py-3 px-4 whitespace-nowrap">{new Date(doc.created_at).toLocaleString()}</td>
+                         <td className="py-3 px-4">
+                           <Badge variant={doc.status === 'authorized' ? 'default' : doc.status === 'error' ? 'destructive' : 'secondary'} className="text-[10px]">
+                             {doc.status}
+                           </Badge>
+                         </td>
+                         <td className="py-3 px-4 font-mono">{doc.protocol_number || '—'}</td>
+                         <td className="py-3 px-4 text-center">{doc.retry_count || 0}</td>
+                         <td className="py-3 px-4 text-right">
+                           <div className="flex justify-end gap-1">
+                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDocInDetail(doc)} title="Ver Detalhes"><Eye className="w-3 h-3" /></Button>
+                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDownloadXml(doc)} title="Download XML"><Download className="w-3 h-3" /></Button>
+                           </div>
+                         </td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+               </div>
+             </CardContent>
+           </Card>
+         </TabsContent>
         </TabsList>
 
         {/* EMISSÃO */}
