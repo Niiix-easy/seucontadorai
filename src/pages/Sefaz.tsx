@@ -1046,6 +1046,27 @@ export default function Sefaz() {
                       </div>
                     </div>
                   </div>
+
+                  <div className="space-y-4 pt-4 border-t">
+                    <p className="text-sm font-medium text-muted-foreground">Automação ao Reativar</p>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs">Auto-reprocessar Dead-Letters</Label>
+                        <Switch 
+                          checked={fiscalConfig.auto_retry_on_reactivation} 
+                          onCheckedChange={c => setFiscalConfig(p => ({ ...p, auto_retry_on_reactivation: c }))} 
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[10px] uppercase text-muted-foreground">Limite de Vazão (throughput)</Label>
+                        <Input 
+                          type="number" 
+                          value={fiscalConfig.reactivation_throughput} 
+                          onChange={e => setFiscalConfig(p => ({ ...p, reactivation_throughput: Number(e.target.value) }))} 
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="space-y-4 pt-4 border-t">
