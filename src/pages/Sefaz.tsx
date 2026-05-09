@@ -15,6 +15,8 @@ import {
      FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X
  } from "lucide-react";
 import JSZip from "jszip";
+ import jsPDF from "jspdf";
+ import autoTable from "jspdf-autotable";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -141,6 +143,7 @@ export default function Sefaz() {
     const [suspensionStates, setSuspensionStates] = useState<any[]>([]);
     const [backlogData, setBacklogData] = useState<any[]>([]);
      const [backlogFilters, setBacklogFilters] = useState({ uf: "all", env: "all", date: "", cStat: "", xMotivo: "" });
+    const [auditFilters, setAuditFilters] = useState({ dateStart: "", dateEnd: "", uf: "all", env: "all", action: "all" });
      const [showPauseDialog, setShowPauseDialog] = useState<{ uf: string, env: string, paused: boolean, manual?: boolean } | null>(null);
      const [manualRetryProgress, setManualRetryProgress] = useState<{ [key: string]: { status: 'queued' | 'processing' | 'done' | 'error', count: number, total: number } }>({});
     const [pauseReason, setPauseReason] = useState("");
@@ -321,11 +324,18 @@ export default function Sefaz() {
     };
 
     const loadAuditLogs = async () => {
-      const { data } = await supabase
+      let query = supabase
         .from("fiscal_action_logs")
         .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50);
+        .order("created_at", { ascending: false });
+
+      if (auditFilters.uf !== "all") query = query.eq("uf", auditFilters.uf);
+      if (auditFilters.env !== "all") query = query.eq("environment", auditFilters.env);
+      if (auditFilters.action !== "all") query = query.eq("action", auditFilters.action);
+      if (auditFilters.dateStart) query = query.gte("created_at", `${auditFilters.dateStart}T00:00:00`);
+      if (auditFilters.dateEnd) query = query.lte("created_at", `${auditFilters.dateEnd}T23:59:59`);
+
+      const { data } = await query.limit(100);
       if (data) setAuditLogs(data);
     };
 
@@ -429,6 +439,12 @@ export default function Sefaz() {
       }
     }, [user, backlogFilters, periodo, cStatFilter, xMotivoFilter, dlPeriodo, dlCStatFilter, dlXMotivoFilter]);
 
+    useEffect(() => {
+      if (user) {
+        loadAuditLogs();
+      }
+    }, [user, auditFilters]);
+
     const loadFiscalConfig = async () => {
       const { data, error } = await supabase
         .from("fiscal_configurations")
@@ -489,6 +505,92 @@ export default function Sefaz() {
       link.click();
       document.body.removeChild(link);
       toast.success("Auditoria exportada!");
+    };
+
+    const handleExportAuditPDF = () => {
+      if (auditLogs.length === 0) return;
+      const doc = new jsPDF();
+      doc.text("Auditoria de Ações Fiscais", 14, 15);
+      doc.setFontSize(8);
+      doc.text(`Gerado em: ${new Date().toLocaleString()}`, 14, 22);
+      
+      const tableData = auditLogs.map(log => [
+        new Date(log.created_at).toLocaleString(),
+        log.action.toUpperCase(),
+        `${log.uf}/${log.environment}`,
+        log.reason || "—",
+        log.user_id?.substring(0, 8) || "—"
+      ]);
+
+      autoTable(doc, {
+        head: [["Data/Hora", "Ação", "UF/Amb", "Motivo", "Usuário"]],
+        body: tableData,
+        startY: 25,
+        theme: 'grid',
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [66, 66, 66] }
+      });
+
+      doc.save(`auditoria_fiscal_${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.success("Auditoria PDF exportada!");
+    };
+
+    const handleExportBacklogCSV = () => {
+      if (backlogData.length === 0) return;
+      const headers = ["UF", "Ambiente", "Quantidade", "Próximo Envio", "Status"];
+      const rows = backlogData.map(b => {
+        const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
+        const status = state?.is_suspended ? "Suspenso" : (state?.is_paused ? "Pausado" : "Ativo");
+        return [
+          b.uf,
+          b.env,
+          b.count,
+          b.next ? new Date(b.next).toLocaleString() : "—",
+          status
+        ];
+      });
+      const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `backlog_fiscal_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Backlog CSV exportado!");
+    };
+
+    const handleExportBacklogPDF = () => {
+      if (backlogData.length === 0) return;
+      const doc = new jsPDF();
+      doc.text("Backlog de Processamento Fiscal", 14, 15);
+      doc.setFontSize(8);
+      doc.text(`Filtros: UF=${backlogFilters.uf}, Amb=${backlogFilters.env}, Data=${backlogFilters.date || 'Todas'}`, 14, 22);
+      
+      const tableData = backlogData.map(b => {
+        const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
+        const status = state?.is_suspended ? "Suspenso" : (state?.is_paused ? "Pausado" : "Ativo");
+        return [
+          b.uf,
+          b.env.toUpperCase(),
+          `${b.count} docs`,
+          b.next ? new Date(b.next).toLocaleString() : "—",
+          status
+        ];
+      });
+
+      autoTable(doc, {
+        head: [["UF", "Ambiente", "Fila", "Próximo Envio", "Status"]],
+        body: tableData,
+        startY: 28,
+        theme: 'grid',
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [41, 128, 185] }
+      });
+
+      doc.save(`backlog_fiscal_${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.success("Backlog PDF exportado!");
     };
 
     const handleExportDeadLetterCSV = () => {
@@ -1397,6 +1499,12 @@ export default function Sefaz() {
                     <Button variant="outline" size="sm" onClick={handleExportAuditCSV} className="gap-2 h-8 text-[10px]">
                       <Download className="w-3 h-3" /> Exportar Auditoria
                     </Button>
+                    <Button variant="outline" size="sm" onClick={handleExportAuditPDF} title="PDF Auditoria" className="h-8 w-8 p-0 border-red-200 hover:bg-red-50">
+                      <FileDown className="w-3 h-3 text-red-500" />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleExportBacklogPDF} title="PDF Backlog" className="h-8 w-8 p-0 border-blue-200 hover:bg-blue-50">
+                      <FileDown className="w-3 h-3 text-blue-500" />
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => setShowAuditLogs(true)} className="gap-2 h-8 text-[10px]">
                       <History className="w-3 h-3" /> Ver Auditoria
                     </Button>
@@ -1431,7 +1539,17 @@ export default function Sefaz() {
                      <Input placeholder="cStat" value={backlogFilters.cStat} onChange={e => setBacklogFilters(p => ({ ...p, cStat: e.target.value }))} className="w-20 h-8 text-[10px]" />
                      <Input placeholder="xMotivo" value={backlogFilters.xMotivo} onChange={e => setBacklogFilters(p => ({ ...p, xMotivo: e.target.value }))} className="w-32 h-8 text-[10px]" />
                    </div>
-                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setBacklogFilters({ uf: "all", env: "all", date: "", cStat: "", xMotivo: "" })} title="Limpar Filtros"><X className="w-3 h-3" /></Button>
+                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setBacklogFilters({ uf: "all", env: "all", date: "", cStat: "", xMotivo: "" })} title="Limpar Filtros">
+                     <X className="w-3 h-3" />
+                   </Button>
+                   <div className="ml-auto flex gap-1">
+                     <Button variant="outline" size="sm" onClick={handleExportBacklogCSV} title="Exportar CSV" className="h-8 px-2 text-[10px] gap-1">
+                       <Download className="w-3 h-3" /> CSV
+                     </Button>
+                     <Button variant="outline" size="sm" onClick={handleExportBacklogPDF} title="Exportar PDF" className="h-8 px-2 text-[10px] gap-1 border-red-100">
+                       <FileDown className="w-3 h-3 text-red-500" /> PDF
+                     </Button>
+                   </div>
                 </div>
 
                 <div className="overflow-x-auto border rounded-lg">
@@ -1611,11 +1729,54 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
        <Dialog open={showAuditLogs} onOpenChange={setShowAuditLogs}>
          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
            <DialogHeader>
-             <DialogTitle className="font-display flex items-center gap-2">
-               <History className="w-5 h-5" /> Auditoria de Ações Fiscais
-             </DialogTitle>
+              <div className="flex items-center justify-between w-full pr-6">
+                <DialogTitle className="font-display flex items-center gap-2">
+                  <History className="w-5 h-5" /> Auditoria de Ações Fiscais
+                </DialogTitle>
+              </div>
            </DialogHeader>
            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2 items-center p-3 bg-muted/20 rounded-lg border text-[10px]">
+                <div className="flex items-center gap-1">
+                  <Label className="text-[9px] uppercase font-bold text-muted-foreground">UF:</Label>
+                  <Select value={auditFilters.uf} onValueChange={v => setAuditFilters(p => ({ ...p, uf: v }))}>
+                    <SelectTrigger className="w-16 h-7 text-[9px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      {ufs.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Label className="text-[9px] uppercase font-bold text-muted-foreground">Ação:</Label>
+                  <Select value={auditFilters.action} onValueChange={v => setAuditFilters(p => ({ ...p, action: v }))}>
+                    <SelectTrigger className="w-24 h-7 text-[9px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      <SelectItem value="pause">Pausa</SelectItem>
+                      <SelectItem value="resume">Retomada</SelectItem>
+                      <SelectItem value="manual_retry">Reprocessamento</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Label className="text-[9px] uppercase font-bold text-muted-foreground">Período:</Label>
+                  <Input type="date" value={auditFilters.dateStart} onChange={e => setAuditFilters(p => ({ ...p, dateStart: e.target.value }))} className="w-28 h-7 text-[9px]" />
+                  <span className="text-muted-foreground text-[8px]">até</span>
+                  <Input type="date" value={auditFilters.dateEnd} onChange={e => setAuditFilters(p => ({ ...p, dateEnd: e.target.value }))} className="w-28 h-7 text-[9px]" />
+                </div>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setAuditFilters({ dateStart: "", dateEnd: "", uf: "all", env: "all", action: "all" })} title="Limpar Filtros">
+                  <X className="w-3 h-3" />
+                </Button>
+                <div className="ml-auto flex gap-1">
+                  <Button variant="outline" size="sm" onClick={handleExportAuditCSV} className="h-7 text-[9px] gap-1 px-2">
+                    <Download className="w-2.5 h-2.5" /> CSV
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleExportAuditPDF} className="h-7 text-[9px] gap-1 px-2 border-red-100">
+                    <FileDown className="w-2.5 h-2.5 text-red-500" /> PDF
+                  </Button>
+                </div>
+              </div>
              <div className="overflow-x-auto border rounded-lg">
                <table className="w-full text-xs">
                  <thead className="bg-muted uppercase">
