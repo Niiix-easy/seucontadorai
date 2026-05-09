@@ -181,7 +181,60 @@ export default function Sefaz() {
      const [selectedIds, setSelectedIds] = useState<string[]>([]);
      const [isBatchProcessing, setIsBatchProcessing] = useState(false);
      const [batchProgress, setBatchProgress] = useState(0);
-    const handleExportCSV = () => {
+ 
+     const handleExportZip = async (type: 'backlog' | 'audit') => {
+       toast.info("Gerando pacote ZIP...");
+       const zip = new JSZip();
+       const dateStr = new Date().toISOString().split('T')[0];
+       
+       if (type === 'backlog') {
+         const headers = ["UF", "Ambiente", "Quantidade", "Próximo Envio", "Status"];
+         const rows = backlogData.map(b => {
+           const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
+           const status = state?.is_suspended ? "Suspenso" : (state?.is_paused ? "Pausado" : "Ativo");
+           return [b.uf, b.env.toUpperCase(), b.count, b.next ? new Date(b.next).toLocaleString() : "—", status];
+         });
+         const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
+         zip.file(`backlog_fiscal_${dateStr}.csv`, csvContent);
+ 
+         const doc = new jsPDF();
+         doc.text("Backlog Fiscal", 14, 15);
+         autoTable(doc, { head: [headers], body: rows, startY: 25 });
+         const pdfContent = doc.output('blob');
+         zip.file(`backlog_fiscal_${dateStr}.pdf`, pdfContent);
+       } else {
+         const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "cStat", "xMotivo"];
+         const rows = auditLogs.map(log => [
+           new Date(log.created_at).toLocaleString(),
+           log.action.toUpperCase(),
+           log.uf,
+           log.environment,
+           log.reason || "",
+           log.cstat || "",
+           log.xmotivo || ""
+         ]);
+         const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
+         zip.file(`auditoria_fiscal_${dateStr}.csv`, csvContent);
+ 
+         const doc = new jsPDF();
+         doc.text("Auditoria Fiscal", 14, 15);
+         autoTable(doc, { head: [headers], body: rows, startY: 25 });
+         const pdfContent = doc.output('blob');
+         zip.file(`auditoria_fiscal_${dateStr}.pdf`, pdfContent);
+       }
+ 
+       const content = await zip.generateAsync({ type: "blob" });
+       const url = URL.createObjectURL(content);
+       const link = document.createElement("a");
+       link.href = url;
+       link.download = `${type}_fiscal_${dateStr}.zip`;
+       document.body.appendChild(link);
+       link.click();
+       document.body.removeChild(link);
+       toast.success("Pacote ZIP exportado!");
+     };
+ 
+     const handleExportCSV = () => {
       const filtered = statusFilter === "all" ? processedDocs : processedDocs.filter(d => d.status === statusFilter);
       if (filtered.length === 0) return;
       const headers = ["ID", "Data", "Tipo", "Status", "Total", "Recibo", "Protocolo", "Sefaz Status", "Sefaz Mensagem", "Erros", "Retentativas"];
