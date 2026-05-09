@@ -546,50 +546,68 @@ export type Database = {
       fiscal_export_logs: {
         Row: {
           created_at: string
+          csv_count: number | null
           error_message: string | null
           file_url: string | null
           filters: Json
           format: string
+          full_error_details: string | null
           id: string
+          pdf_count: number | null
           period_end: string | null
           period_start: string | null
           recipients: string[]
           record_count: number
           report_id: string | null
           report_type: string
+          resend_status: string | null
+          stage_counts: Json | null
           status: string
+          technical_log: Json | null
           user_id: string
         }
         Insert: {
           created_at?: string
+          csv_count?: number | null
           error_message?: string | null
           file_url?: string | null
           filters: Json
           format: string
+          full_error_details?: string | null
           id?: string
+          pdf_count?: number | null
           period_end?: string | null
           period_start?: string | null
           recipients: string[]
           record_count?: number
           report_id?: string | null
           report_type: string
+          resend_status?: string | null
+          stage_counts?: Json | null
           status: string
+          technical_log?: Json | null
           user_id: string
         }
         Update: {
           created_at?: string
+          csv_count?: number | null
           error_message?: string | null
           file_url?: string | null
           filters?: Json
           format?: string
+          full_error_details?: string | null
           id?: string
+          pdf_count?: number | null
           period_end?: string | null
           period_start?: string | null
           recipients?: string[]
           record_count?: number
           report_id?: string | null
           report_type?: string
+          resend_status?: string | null
+          stage_counts?: Json | null
           status?: string
+          technical_log?: Json | null
           user_id?: string
         }
         Relationships: [
