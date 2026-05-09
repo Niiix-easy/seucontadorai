@@ -2409,10 +2409,22 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                             {log.status === 'success' ? 'Enviado' : 'Erro'}
                           </Badge>
                         </td>
-                        <td className="py-2 px-4 text-right">
-                          <Button variant="ghost" size="sm" onClick={() => handleResendEmail(log.id)} className="h-7 text-[10px] text-purple-600">
-                            <Send className="w-3 h-3 mr-1" /> Reenviar
-                          </Button>
+                        <td className="py-2 px-4 text-right flex flex-col items-end gap-1">
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => handleResendEmail(log.id)} className="h-7 text-[10px] text-purple-600">
+                              <Send className="w-3 h-3 mr-1" /> Reenviar
+                            </Button>
+                          </div>
+                          {log.status === 'error' && (
+                            <div className="text-[8px] text-destructive max-w-[150px] text-right truncate" title={log.error_message}>
+                              Etapa: Geração -> Falha: {log.error_message || 'Desconhecido'}
+                            </div>
+                          )}
+                          {log.status === 'success' && (
+                            <div className="text-[8px] text-green-600">
+                              Etapas: Geração (OK) -> Anexo (OK) -> Envio (OK)
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
