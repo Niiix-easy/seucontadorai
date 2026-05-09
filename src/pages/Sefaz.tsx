@@ -157,7 +157,7 @@ export default function Sefaz() {
     const [showScheduleDialog, setShowScheduleDialog] = useState<{ type: 'backlog' | 'audit' } | null>(null);
      const [newSchedule, setNewSchedule] = useState({ format: 'pdf', frequency: 'daily', emails: [] as string[] as string[], currentEmail: "" });
     const [showExportPreview, setShowExportPreview] = useState(false);
-    const [showZipPreviewDialog, setShowZipPreviewDialog] = useState<{ type: 'backlog' | 'audit', count: number, filters: any } | null>(null);
+    const [showZipPreviewDialog, setShowZipPreviewDialog] = useState<{ type: 'backlog' | 'audit', count: number, filters: any, previewCount?: number } | null>(null);
     const [manualScheduleStatus, setManualScheduleStatus] = useState<{ id: string, status: string, progress: number, zipUrl?: string } | null>(null);
     const [exportHistory, setExportHistory] = useState<any[]>([]);
     const [showExportHistory, setShowExportHistory] = useState(false);
@@ -704,18 +704,59 @@ export default function Sefaz() {
        }
      };
  
-      const handleExportZip = async (type: 'backlog' | 'audit') => {
-        const filters = type === 'backlog' ? backlogFilters : auditFilters;
-        const count = type === 'backlog' 
-          ? backlogData.reduce((acc, b) => acc + b.count, 0) 
-          : auditLogs.length;
-        
-        setShowZipPreviewDialog({ type, count, filters });
-      };
+     const calculateHash = async (content: string | Blob) => {
+       const data = typeof content === 'string' ? new TextEncoder().encode(content) : new Uint8Array(await (content as Blob).arrayBuffer());
+       const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+       const hashArray = Array.from(new Uint8Array(hashBuffer));
+       return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+     };
+
+     const handleExportZip = async (type: 'backlog' | 'audit') => {
+       const filters = type === 'backlog' ? backlogFilters : auditFilters;
+       const count = type === 'backlog' 
+         ? backlogData.reduce((acc, b) => acc + b.count, 0) 
+         : auditLogs.length;
+       
+       setShowZipPreviewDialog({ type, count, filters, previewCount: count });
+     };
+
+     const handleRerunExport = async (log: any) => {
+       if (!user) return;
+       toast.info("Reexecutando exportação com snapshot de filtros...");
+       
+       const schedule = {
+         id: log.report_id,
+         report_type: log.report_type,
+         filters: log.filters
+       };
+
+       const technicalInfo = {
+         ...log.technical_log,
+         is_rerun: true,
+         original_log_id: log.id
+       };
+
+       setManualScheduleStatus({ id: log.report_id, status: 'initializing', progress: 10 });
+       
+       try {
+         const { error } = await supabase.functions.invoke("fiscal-scheduler", {
+           body: { 
+             action: "run_now", 
+             schedule_id: log.report_id,
+             technical_info: technicalInfo
+           }
+         });
+
+         if (error) throw error;
+         handleRunScheduleNow(schedule); 
+       } catch (err: any) {
+         toast.error("Erro ao reexecutar: " + err.message);
+       }
+     };
 
       const confirmExportZip = async () => {
-        if (!showZipPreviewDialog) return;
-        const { type } = showZipPreviewDialog;
+         if (!showZipPreviewDialog || !user) return;
+         const { type, previewCount } = showZipPreviewDialog;
         setShowZipPreviewDialog(null);
         
         toast.info("Gerando pacote ZIP...");
@@ -738,35 +779,44 @@ export default function Sefaz() {
             const status = state?.is_suspended ? "Suspenso" : (state?.is_paused ? "Pausado" : "Ativo");
             return [b.uf, b.env.toUpperCase(), b.count, b.next ? new Date(b.next).toLocaleString() : "—", status];
           });
-          const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
-          zip.file(`backlog_fiscal_${dateStr}.csv`, csvContent);
-  
-          const doc = new jsPDF();
-          doc.text("Backlog Fiscal", 14, 15);
-          autoTable(doc, { head: [headers], body: rows, startY: 25 });
-          const pdfContent = doc.output('blob');
-          zip.file(`backlog_fiscal_${dateStr}.pdf`, pdfContent);
-        } else {
-          // Audit logs are already sorted in loadAuditLogs by auditSort
-          const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "cStat", "xMotivo"];
-          const rows = auditLogs.map(log => [
-            new Date(log.created_at).toLocaleString(),
-            log.action.toUpperCase(),
-            log.uf,
-            log.environment,
-            log.reason || "",
-            log.cstat || "",
-            log.xmotivo || ""
-          ]);
-          const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
-          zip.file(`auditoria_fiscal_${dateStr}.csv`, csvContent);
-  
-          const doc = new jsPDF();
-          doc.text("Auditoria Fiscal", 14, 15);
-          autoTable(doc, { head: [headers], body: rows, startY: 25 });
-          const pdfContent = doc.output('blob');
-          zip.file(`auditoria_fiscal_${dateStr}.pdf`, pdfContent);
-        }
+           const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
+           const csvHash = await calculateHash(csvContent);
+           zip.file(`backlog_fiscal_${dateStr}.csv`, csvContent);
+
+           const doc = new jsPDF();
+           doc.text("Backlog Fiscal", 14, 15);
+           autoTable(doc, { head: [headers], body: rows, startY: 25 });
+           const pdfContent = doc.output('blob');
+           const pdfHash = await calculateHash(pdfContent);
+           zip.file(`backlog_fiscal_${dateStr}.pdf`, pdfContent);
+
+           const techLog = { sorting: backlogSort, page: backlogPage, timestamp: new Date().toISOString(), csv_hash: csvHash, pdf_hash: pdfHash, preview_count: previewCount, final_count: rows.length };
+           zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(techLog, null, 2));
+           const divergence = previewCount !== rows.length;
+           await supabase.from("fiscal_export_logs").insert([{
+             user_id: user.id, report_type: 'backlog', format: 'zip', status: 'success', record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, csv_hash: csvHash, pdf_hash: pdfHash, validation_divergence: divergence, filters: backlogFilters, technical_log: techLog as any, recipients: []
+           }]);
+         } else {
+           const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "cStat", "xMotivo"];
+           const rows = auditLogs.map(log => [new Date(log.created_at).toLocaleString(), log.action.toUpperCase(), log.uf, log.environment, log.reason || "", log.cstat || "", log.xmotivo || ""]);
+           const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
+           const csvHash = await calculateHash(csvContent);
+           zip.file(`auditoria_fiscal_${dateStr}.csv`, csvContent);
+
+           const doc = new jsPDF();
+           doc.text("Auditoria Fiscal", 14, 15);
+           autoTable(doc, { head: [headers], body: rows, startY: 25 });
+           const pdfContent = doc.output('blob');
+           const pdfHash = await calculateHash(pdfContent);
+           zip.file(`auditoria_fiscal_${dateStr}.pdf`, pdfContent);
+
+           const techLog = { sorting: auditSort, page: auditPage, timestamp: new Date().toISOString(), csv_hash: csvHash, pdf_hash: pdfHash, preview_count: previewCount, final_count: rows.length };
+           zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(techLog, null, 2));
+           const divergence = previewCount !== rows.length;
+           await supabase.from("fiscal_export_logs").insert([{
+             user_id: user.id, report_type: 'audit', format: 'zip', status: 'success', record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, csv_hash: csvHash, pdf_hash: pdfHash, validation_divergence: divergence, filters: auditFilters, technical_log: techLog as any, recipients: []
+           }]);
+         }
   
         const content = await zip.generateAsync({ type: "blob" });
         const url = URL.createObjectURL(content);
@@ -2745,11 +2795,16 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                                   {log.resend_status === 'sent' ? 'E-mail Enviado' : (log.resend_status === 'sending' ? 'Enviando...' : 'Reenviar E-mail')}
                                </Button>
                                {log.file_url && (
-                                 <Button variant="ghost" size="sm" asChild className="h-7 text-[10px] text-green-600">
-                                   <a href={log.file_url} target="_blank" rel="noopener noreferrer">
-                                     <Download className="w-3 h-3 mr-1" /> Baixar ZIP
-                                   </a>
-                                 </Button>
+                                 <div className="flex gap-1">
+                                   <Button variant="ghost" size="sm" asChild className="h-7 text-[10px] text-green-600">
+                                     <a href={log.file_url} target="_blank" rel="noopener noreferrer">
+                                       <Download className="w-3 h-3 mr-1" /> Baixar ZIP
+                                     </a>
+                                   </Button>
+                                   <Button variant="ghost" size="sm" onClick={() => handleRerunExport(log)} className="h-7 text-[10px] text-blue-600" title="Repetir Exportação com mesmos filtros">
+                                      <RefreshCw className="w-3 h-3 mr-1" /> Repetir
+                                   </Button>
+                                 </div>
                                )}
                              </div>
                              <div className="flex flex-col items-end">
@@ -2757,9 +2812,17 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                                  <div className="flex flex-col items-end text-[8px] text-green-600">
                                    <span>Geração: {log.stage_counts?.generation || 0} reg | Proc: {log.stage_counts?.processing || 0} reg</span>
                                    {log.technical_log?.sorting && (
-                                     <span className="text-muted-foreground font-mono">
-                                       Log: {log.technical_log.sorting.field} ({log.technical_log.sorting.order}), P{log.technical_log.page}
-                                     </span>
+                                     <div className="flex flex-col items-end">
+                                       <span className="text-muted-foreground font-mono">
+                                         Log: {log.technical_log.sorting.field} ({log.technical_log.sorting.order}), P{log.technical_log.page}
+                                       </span>
+                                       <span className="text-[7px] text-muted-foreground font-mono">
+                                         Hash CSV: {log.csv_hash?.substring(0, 16)}...
+                                       </span>
+                                       {log.validation_divergence && (
+                                         <Badge variant="destructive" className="text-[7px] h-3 px-1 mt-0.5">Divergência Detectada</Badge>
+                                       )}
+                                     </div>
                                    )}
                                  </div>
                                ) : (

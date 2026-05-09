@@ -37,7 +37,8 @@
             status: "processing",
              recipients: schedule.email_recipients,
              filters: schedule.filters,
-             technical_log: technical_info || {}
+             technical_log: technical_info || {},
+             recipients: schedule.email_recipients || []
           })
           .select()
           .single();
@@ -86,14 +87,22 @@
            stageCounts.generation = csvCount;
         }
 
-        await supabaseClient.from("fiscal_export_logs").update({
-          status: "success",
+         const finalCsvHash = "simulated_hash_" + Math.random().toString(16).slice(2);
+         const finalPdfHash = "simulated_hash_" + Math.random().toString(16).slice(2);
+         const previewCount = technical_info?.preview_count || csvCount;
+         const divergence = previewCount !== csvCount;
+
+         await supabaseClient.from("fiscal_export_logs").update({
+           status: "success",
            record_count: csvCount,
            csv_count: csvCount,
            pdf_count: pdfCount,
+           csv_hash: finalCsvHash,
+           pdf_hash: finalPdfHash,
+           validation_divergence: divergence,
            stage_counts: stageCounts,
-          file_url: "https://ghvfzwehyysldzxuvhez.supabase.co/storage/v1/object/public/reports/sample_report.zip" // Simulated
-        }).eq("id", log.id);
+           file_url: "https://ghvfzwehyysldzxuvhez.supabase.co/storage/v1/object/public/reports/sample_report.zip" // Simulated
+         }).eq("id", log.id);
 
         return new Response(JSON.stringify({ success: true, log_id: log.id }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -547,6 +547,7 @@ export type Database = {
         Row: {
           created_at: string
           csv_count: number | null
+          csv_hash: string | null
           error_message: string | null
           file_url: string | null
           filters: Json
@@ -554,6 +555,7 @@ export type Database = {
           full_error_details: string | null
           id: string
           pdf_count: number | null
+          pdf_hash: string | null
           period_end: string | null
           period_start: string | null
           recipients: string[]
@@ -564,11 +566,14 @@ export type Database = {
           stage_counts: Json | null
           status: string
           technical_log: Json | null
+          technical_log_url: string | null
           user_id: string
+          validation_divergence: boolean | null
         }
         Insert: {
           created_at?: string
           csv_count?: number | null
+          csv_hash?: string | null
           error_message?: string | null
           file_url?: string | null
           filters: Json
@@ -576,6 +581,7 @@ export type Database = {
           full_error_details?: string | null
           id?: string
           pdf_count?: number | null
+          pdf_hash?: string | null
           period_end?: string | null
           period_start?: string | null
           recipients: string[]
@@ -586,11 +592,14 @@ export type Database = {
           stage_counts?: Json | null
           status: string
           technical_log?: Json | null
+          technical_log_url?: string | null
           user_id: string
+          validation_divergence?: boolean | null
         }
         Update: {
           created_at?: string
           csv_count?: number | null
+          csv_hash?: string | null
           error_message?: string | null
           file_url?: string | null
           filters?: Json
@@ -598,6 +607,7 @@ export type Database = {
           full_error_details?: string | null
           id?: string
           pdf_count?: number | null
+          pdf_hash?: string | null
           period_end?: string | null
           period_start?: string | null
           recipients?: string[]
@@ -608,7 +618,9 @@ export type Database = {
           stage_counts?: Json | null
           status?: string
           technical_log?: Json | null
+          technical_log_url?: string | null
           user_id?: string
+          validation_divergence?: boolean | null
         }
         Relationships: [
           {
