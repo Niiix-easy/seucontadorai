@@ -325,9 +325,38 @@ export default function Sefaz() {
      } finally { setEmitindo(false); }
    };
 
-  const faturamento = nfes.filter(n => n.status === "autorizada").reduce((s, n) => s + Number(n.valor_total), 0);
+   const handleRetry = async (id: string) => {
+     toast.info("Reiniciando processamento...");
+     const { error } = await supabase.from("processed_documents").update({
+       status: "pending",
+       last_error: null
+     }).eq("id", id);
+     
+     if (!error) {
+       await supabase.functions.invoke("fiscal-engine", {
+         body: { action: "sign_and_send", documentId: id }
+       });
+       loadProcessedDocs();
+     }
+   };
 
-  return (
+   const handleDownloadXml = (doc: ProcessedDocument) => {
+     const content = doc.signed_xml_content || doc.xml_content;
+     const blob = new Blob([content], { type: "text/xml" });
+     const url = URL.createObjectURL(blob);
+     const a = document.createElement("a");
+     a.href = url;
+     a.download = `documento_${doc.id.slice(0, 8)}.xml`;
+     document.body.appendChild(a);
+     a.click();
+     document.body.removeChild(a);
+     URL.revokeObjectURL(url);
+     toast.success("XML baixado!");
+   };
+
+   const faturamento = nfes.filter(n => n.status === "autorizada").reduce((s, n) => s + Number(n.valor_total), 0);
+
+   return (
     <div className="p-6 lg:p-8 max-w-7xl space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
