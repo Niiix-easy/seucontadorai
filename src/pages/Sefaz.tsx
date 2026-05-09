@@ -1402,15 +1402,26 @@ export default function Sefaz() {
                               )}
                             </td>
                             <td className="py-2 px-4 text-right">
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className={cn("h-7 text-[10px]", isPaused ? "text-green-600" : "text-amber-600")}
-                                onClick={() => togglePause(b.uf, b.env, !!isPaused)}
-                              >
-                                {isPaused ? <Play className="w-3 h-3 mr-1" /> : <Square className="w-3 h-3 mr-1" />}
-                                {isPaused ? "Retomar" : "Pausar"}
-                              </Button>
+                              <div className="flex justify-end gap-1">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-7 text-[10px] text-primary"
+                                  onClick={() => handleManualRetryBatch(b.uf, b.env)}
+                                  title="Reprocessar Imediatamente"
+                                >
+                                  <RefreshCw className="w-3 h-3 mr-1" /> Agora
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className={cn("h-7 text-[10px]", isPaused ? "text-green-600" : "text-amber-600")}
+                                  onClick={() => setShowPauseDialog({ uf: b.uf, env: b.env, paused: !!isPaused })}
+                                >
+                                  {isPaused ? <Play className="w-3 h-3 mr-1" /> : <Square className="w-3 h-3 mr-1" />}
+                                  {isPaused ? "Retomar" : "Pausar"}
+                                </Button>
+                              </div>
                             </td>
                           </tr>
                         );
