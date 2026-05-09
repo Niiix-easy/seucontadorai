@@ -641,9 +641,17 @@ export default function Sefaz() {
         
         try {
           setManualScheduleStatus(prev => prev ? { ...prev, status: 'running', progress: 30 } : null);
-          const { data, error } = await supabase.functions.invoke("fiscal-scheduler", {
-            body: { action: "run_now", schedule_id: schedule.id }
-          });
+           const { data, error } = await supabase.functions.invoke("fiscal-scheduler", {
+             body: { 
+               action: "run_now", 
+               schedule_id: schedule.id,
+               technical_info: {
+                 sorting: schedule.report_type === 'backlog' ? backlogSort : auditSort,
+                 page: schedule.report_type === 'backlog' ? backlogPage : auditPage,
+                 page_size: 10
+               }
+             }
+           });
   
           if (error) throw error;
           
