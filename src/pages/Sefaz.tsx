@@ -155,7 +155,7 @@ export default function Sefaz() {
     const [newPrefName, setNewPrefName] = useState("");
     const [scheduledReports, setScheduledReports] = useState<any[]>([]);
     const [showScheduleDialog, setShowScheduleDialog] = useState<{ type: 'backlog' | 'audit' } | null>(null);
-    const [newSchedule, setNewSchedule] = useState({ format: 'pdf', frequency: 'daily', email: "" });
+     const [newSchedule, setNewSchedule] = useState({ format: 'pdf', frequency: 'daily', emails: [] as string[], currentEmail: "" });
     const [showExportPreview, setShowExportPreview] = useState(false);
     const [exportHistory, setExportHistory] = useState<any[]>([]);
     const [showExportHistory, setShowExportHistory] = useState(false);
@@ -598,10 +598,18 @@ export default function Sefaz() {
       if (data) setScheduledReports(data);
     };
 
-    const handleCreateSchedule = async () => {
-      if (!user || !showScheduleDialog || !newSchedule.email) return;
-      
-      const currentFilters = showScheduleDialog.type === 'backlog' ? backlogFilters : auditFilters;
+     const handleCreateSchedule = async () => {
+       let recipients = [...newSchedule.emails];
+       if (newSchedule.currentEmail && !recipients.includes(newSchedule.currentEmail)) {
+         recipients.push(newSchedule.currentEmail);
+       }
+ 
+       if (!user || !showScheduleDialog || recipients.length === 0) {
+         toast.error("Adicione pelo menos um destinatário.");
+         return;
+       }
+       
+       const currentFilters = showScheduleDialog.type === 'backlog' ? backlogFilters : auditFilters;
       const hasUF = currentFilters.uf && currentFilters.uf !== 'all';
       const hasEnv = (currentFilters as any).env && (currentFilters as any).env !== 'all';
       const hasDate = showScheduleDialog.type === 'backlog' ? !!(currentFilters as any).date : (!!(currentFilters as any).dateStart || !!(currentFilters as any).dateEnd);
@@ -611,15 +619,97 @@ export default function Sefaz() {
         return;
       }
 
-      const { error } = await supabase.from("fiscal_scheduled_reports").insert({
-        user_id: user.id,
-        report_type: showScheduleDialog.type,
-        format: newSchedule.format,
-        frequency: newSchedule.frequency,
-        filters: currentFilters,
-        email_recipients: [newSchedule.email],
-        is_active: true
-      });
+       const { error } = await supabase.from("fiscal_scheduled_reports").insert({
+         user_id: user.id,
+         report_type: showScheduleDialog.type,
+         format: newSchedule.format,
+         frequency: newSchedule.frequency,
+         filters: currentFilters,
+         email_recipients: recipients,
+         is_active: true
+       });
+     const handleRunScheduleNow = async (schedule: any) => {
+       if (!user) return;
+       toast.info("Iniciando processamento manual da exportação...");
+       
+       try {
+         const { error } = await supabase.functions.invoke("fiscal-scheduler", {
+           body: { action: "run_now", schedule_id: schedule.id }
+         });
+ 
+         if (error) throw error;
+         toast.success("Exportação enfileirada com sucesso!");
+         const { data: logs } = await supabase.from("fiscal_export_logs").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+         if (logs) setExportHistory(logs);
+       } catch (err: any) {
+         toast.error("Erro ao disparar exportação: " + err.message);
+       }
+     };
+ 
+     const handleResendExportEmail = async (logId: string) => {
+       toast.info("Reenviando e-mail...");
+       const { error } = await supabase.functions.invoke("fiscal-scheduler", {
+         body: { action: "resend_email", log_id: logId }
+       });
+       if (!error) {
+         toast.success("E-mail reenviado com sucesso!");
+       } else {
+         toast.error("Erro ao reenviar e-mail: " + error.message);
+       }
+     };
+ 
+     const handleExportZip = async (type: 'backlog' | 'audit') => {
+       toast.info("Gerando pacote ZIP...");
+       const zip = new JSZip();
+       const dateStr = new Date().toISOString().split('T')[0];
+       
+       if (type === 'backlog') {
+         const headers = ["UF", "Ambiente", "Quantidade", "Próximo Envio", "Status"];
+         const rows = backlogData.map(b => {
+           const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
+           const status = state?.is_suspended ? "Suspenso" : (state?.is_paused ? "Pausado" : "Ativo");
+           return [b.uf, b.env.toUpperCase(), b.count, b.next ? new Date(b.next).toLocaleString() : "—", status];
+         });
+         const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
+         zip.file(`backlog_fiscal_${dateStr}.csv`, csvContent);
+ 
+         const doc = new jsPDF();
+         doc.text("Backlog Fiscal", 14, 15);
+         autoTable(doc, { head: [headers], body: rows, startY: 25 });
+         const pdfContent = doc.output('blob');
+         zip.file(`backlog_fiscal_${dateStr}.pdf`, pdfContent);
+       } else {
+         const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "cStat", "xMotivo"];
+         const rows = auditLogs.map(log => [
+           new Date(log.created_at).toLocaleString(),
+           log.action.toUpperCase(),
+           log.uf,
+           log.environment,
+           log.reason || "",
+           log.cstat || "",
+           log.xmotivo || ""
+         ]);
+         const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
+         zip.file(`auditoria_fiscal_${dateStr}.csv`, csvContent);
+ 
+         const doc = new jsPDF();
+         doc.text("Auditoria Fiscal", 14, 15);
+         autoTable(doc, { head: [headers], body: rows, startY: 25 });
+         const pdfContent = doc.output('blob');
+         zip.file(`auditoria_fiscal_${dateStr}.pdf`, pdfContent);
+       }
+ 
+       const content = await zip.generateAsync({ type: "blob" });
+       const url = URL.createObjectURL(content);
+       const link = document.createElement("a");
+       link.href = url;
+       link.download = `${type}_fiscal_${dateStr}.zip`;
+       document.body.appendChild(link);
+       link.click();
+       document.body.removeChild(link);
+       toast.success("Pacote ZIP exportado!");
+     };
+ 
 
       if (!error) {
         toast.success("Agendamento criado com sucesso!");
