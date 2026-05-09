@@ -157,7 +157,7 @@ export default function Sefaz() {
     const [showScheduleDialog, setShowScheduleDialog] = useState<{ type: 'backlog' | 'audit' } | null>(null);
      const [newSchedule, setNewSchedule] = useState({ format: 'pdf', frequency: 'daily', emails: [] as string[] as string[], currentEmail: "" });
     const [showExportPreview, setShowExportPreview] = useState(false);
-    const [showZipPreviewDialog, setShowZipPreviewDialog] = useState<{ type: 'backlog' | 'audit', count: number, filters: any } | null>(null);
+    const [showZipPreviewDialog, setShowZipPreviewDialog] = useState<{ type: 'backlog' | 'audit', count: number, filters: any, previewCount?: number } | null>(null);
     const [manualScheduleStatus, setManualScheduleStatus] = useState<{ id: string, status: string, progress: number, zipUrl?: string } | null>(null);
     const [exportHistory, setExportHistory] = useState<any[]>([]);
     const [showExportHistory, setShowExportHistory] = useState(false);
@@ -794,7 +794,7 @@ export default function Sefaz() {
            zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(techLog, null, 2));
            const divergence = previewCount !== rows.length;
            await supabase.from("fiscal_export_logs").insert([{
-             user_id: user.id, report_type: 'backlog', format: 'zip', status: 'success', record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, csv_hash: csvHash, pdf_hash: pdfHash, validation_divergence: divergence, filters: backlogFilters, technical_log: techLog as any
+             user_id: user.id, report_type: 'backlog', format: 'zip', status: 'success', record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, csv_hash: csvHash, pdf_hash: pdfHash, validation_divergence: divergence, filters: backlogFilters, technical_log: techLog as any, recipients: []
            }]);
          } else {
            const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "cStat", "xMotivo"];
@@ -814,7 +814,7 @@ export default function Sefaz() {
            zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(techLog, null, 2));
            const divergence = previewCount !== rows.length;
            await supabase.from("fiscal_export_logs").insert([{
-             user_id: user.id, report_type: 'audit', format: 'zip', status: 'success', record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, csv_hash: csvHash, pdf_hash: pdfHash, validation_divergence: divergence, filters: auditFilters, technical_log: techLog as any
+             user_id: user.id, report_type: 'audit', format: 'zip', status: 'success', record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, csv_hash: csvHash, pdf_hash: pdfHash, validation_divergence: divergence, filters: auditFilters, technical_log: techLog as any, recipients: []
            }]);
          }
   
