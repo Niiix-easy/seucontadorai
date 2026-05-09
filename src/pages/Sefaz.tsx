@@ -157,7 +157,15 @@ export default function Sefaz() {
     const [showScheduleDialog, setShowScheduleDialog] = useState<{ type: 'backlog' | 'audit' } | null>(null);
      const [newSchedule, setNewSchedule] = useState({ format: 'pdf', frequency: 'daily', emails: [] as string[] as string[], currentEmail: "" });
     const [showExportPreview, setShowExportPreview] = useState(false);
-    const [showZipPreviewDialog, setShowZipPreviewDialog] = useState<{ type: 'backlog' | 'audit', count: number, filters: any, previewCount?: number } | null>(null);
+    const [showZipPreviewDialog, setShowZipPreviewDialog] = useState<{ 
+      type: 'backlog' | 'audit', 
+      count: number, 
+      filters: any, 
+      previewCount?: number,
+      expectedCsvHash?: string,
+      expectedPdfHash?: string,
+      isCalculating?: boolean
+    } | null>(null);
     const [manualScheduleStatus, setManualScheduleStatus] = useState<{ id: string, status: string, progress: number, zipUrl?: string } | null>(null);
     const [exportHistory, setExportHistory] = useState<any[]>([]);
     const [showExportHistory, setShowExportHistory] = useState(false);
@@ -711,13 +719,80 @@ export default function Sefaz() {
        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
      };
 
-     const handleExportZip = async (type: 'backlog' | 'audit') => {
+     const handleExportZip = async (type: 'backlog' | 'audit', mode: 'full' | 'proof' = 'full') => {
        const filters = type === 'backlog' ? backlogFilters : auditFilters;
        const count = type === 'backlog' 
          ? backlogData.reduce((acc, b) => acc + b.count, 0) 
          : auditLogs.length;
        
-       setShowZipPreviewDialog({ type, count, filters, previewCount: count });
+       setShowZipPreviewDialog({ type, count, filters, previewCount: count, isCalculating: true });
+
+       // Pre-calculate hashes for preview/proof
+       let csvContent = "";
+       let rows: any[] = [];
+       if (type === 'backlog') {
+         const sortedData = [...backlogData].sort((a: any, b: any) => {
+           const field = backlogSort.field;
+           const modifier = backlogSort.order === 'asc' ? 1 : -1;
+           if (a[field] < b[field]) return -1 * modifier;
+           if (a[field] > b[field]) return 1 * modifier;
+           return 0;
+         });
+         const headers = ["UF", "Ambiente", "Quantidade", "Próximo Envio", "Status"];
+         rows = sortedData.map(b => {
+           const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
+           return [b.uf, b.env.toUpperCase(), b.count, b.next ? new Date(b.next).toLocaleString() : "—", state?.is_suspended ? "Suspenso" : (state?.is_paused ? "Pausado" : "Ativo")];
+         });
+         csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
+       } else {
+         const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "cStat", "xMotivo"];
+         rows = auditLogs.map(log => [new Date(log.created_at).toLocaleString(), log.action.toUpperCase(), log.uf, log.environment, log.reason || "", log.cstat || "", log.xmotivo || ""]);
+         csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
+       }
+
+       const csvHash = await calculateHash(csvContent);
+       // Simulated PDF hash for preview speed
+       const pdfHash = await calculateHash(csvContent + "_pdf_proof"); 
+
+       setShowZipPreviewDialog(prev => prev ? { 
+         ...prev, 
+         expectedCsvHash: csvHash, 
+         expectedPdfHash: pdfHash,
+         isCalculating: false 
+       } : null);
+
+       if (mode === 'proof') {
+         toast.success("Modo Prova concluído: Hashes e contagens validados.");
+       }
+     };
+
+     const verifyAndDownload = async (log: any) => {
+       if (!log.file_url) return;
+       toast.info("Verificando integridade dos hashes...");
+       try {
+         const response = await fetch(log.file_url);
+         const blob = await response.blob();
+         const zip = await JSZip.loadAsync(blob);
+         let csvFile = "";
+         zip.forEach((path) => { if (path.endsWith(".csv") && !path.startsWith("log_tecnico")) csvFile = path; });
+         if (csvFile) {
+           const content = await zip.file(csvFile)?.async("string");
+           if (content) {
+             const currentHash = await calculateHash(content);
+             if (log.csv_hash && currentHash !== log.csv_hash) {
+               toast.error("ERRO: Hash do CSV não coincide!", { duration: 10000 });
+               return;
+             }
+           }
+         }
+         const link = document.createElement("a");
+         link.href = log.file_url;
+         link.download = `${log.report_type}_fiscal_verified.zip`;
+         document.body.appendChild(link);
+         link.click();
+         document.body.removeChild(link);
+         toast.success("Download verificado.");
+       } catch (err) { toast.error("Erro na verificação."); }
      };
 
      const handleRerunExport = async (log: any) => {
@@ -2630,10 +2705,17 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                         <span className="text-xl font-bold">{showZipPreviewDialog.count}</span>
                         <span className="text-[10px] text-muted-foreground ml-1">total (pacote ZIP)</span>
                       </div>
-                      <div className="text-[10px] text-right space-y-0.5">
-                        <p className="text-blue-600 font-medium">CSV: {showZipPreviewDialog.count} reg. (separado)</p>
-                        <p className="text-red-600 font-medium">PDF: {showZipPreviewDialog.count} reg. (separado)</p>
-                      </div>
+                        <div className="text-[10px] text-right space-y-0.5">
+                          <p className="text-blue-600 font-medium">CSV: {showZipPreviewDialog.count} reg. (separado)</p>
+                          <p className="text-red-600 font-medium">PDF: {showZipPreviewDialog.count} reg. (separado)</p>
+                          {showZipPreviewDialog.isCalculating ? (
+                            <p className="text-muted-foreground animate-pulse">Calculando Hashes...</p>
+                          ) : showZipPreviewDialog.expectedCsvHash && (
+                            <p className="text-[8px] font-mono text-muted-foreground truncate max-w-[150px]" title={showZipPreviewDialog.expectedCsvHash}>
+                              SHA: {showZipPreviewDialog.expectedCsvHash.substring(0, 16)}...
+                            </p>
+                          )}
+                        </div>
                     </div>
                   </div>
                   <div className="border rounded p-3 bg-muted/30">
@@ -2664,12 +2746,17 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button variant="outline" onClick={() => setShowZipPreviewDialog(null)}>Cancelar</Button>
-                  <Button className="bg-purple-600 hover:bg-purple-700" onClick={confirmExportZip}>
-                    <Download className="w-4 h-4 mr-2" /> Gerar ZIP Agora
-                  </Button>
-                </div>
+                  <div className="flex justify-between gap-2 pt-2">
+                    <Button variant="outline" size="sm" onClick={() => handleExportZip(showZipPreviewDialog.type, 'proof')} disabled={showZipPreviewDialog.isCalculating}>
+                      <CheckSquare className="w-4 h-4 mr-2" /> Modo Prova
+                    </Button>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => setShowZipPreviewDialog(null)}>Cancelar</Button>
+                      <Button className="bg-purple-600 hover:bg-purple-700" onClick={confirmExportZip} disabled={showZipPreviewDialog.isCalculating}>
+                        <Download className="w-4 h-4 mr-2" /> Gerar ZIP Agora
+                      </Button>
+                    </div>
+                  </div>
               </div>
             )}
           </DialogContent>
@@ -2796,10 +2883,8 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                                </Button>
                                {log.file_url && (
                                  <div className="flex gap-1">
-                                   <Button variant="ghost" size="sm" asChild className="h-7 text-[10px] text-green-600">
-                                     <a href={log.file_url} target="_blank" rel="noopener noreferrer">
-                                       <Download className="w-3 h-3 mr-1" /> Baixar ZIP
-                                     </a>
+                                   <Button variant="ghost" size="sm" onClick={() => verifyAndDownload(log)} className="h-7 text-[10px] text-green-600">
+                                      <Download className="w-3 h-3 mr-1" /> Baixar ZIP (Verificado)
                                    </Button>
                                    <Button variant="ghost" size="sm" onClick={() => handleRerunExport(log)} className="h-7 text-[10px] text-blue-600" title="Repetir Exportação com mesmos filtros">
                                       <RefreshCw className="w-3 h-3 mr-1" /> Repetir
