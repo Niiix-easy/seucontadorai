@@ -156,6 +156,12 @@ export default function Sefaz() {
     const [scheduledReports, setScheduledReports] = useState<any[]>([]);
     const [showScheduleDialog, setShowScheduleDialog] = useState<{ type: 'backlog' | 'audit' } | null>(null);
     const [newSchedule, setNewSchedule] = useState({ format: 'pdf', frequency: 'daily', email: "" });
+    const [exportHistory, setExportHistory] = useState<any[]>([]);
+    const [showExportHistory, setShowExportHistory] = useState(false);
+    const [backlogPage, setBacklogPage] = useState(1);
+    const [auditPage, setAuditPage] = useState(1);
+    const [backlogSort, setBacklogSort] = useState<{ field: string, order: 'asc' | 'desc' }>({ field: 'count', order: 'desc' });
+    const [auditSort, setAuditSort] = useState<{ field: string, order: 'asc' | 'desc' }>({ field: 'created_at', order: 'desc' });
     const [showAuditLogs, setShowAuditLogs] = useState(false);
 
     const [deadLetterNotifs, setDeadLetterNotifs] = useState<any[]>([]);
