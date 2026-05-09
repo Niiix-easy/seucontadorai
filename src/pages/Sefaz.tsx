@@ -102,8 +102,7 @@ function generateChave() {
    document_type: string;
    status: string;
    valor_total?: number;
-   sefaz_response_message: string | null;
-   created_at: string;
+    created_at: string;
    xml_content: string;
    signed_xml_content: string | null;
    receipt_number: string | null;
