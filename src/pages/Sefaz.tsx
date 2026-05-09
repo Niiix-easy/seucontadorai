@@ -149,6 +149,12 @@ export default function Sefaz() {
      const [manualRetryProgress, setManualRetryProgress] = useState<{ [key: string]: { status: 'queued' | 'processing' | 'done' | 'error', count: number, total: number } }>({});
     const [pauseReason, setPauseReason] = useState("");
     const [auditLogs, setAuditLogs] = useState<any[]>([]);
+    const [savedPreferences, setSavedPreferences] = useState<any[]>([]);
+    const [showSavePrefDialog, setShowSavePrefDialog] = useState<{ type: 'backlog' | 'audit', filters: any } | null>(null);
+    const [newPrefName, setNewPrefName] = useState("");
+    const [scheduledReports, setScheduledReports] = useState<any[]>([]);
+    const [showScheduleDialog, setShowScheduleDialog] = useState<{ type: 'backlog' | 'audit' } | null>(null);
+    const [newSchedule, setNewSchedule] = useState({ format: 'pdf', frequency: 'daily', email: "" });
     const [showAuditLogs, setShowAuditLogs] = useState(false);
 
     const [deadLetterNotifs, setDeadLetterNotifs] = useState<any[]>([]);
@@ -506,6 +512,101 @@ export default function Sefaz() {
       link.click();
       document.body.removeChild(link);
       toast.success("Auditoria exportada!");
+    };
+
+    const loadUserPreferences = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from("fiscal_user_preferences")
+        .select("*")
+        .eq("user_id", user.id);
+      if (data) setSavedPreferences(data);
+    };
+
+    const handleSavePreference = async () => {
+      if (!user || !showSavePrefDialog || !newPrefName.trim()) return;
+      const { error } = await supabase.from("fiscal_user_preferences").upsert({
+        user_id: user.id,
+        preference_key: `${showSavePrefDialog.type}_filters`,
+        preference_name: newPrefName.trim(),
+        filters: showSavePrefDialog.filters
+      }, { onConflict: "user_id, preference_key, preference_name" });
+
+      if (!error) {
+        toast.success(`Filtro "${newPrefName}" salvo!`);
+        loadUserPreferences();
+        setShowSavePrefDialog(null);
+        setNewPrefName("");
+      } else {
+        toast.error("Erro ao salvar filtro");
+      }
+    };
+
+    const loadScheduledReports = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from("fiscal_scheduled_reports")
+        .select("*")
+        .eq("user_id", user.id);
+      if (data) setScheduledReports(data);
+    };
+
+    const handleCreateSchedule = async () => {
+      if (!user || !showScheduleDialog || !newSchedule.email) return;
+      const { error } = await supabase.from("fiscal_scheduled_reports").insert({
+        user_id: user.id,
+        report_type: showScheduleDialog.type,
+        format: newSchedule.format,
+        frequency: newSchedule.frequency,
+        filters: showScheduleDialog.type === 'backlog' ? backlogFilters : auditFilters,
+        email_recipients: [newSchedule.email],
+        is_active: true
+      });
+
+      if (!error) {
+        toast.success("Agendamento criado com sucesso!");
+        loadScheduledReports();
+        setShowScheduleDialog(null);
+      } else {
+        toast.error("Erro ao criar agendamento");
+      }
+    };
+
+    const handleExportAuditXLSX = () => {
+      if (auditLogs.length === 0) return;
+      const data = auditLogs.map(log => ({
+        "Data/Hora": new Date(log.created_at).toLocaleString(),
+        "Ação": log.action.toUpperCase(),
+        "UF": log.uf,
+        "Ambiente": log.environment,
+        "Motivo": log.reason || "",
+        "Usuário ID": log.user_id
+      }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Auditoria");
+      XLSX.writeFile(wb, `auditoria_fiscal_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success("Auditoria Excel exportada!");
+    };
+
+    const handleExportBacklogXLSX = () => {
+      if (backlogData.length === 0) return;
+      const data = backlogData.map(b => {
+        const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
+        const status = state?.is_suspended ? "Suspenso" : (state?.is_paused ? "Pausado" : "Ativo");
+        return {
+          "UF": b.uf,
+          "Ambiente": b.env.toUpperCase(),
+          "Quantidade": b.count,
+          "Próximo Envio": b.next ? new Date(b.next).toLocaleString() : "—",
+          "Status": status
+        };
+      });
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Backlog");
+      XLSX.writeFile(wb, `backlog_fiscal_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success("Backlog Excel exportada!");
     };
 
     const handleExportAuditPDF = () => {
