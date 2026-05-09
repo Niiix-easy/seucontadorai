@@ -332,7 +332,7 @@ export default function Sefaz() {
           return acc;
         }, {});
         
-        let result = Object.values(groupedMap);
+        const result = Object.values(groupedMap);
         
         // Apply Sorting
         result.sort((a: any, b: any) => {
