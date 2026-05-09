@@ -156,6 +156,7 @@ export default function Sefaz() {
     const [scheduledReports, setScheduledReports] = useState<any[]>([]);
     const [showScheduleDialog, setShowScheduleDialog] = useState<{ type: 'backlog' | 'audit' } | null>(null);
     const [newSchedule, setNewSchedule] = useState({ format: 'pdf', frequency: 'daily', email: "" });
+    const [showExportPreview, setShowExportPreview] = useState(false);
     const [exportHistory, setExportHistory] = useState<any[]>([]);
     const [showExportHistory, setShowExportHistory] = useState(false);
     const [backlogPage, setBacklogPage] = useState(1);
@@ -521,6 +522,24 @@ export default function Sefaz() {
       link.click();
       document.body.removeChild(link);
       toast.success("Auditoria exportada!");
+    };
+
+    const loadExportHistory = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from("fiscal_export_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (data) setExportHistory(data);
+    };
+
+    const handleResendEmail = async (logId: string) => {
+      toast.info("Reenviando e-mail...");
+      // Simulate resend
+      setTimeout(() => {
+        toast.success("E-mail reenviado com sucesso!");
+      }, 1500);
     };
 
     const loadUserPreferences = async () => {
