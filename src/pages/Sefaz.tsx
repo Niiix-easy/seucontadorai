@@ -858,8 +858,13 @@ export default function Sefaz() {
       toast.success(`Resumo de auditoria (${format.toUpperCase()}) exportado.`);
     };
 
-    const handleRunProofFromHistory = (log: any) => {
+    const handleRunProofFromHistory = async (log: any) => {
       toast.info("Iniciando Modo Prova a partir do histórico...");
+      
+      // We reuse handleExportZip but we'll modify it to return values or we can just implement the proof logging here
+      // To keep it clean, let's just trigger handleExportZip with 'proof' mode
+      // But handleExportZip currently doesn't insert for proof mode. 
+      // Let's modify handleExportZip to handle logging for proof mode too.
       handleExportZip(log.report_type as 'backlog' | 'audit', 'proof', log.filters, log.technical_log?.sorting);
     };
 
