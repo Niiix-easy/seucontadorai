@@ -168,7 +168,49 @@ export default function Sefaz() {
       isCalculating?: boolean
     } | null>(null);
     const [manualScheduleStatus, setManualScheduleStatus] = useState<{ id: string, status: string, progress: number, zipUrl?: string } | null>(null);
-    const [showAuditDetailDialog, setShowAuditDetailDialog] = useState<any | null>(null);
+     const [showAuditDetailDialog, setShowAuditDetailDialog] = useState<any | null>(null);
+     const [selectedHistoryItems, setSelectedHistoryItems] = useState<string[]>([]);
+     const [showComparisonDialog, setShowComparisonDialog] = useState<any[] | null>(null);
+   const handleBulkDownloadAudit = async (format: 'json' | 'xlsx') => {
+     if (exportHistory.length === 0) return;
+     toast.info(`Gerando resumo consolidado (${format.toUpperCase()})...`);
+     const data = exportHistory.map(log => ({
+       id: log.id,
+       data: new Date(log.created_at).toLocaleString(),
+       relatorio: log.report_type,
+       status: log.status,
+       divergencia: log.validation_divergence ? 'SIM' : 'NÃO',
+       registros: log.record_count,
+       csv_hash: log.csv_hash,
+       pdf_hash: log.pdf_hash,
+       zip_hash: log.zip_hash,
+       parametros: JSON.stringify(log.technical_log),
+       filtros: JSON.stringify(log.filters),
+       destinatarios: log.recipients?.join(", ")
+     }));
+     if (format === 'json') {
+       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+       const url = URL.createObjectURL(blob);
+       const link = document.createElement("a");
+       link.href = url;
+       link.download = `auditoria_consolidada_${new Date().toISOString().split('T')[0]}.json`;
+       document.body.appendChild(link);
+       link.click();
+       document.body.removeChild(link);
+     } else {
+       const ws = XLSX.utils.json_to_sheet(data);
+       const wb = XLSX.utils.book_new();
+       XLSX.utils.book_append_sheet(wb, ws, "Auditoria");
+       XLSX.writeFile(wb, `auditoria_consolidada_${new Date().toISOString().split('T')[0]}.xlsx`);
+     }
+     toast.success("Resumo consolidado exportado com sucesso!");
+   };
+
+   const copyToClipboard = (text: string, label: string) => {
+     navigator.clipboard.writeText(text);
+     toast.success(`${label} copiado para a área de transferência!`);
+   };
+
     const [exportHistory, setExportHistory] = useState<any[]>([]);
     const [showExportHistory, setShowExportHistory] = useState(false);
     const [backlogPage, setBacklogPage] = useState(1);
@@ -3287,9 +3329,19 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                         <Button variant="outline" size="sm" className="h-7 text-[9px] flex-1" onClick={loadExportHistory}>
                           <Search className="w-3 h-3 mr-1" /> Filtrar
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-[9px] flex-1" onClick={() => setHistoryFilters({ status: "all", divergence: "all", uf: "all", env: "all", dateStart: "", dateEnd: "", recipient: "" })}>
-                          Limpar
-                        </Button>
+                         <div className="flex flex-col gap-1 flex-1">
+                           <Button variant="ghost" size="sm" className="h-7 text-[9px] w-full" onClick={() => setHistoryFilters({ status: "all", divergence: "all", uf: "all", env: "all", dateStart: "", dateEnd: "", recipient: "" })}>
+                             Limpar
+                           </Button>
+                           <div className="flex gap-1 w-full">
+                             <Button variant="outline" size="sm" className="h-[22px] text-[8px] flex-1 border-orange-200 text-orange-600 hover:bg-orange-50" onClick={() => handleBulkDownloadAudit('json')}>
+                               Bulk JSON
+                             </Button>
+                             <Button variant="outline" size="sm" className="h-[22px] text-[8px] flex-1 border-green-200 text-green-600 hover:bg-green-50" onClick={() => handleBulkDownloadAudit('xlsx')}>
+                               Bulk XLSX
+                             </Button>
+                           </div>
+                         </div>
                       </div>
                     </div>
                     <div className="overflow-x-auto border rounded-lg">
@@ -3333,16 +3385,30 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                          <td className="py-2 px-4 text-right">
                            <div className="flex flex-col items-end gap-1">
                              <div className="flex gap-1">
-                               <Button 
-                                 variant="ghost" 
-                                 size="sm" 
-                                 onClick={() => handleResendEmail(log.id)} 
-                                 className={cn("h-7 text-[10px]", log.resend_status === 'sent' ? "text-green-600" : "text-purple-600")}
-                                 disabled={log.resend_status === 'sending'}
-                               >
-                                  {log.resend_status === 'sending' ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Send className="w-3 h-3 mr-1" />}
-                                  {log.resend_status === 'sent' ? 'E-mail Enviado' : (log.resend_status === 'sending' ? 'Enviando...' : 'Reenviar E-mail')}
-                               </Button>
+                               <div className="flex flex-col gap-1 items-end">
+                                 <Button 
+                                   variant="ghost" 
+                                   size="sm" 
+                                   onClick={() => handleResendEmail(log.id)} 
+                                   className={cn("h-7 text-[10px]", log.resend_status === 'sent' ? "text-green-600" : "text-purple-600")}
+                                   disabled={log.resend_status === 'sending'}
+                                 >
+                                     {log.resend_status === 'sending' ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Send className="w-3 h-3 mr-1" />}
+                                     {log.resend_status === 'sent' ? 'E-mail Enviado' : (log.resend_status === 'sending' ? 'Enviando...' : 'Reenviar E-mail')}
+                                 </Button>
+                                 <div className="flex items-center gap-1 bg-muted/50 px-2 py-1 rounded border border-dashed text-[9px] mt-1">
+                                   <input 
+                                     type="checkbox" 
+                                     checked={selectedHistoryItems.includes(log.id)}
+                                     onChange={(e) => {
+                                       if (e.target.checked) setSelectedHistoryItems(p => [...p, log.id]);
+                                       else setSelectedHistoryItems(p => p.filter(id => id !== log.id));
+                                     }}
+                                     className="w-3 h-3 cursor-pointer"
+                                   />
+                                   <span className="text-muted-foreground">Comparar</span>
+                                 </div>
+                               </div>
                                 {log.file_url && (
                                   <div className="flex flex-col gap-1">
                                     <div className="flex gap-1">
