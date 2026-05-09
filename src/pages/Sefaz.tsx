@@ -977,7 +977,7 @@ export default function Sefaz() {
 
       const confirmExportZip = async () => {
          if (!showZipPreviewDialog || !user) return;
-         const { type, previewCount, filters, sort } = showZipPreviewDialog;
+         const { type, previewCount, filters, sort, expectedCsvHash, expectedPdfHash } = showZipPreviewDialog;
         
         setManualScheduleStatus({ id: 'manual-zip', status: 'initializing', progress: 5 });
         setShowZipPreviewDialog(null);
@@ -1083,6 +1083,7 @@ export default function Sefaz() {
   
         setManualScheduleStatus(prev => prev ? { ...prev, status: 'finalizing_zip', progress: 95 } : null);
         const content = await zip.generateAsync({ type: "blob" });
+        const zipHash = await calculateHash(content);
         const url = URL.createObjectURL(content);
         const link = document.createElement("a");
         link.href = url;
