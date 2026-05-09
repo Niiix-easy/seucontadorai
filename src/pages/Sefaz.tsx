@@ -285,7 +285,12 @@ export default function Sefaz() {
    useEffect(() => {
      if (user) {
        loadNfes();
-        loadFiscalConfig(); loadProcessedDocs(); loadBacklogData();
+        loadFiscalConfig();
+        loadProcessedDocs();
+        loadBacklogData();
+      }
+    }, [user]);
+
     const loadBacklogData = async () => {
       const { data: backlog } = await supabase
         .from("processed_documents")
@@ -324,8 +329,6 @@ export default function Sefaz() {
         loadBacklogData();
       }
     };
-
-     }
    }, [user]);
 
    const loadFiscalConfig = async () => {
