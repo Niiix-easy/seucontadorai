@@ -2148,6 +2148,78 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
            )}
          </DialogContent>
        </Dialog>
-     </div>
+
+        {/* Save Preference Dialog */}
+        <Dialog open={!!showSavePrefDialog} onOpenChange={() => setShowSavePrefDialog(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Salvar Filtros</DialogTitle>
+              <DialogDescription>Dê um nome para identificar este conjunto de filtros.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label>Nome do Filtro</Label>
+                <Input 
+                  placeholder="Ex: Pendentes SP, Erros Homologação..." 
+                  value={newPrefName}
+                  onChange={e => setNewPrefName(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowSavePrefDialog(null)}>Cancelar</Button>
+                <Button onClick={handleSavePreference}>Salvar Filtro</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Schedule Report Dialog */}
+        <Dialog open={!!showScheduleDialog} onOpenChange={() => setShowScheduleDialog(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Agendar Exportação Automática</DialogTitle>
+              <DialogDescription>Configure o envio recorrente por e-mail.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Formato</Label>
+                  <Select value={newSchedule.format} onValueChange={v => setNewSchedule(p => ({ ...p, format: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pdf">PDF</SelectItem>
+                      <SelectItem value="csv">CSV</SelectItem>
+                      <SelectItem value="xlsx">Excel (XLSX)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Frequência</Label>
+                  <Select value={newSchedule.frequency} onValueChange={v => setNewSchedule(p => ({ ...p, frequency: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Diário</SelectItem>
+                      <SelectItem value="weekly">Semanal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>E-mail do Destinatário</Label>
+                <Input 
+                  type="email" 
+                  placeholder="email@exemplo.com"
+                  value={newSchedule.email}
+                  onChange={e => setNewSchedule(p => ({ ...p, email: e.target.value }))}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowScheduleDialog(null)}>Cancelar</Button>
+                <Button onClick={handleCreateSchedule}>Criar Agendamento</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
    );
  }
