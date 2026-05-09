@@ -93,6 +93,8 @@ function generateChave() {
    uf: string;
    environment: "homologacao" | "producao";
    certificate_filename: string | null;
+   max_retries?: number;
+   retry_delay_minutes?: number;
  };
 
  type ProcessedDocument = {
@@ -100,13 +102,14 @@ function generateChave() {
    document_type: string;
    status: string;
    valor_total?: number;
-   sefaz_response_message: string | null;
-   created_at: string;
+    created_at: string;
    xml_content: string;
    signed_xml_content: string | null;
    receipt_number: string | null;
-   protocol_number: string | null;
-   last_error?: string | null;
+    protocol_number: string | null;
+    sefaz_response_code?: string | null;
+    sefaz_response_message: string | null;
+    last_error?: string | null;
    retry_count?: number;
    next_retry_at?: string | null;
    processing_log?: any[];
@@ -117,9 +120,16 @@ export default function Sefaz() {
   const [search, setSearch] = useState("");
   const [emitindo, setEmitindo] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [nfes, setNfes] = useState<NFeEmitida[]>([]);
+   const [nfes, setNfes] = useState<NFeEmitida[]>([]);
    const [processedDocs, setProcessedDocs] = useState<ProcessedDocument[]>([]);
-   const [fiscalConfig, setFiscalConfig] = useState<FiscalConfig>({ uf: "SP", environment: "homologacao", certificate_filename: null });
+   const [fiscalConfig, setFiscalConfig] = useState<FiscalConfig>({ 
+     uf: "SP", 
+     environment: "homologacao", 
+     certificate_filename: null,
+     max_retries: 5,
+     retry_delay_minutes: 15
+   });
+   const [statusFilter, setStatusFilter] = useState<string>("all");
     const [configLoading, setConfigLoading] = useState(false);
     const [certPassword, setCertPassword] = useState("");
     const [showCertPassword, setShowCertPassword] = useState(false);
@@ -128,12 +138,21 @@ export default function Sefaz() {
      const [isBatchProcessing, setIsBatchProcessing] = useState(false);
      const [batchProgress, setBatchProgress] = useState(0);
     const handleExportCSV = () => {
-      if (processedDocs.length === 0) return;
-      const headers = ["ID", "Data", "Tipo", "Status", "Total", "Recibo", "Protocolo", "Erros", "Retentativas"];
-      const rows = processedDocs.map(doc => [
-        doc.id, new Date(doc.created_at).toLocaleString(), doc.document_type, doc.status,
-        doc.valor_total || 0, doc.receipt_number || "", doc.protocol_number || "",
-        doc.last_error || "", doc.retry_count || 0
+      const filtered = statusFilter === "all" ? processedDocs : processedDocs.filter(d => d.status === statusFilter);
+      if (filtered.length === 0) return;
+      const headers = ["ID", "Data", "Tipo", "Status", "Total", "Recibo", "Protocolo", "Sefaz Status", "Sefaz Mensagem", "Erros", "Retentativas"];
+      const rows = filtered.map(doc => [
+        doc.id, 
+        new Date(doc.created_at).toLocaleString(), 
+        doc.document_type, 
+        doc.status,
+        doc.valor_total || 0, 
+        doc.receipt_number || "", 
+        doc.protocol_number || "",
+        doc.last_error || "", 
+        doc.retry_count || 0,
+        doc.sefaz_response_code || "",
+        doc.sefaz_response_message || ""
       ]);
       const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -221,18 +240,35 @@ export default function Sefaz() {
      if (data) setProcessedDocs(data as ProcessedDocument[]);
    };
 
-   const handleSaveConfig = async () => {
-     if (!user) return;
-     setConfigLoading(true);
-     const { error } = await supabase.from("fiscal_configurations").upsert({
-       user_id: user.id,
-       uf: fiscalConfig.uf,
-       environment: fiscalConfig.environment,
-     }, { onConflict: "user_id" });
-     if (!error) toast.success("Configurações salvas!");
-     else toast.error("Erro ao salvar: " + error.message);
-     setConfigLoading(false);
-   };
+    const handleSaveConfig = async () => {
+      if (!user) return;
+      setConfigLoading(true);
+      try {
+        const { error } = await supabase.from("fiscal_configurations").upsert({
+          user_id: user.id,
+          uf: fiscalConfig.uf,
+          environment: fiscalConfig.environment,
+          max_retries: fiscalConfig.max_retries,
+          retry_delay_minutes: fiscalConfig.retry_delay_minutes
+        }, { onConflict: "user_id" });
+        
+        if (error) throw error;
+
+        if (certPassword) {
+          const { data, error: funcError } = await supabase.functions.invoke("fiscal-engine", {
+            body: { action: "update_password", password: certPassword }
+          });
+          if (funcError) throw funcError;
+          setCertPassword("");
+        }
+        
+        toast.success("Configurações salvas!");
+      } catch (err: any) {
+        toast.error("Erro ao salvar: " + err.message);
+      } finally {
+        setConfigLoading(false);
+      }
+    };
 
   const loadNfes = async () => {
     setLoading(true);
@@ -435,6 +471,9 @@ export default function Sefaz() {
           <TabsTrigger value="consultas">Consultas</TabsTrigger>
            <TabsTrigger value="integradores">Integradores</TabsTrigger>
            <TabsTrigger value="processamento">Relatórios de Processamento</TabsTrigger>
+            <TabsTrigger value="config_avancada">Config. Certificado</TabsTrigger>
+        </TabsList>
+
          <TabsContent value="processamento">
            <Card>
              <CardHeader>
@@ -459,12 +498,30 @@ export default function Sefaz() {
                    <div className="bg-primary h-full transition-all duration-300" style={{ width: `${batchProgress}%` }} />
                  </div>
                )}
-               <div className="flex flex-wrap items-center gap-2">
-                 <Input type="date" value={periodo.de} onChange={e => setPeriodo(prev => ({ ...prev, de: e.target.value }))} className="w-32 h-9" />
-                 <span className="text-muted-foreground text-xs">até</span>
-                 <Input type="date" value={periodo.ate} onChange={e => setPeriodo(prev => ({ ...prev, ate: e.target.value }))} className="w-32 h-9" />
-                 <Button variant="outline" size="sm" onClick={loadProcessedDocs}><Search className="w-4 h-4" /></Button>
-               </div>
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs">De:</Label>
+                    <Input type="date" value={periodo.de} onChange={e => setPeriodo(prev => ({ ...prev, de: e.target.value }))} className="w-32 h-9" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs">Até:</Label>
+                    <Input type="date" value={periodo.ate} onChange={e => setPeriodo(prev => ({ ...prev, ate: e.target.value }))} className="w-32 h-9" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs">Status:</Label>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-32 h-9 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="authorized">Autorizado</SelectItem>
+                        <SelectItem value="error">Erro</SelectItem>
+                        <SelectItem value="pending">Pendente</SelectItem>
+                        <SelectItem value="failed_permanently">Dead-letter</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={loadProcessedDocs}><Search className="w-4 h-4" /></Button>
+                </div>
  
                <div className="overflow-x-auto border rounded-lg">
                  <table className="w-full text-xs">
@@ -513,8 +570,7 @@ export default function Sefaz() {
                </div>
              </CardContent>
            </Card>
-         </TabsContent>
-        </TabsList>
+          </TabsContent>
 
         {/* EMISSÃO */}
         <TabsContent value="nfe">
@@ -737,6 +793,90 @@ export default function Sefaz() {
               </CardContent></Card>
             ))}
           </div>
+        </TabsContent>
+
+        <TabsContent value="config_avancada">
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-display flex items-center gap-2">
+                <Settings className="w-5 h-5 text-primary" /> Configurações do Certificado & SEFAZ
+              </CardTitle>
+              <CardDescription>Gerencie limites de retentativa, ambiente e senha do e-CNPJ A1.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <p className="text-sm font-medium text-muted-foreground">Parâmetros de Conexão</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>UF</Label>
+                      <Select value={fiscalConfig.uf} onValueChange={v => setFiscalConfig(p => ({ ...p, uf: v }))}>
+                        <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                        <SelectContent>{ufs.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Ambiente</Label>
+                      <Select value={fiscalConfig.environment} onValueChange={(v: any) => setFiscalConfig(p => ({ ...p, environment: v }))}>
+                        <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="homologacao">Homologação</SelectItem>
+                          <SelectItem value="producao">Produção</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Senha do Certificado (Criptografada no Servidor)</Label>
+                    <div className="relative">
+                      <Input 
+                        type={showCertPassword ? "text" : "password"} 
+                        value={certPassword} 
+                        onChange={e => setCertPassword(e.target.value)} 
+                        placeholder="Nova senha do .pfx" 
+                        className="pr-10"
+                      />
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="absolute right-0 top-0 h-full px-3" 
+                        onClick={() => setShowCertPassword(!showCertPassword)}
+                      >
+                        {showCertPassword ? <Eye className="w-4 h-4" /> : <Eye className="w-4 h-4 text-muted-foreground" />}
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">A senha é enviada via canal seguro e criptografada com AES-256 no servidor.</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <p className="text-sm font-medium text-muted-foreground">Políticas de Reprocessamento</p>
+                  <div className="space-y-2">
+                    <Label>Máximo de Tentativas (Dead-letter limit)</Label>
+                    <Input 
+                      type="number" 
+                      value={fiscalConfig.max_retries} 
+                      onChange={e => setFiscalConfig(p => ({ ...p, max_retries: Number(e.target.value) }))} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Intervalo entre Tentativas (minutos)</Label>
+                    <Input 
+                      type="number" 
+                      value={fiscalConfig.retry_delay_minutes} 
+                      onChange={e => setFiscalConfig(p => ({ ...p, retry_delay_minutes: Number(e.target.value) }))} 
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end pt-4 border-t">
+                <Button onClick={handleSaveConfig} disabled={configLoading} className="gap-2">
+                  {configLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                  Salvar Configurações
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
