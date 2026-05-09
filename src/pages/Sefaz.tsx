@@ -3150,7 +3150,7 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                       </div>
                       <div className="flex items-end gap-1 col-span-2">
                         <Button variant="outline" size="sm" className="h-7 text-[9px] flex-1" onClick={loadExportHistory}>
-                          <Filter className="w-3 h-3 mr-1" /> Filtrar
+                          <Search className="w-3 h-3 mr-1" /> Filtrar
                         </Button>
                         <Button variant="ghost" size="sm" className="h-7 text-[9px] flex-1" onClick={() => setHistoryFilters({ status: "all", divergence: "all", uf: "all", env: "all", dateStart: "", dateEnd: "", recipient: "" })}>
                           Limpar
