@@ -223,13 +223,19 @@ serve(async (req) => {
 
       try {
         const response = await sendToSefaz(signedXml, config.uf, config.environment);
-        const responseText = await response.text();
-        
-        const cStat = responseText.match(/<cStat>(.*?)<\/cStat>/)?.[1];
-        const xMotivo = responseText.match(/<xMotivo>(.*?)<\/xMotivo>/)?.[1];
-        const nProt = responseText.match(/<nProt>(.*?)<\/nProt>/)?.[1];
-
-        if (cStat === "100") {
+         const responseText = await response.text();
+         console.log("SEFAZ Response:", responseText);
+ 
+         const getTag = (tag: string) => {
+           const match = responseText.match(new RegExp(`<${tag}[^>]*>(.*?)<\/${tag}>`, 'i'));
+           return match ? match[1] : null;
+         };
+ 
+         const cStat = getTag("cStat");
+         const xMotivo = getTag("xMotivo");
+         const nProt = getTag("nProt");
+ 
+         if (cStat === "100" || cStat === "101" || cStat === "102") {
           await supabaseClient.from("processed_documents").update({
             status: "authorized",
             signed_xml_content: signedXml,
@@ -237,29 +243,38 @@ serve(async (req) => {
             sefaz_response_code: cStat,
             sefaz_response_message: xMotivo,
             is_processing: false,
-            processing_log: [...(doc.processing_log || []), { timestamp: new Date().toISOString(), event: "Autorizado pela SEFAZ" }]
+             processing_log: [...(doc.processing_log || []), { timestamp: new Date().toISOString(), event: "Autorizado pela SEFAZ", cStat, xMotivo }]
           }).eq("id", documentId);
         } else {
-          throw new Error(`SEFAZ [${cStat}]: ${xMotivo}`);
+           throw new Error(`SEFAZ [${cStat || 'ERRO'}]: ${xMotivo || 'Erro desconhecido'}`);
         }
       } catch (error) {
         const newRetryCount = (doc.retry_count || 0) + 1;
         const maxRetries = config.max_retries || 5;
         const delay = config.retry_delay_minutes || 15;
         
-        const status = newRetryCount >= maxRetries ? "failed_permanently" : "error";
+         const status = newRetryCount >= maxRetries ? "dead-letter" : "error";
         const nextRetry = status === "error" 
           ? new Date(Date.now() + 1000 * 60 * delay).toISOString() 
           : null;
 
-        await supabaseClient.from("processed_documents").update({
-          status,
-          last_error: error.message,
-          retry_count: newRetryCount,
-          next_retry_at: nextRetry,
-          is_processing: false,
-            processing_log: [...(doc.processing_log || []), { timestamp: new Date().toISOString(), event: `Erro: ${error.message}` }]
-        }).eq("id", documentId);
+         await supabaseClient.from("processed_documents").update({
+           status,
+           last_error: error.message,
+           retry_count: newRetryCount,
+           next_retry_at: nextRetry,
+           is_processing: false,
+           processing_log: [...(doc.processing_log || []), { timestamp: new Date().toISOString(), event: `Tentativa ${newRetryCount}: ${error.message}` }]
+         }).eq("id", documentId);
+ 
+         if (status === "dead-letter") {
+           await supabaseClient.from("notifications").insert({
+             user_id: doc.user_id,
+             title: "Documento em Dead-Letter",
+             message: `O documento ${documentId} excedeu o limite de ${maxRetries} tentativas e foi movido para dead-letter.`,
+             type: "error"
+           });
+         }
       }
 
       return new Response(JSON.stringify({ success: true }), {
