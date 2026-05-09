@@ -105,6 +105,10 @@ function generateChave() {
    signed_xml_content: string | null;
    receipt_number: string | null;
    protocol_number: string | null;
+   last_error?: string | null;
+   retry_count?: number;
+   next_retry_at?: string | null;
+   processing_log?: any[];
  };
 
 export default function Sefaz() {
