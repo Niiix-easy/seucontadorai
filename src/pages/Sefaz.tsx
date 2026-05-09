@@ -439,6 +439,12 @@ export default function Sefaz() {
       }
     }, [user, backlogFilters, periodo, cStatFilter, xMotivoFilter, dlPeriodo, dlCStatFilter, dlXMotivoFilter]);
 
+    useEffect(() => {
+      if (user) {
+        loadAuditLogs();
+      }
+    }, [user, auditFilters]);
+
     const loadFiscalConfig = async () => {
       const { data, error } = await supabase
         .from("fiscal_configurations")
