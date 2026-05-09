@@ -122,15 +122,16 @@ export default function Certificados() {
        });
        if (dbError) throw dbError;
 
-       // Also update fiscal_configurations if it's A1
-       if (tipoCert === "A1") {
-         await supabase.from("fiscal_configurations").upsert({
-           user_id: user.id,
-           certificate_filename: selectedFile.name,
-           certificate_path: filePath,
-           uf: "SP", // Default UF, user can change in settings
-         }, { onConflict: "user_id" });
-       }
+        // Also update fiscal_configurations if it's A1
+        if (tipoCert === "A1") {
+          await supabase.from("fiscal_configurations").upsert({
+            user_id: user.id,
+            certificate_filename: selectedFile.name,
+            certificate_path: filePath,
+            certificate_password_encrypted: senha, // Saving the password
+            uf: "SP", // Default UF, user can change in settings
+          }, { onConflict: "user_id" });
+        }
 
       toast.success("Certificado enviado com sucesso!");
       setSelectedFile(null); setSenha(""); setCnpjUpload(""); setRazaoUpload("");
