@@ -340,19 +340,29 @@ export default function Sefaz() {
       }
     };
 
-    const togglePause = async (uf: string, env: string, currentPaused: boolean) => {
+    const togglePause = async (uf: string, env: string, currentPaused: boolean, reason?: string) => {
       const { error } = await supabase
         .from("fiscal_suspension_states")
         .upsert({ 
           user_id: user?.id, 
           uf, 
           environment: env, 
-          is_paused: !currentPaused 
+          is_paused: !currentPaused,
+          reason: reason || null
         }, { onConflict: "user_id, uf, environment" });
       
       if (!error) {
+        await supabase.from("fiscal_action_logs").insert({
+          user_id: user?.id,
+          action: !currentPaused ? "pause" : "resume",
+          uf,
+          environment: env,
+          reason: reason || ( !currentPaused ? "Pausado pelo usuário" : "Retomado pelo usuário" )
+        });
         toast.success(`Reprocessamento ${!currentPaused ? "pausado" : "retomado"} para ${uf}/${env}`);
         loadBacklogData();
+        setShowPauseDialog(null);
+        setPauseReason("");
       }
     };
 
@@ -421,7 +431,7 @@ export default function Sefaz() {
 
     const handleExportDeadLetterCSV = () => {
       if (deadLetterNotifs.length === 0) return;
-      const headers = ["ID", "Documento ID", "UF", "Ambiente", "Data", "Status Alerta", "Canais", "cStat", "xMotivo", "Retentativas", "Próximo Retry", "XML/Recibo"];
+      const headers = ["ID", "Documento ID", "UF", "Ambiente", "Data", "Status Alerta", "Canais", "cStat", "xMotivo", "Retentativas", "Próximo Retry", "ID XML", "ID Comprovante", "Link XML"];
       const rows = deadLetterNotifs.map(n => [
         n.id,
         n.document_id,
@@ -432,8 +442,11 @@ export default function Sefaz() {
         (n.channels || []).join(", "),
         n.cstat || "",
         n.xmotivo || "",
-        n.retry_count_at_failure || "", n.processed_documents?.next_retry_at || "",
-        `${n.last_xml_url || ""}; ${n.last_receipt_number || ""}`
+        n.retry_count_at_failure || "", 
+        n.processed_documents?.next_retry_at || "",
+        n.document_id,
+        n.last_receipt_number || "",
+        n.last_xml_url || ""
       ]);
       const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
