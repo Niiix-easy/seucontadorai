@@ -140,9 +140,9 @@ export default function Sefaz() {
     });
     const [suspensionStates, setSuspensionStates] = useState<any[]>([]);
     const [backlogData, setBacklogData] = useState<any[]>([]);
-    const [backlogFilters, setBacklogFilters] = useState({ uf: "all", env: "all", date: "" });
-    const [backlogSearch, setBacklogSearch] = useState("");
-    const [showPauseDialog, setShowPauseDialog] = useState<{ uf: string, env: string, paused: boolean } | null>(null);
+     const [backlogFilters, setBacklogFilters] = useState({ uf: "all", env: "all", date: "", cStat: "", xMotivo: "" });
+     const [showPauseDialog, setShowPauseDialog] = useState<{ uf: string, env: string, paused: boolean, manual?: boolean } | null>(null);
+     const [manualRetryProgress, setManualRetryProgress] = useState<{ [key: string]: { status: 'queued' | 'processing' | 'done' | 'error', count: number, total: number } }>({});
     const [pauseReason, setPauseReason] = useState("");
     const [auditLogs, setAuditLogs] = useState<any[]>([]);
     const [showAuditLogs, setShowAuditLogs] = useState(false);
@@ -292,12 +292,14 @@ export default function Sefaz() {
     const loadBacklogData = async () => {
       let query = supabase
         .from("processed_documents")
-        .select("uf, environment, status, next_retry_at")
+        .select("uf, environment, status, next_retry_at, sefaz_response_code, sefaz_response_message")
         .or('status.in.("pending","error")');
       
       if (backlogFilters.uf !== "all") query = query.eq("uf", backlogFilters.uf);
       if (backlogFilters.env !== "all") query = query.eq("environment", backlogFilters.env);
       if (backlogFilters.date) query = query.gte("next_retry_at", `${backlogFilters.date}T00:00:00`);
+      if (backlogFilters.cStat) query = query.ilike("sefaz_response_code", `%${backlogFilters.cStat}%`);
+      if (backlogFilters.xMotivo) query = query.ilike("sefaz_response_message", `%${backlogFilters.xMotivo}%`);
 
       const { data: backlog } = await query;
       
@@ -328,14 +330,33 @@ export default function Sefaz() {
     };
 
     const handleManualRetryBatch = async (uf: string, env: string) => {
+      const key = `${uf}-${env}`;
+      setManualRetryProgress(prev => ({
+        ...prev,
+        [key]: { status: 'queued', count: 0, total: backlogData.find(b => b.uf === uf && b.env === env)?.count || 0 }
+      }));
+
       try {
+        setManualRetryProgress(prev => ({ ...prev, [key]: { ...prev[key], status: 'processing' } }));
         const { data, error } = await supabase.functions.invoke("fiscal-engine", {
           body: { action: "manual_retry_batch", uf, environment: env, userId: user?.id }
         });
         if (error) throw error;
+        
+        await supabase.from("fiscal_action_logs").insert({
+          user_id: user?.id,
+          action: "manual_retry",
+          uf,
+          environment: env,
+          reason: "Reprocessamento manual disparado pelo usuário"
+        });
+
+        setManualRetryProgress(prev => ({ ...prev, [key]: { ...prev[key], status: 'done', count: data.count || 0 } }));
         toast.success(`${data.count || 0} documentos colocados na fila para reprocessamento imediato.`);
         loadBacklogData();
+        loadAuditLogs();
       } catch (err: any) {
+        setManualRetryProgress(prev => ({ ...prev, [key]: { ...prev[key], status: 'error' } }));
         toast.error("Erro ao disparar reprocessamento: " + err.message);
       }
     };
@@ -406,7 +427,7 @@ export default function Sefaz() {
           supabase.removeChannel(channel);
         };
       }
-    }, [user, backlogFilters]);
+    }, [user, backlogFilters, periodo, cStatFilter, xMotivoFilter, dlPeriodo, dlCStatFilter, dlXMotivoFilter]);
 
     const loadFiscalConfig = async () => {
       const { data, error } = await supabase
@@ -445,6 +466,29 @@ export default function Sefaz() {
         const { data: dlNotifs } = await dlQuery.limit(100);
         if (dlNotifs) setDeadLetterNotifs(dlNotifs);
       }
+    };
+
+    const handleExportAuditCSV = () => {
+      if (auditLogs.length === 0) return;
+      const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "Usuário ID"];
+      const rows = auditLogs.map(log => [
+        new Date(log.created_at).toLocaleString(),
+        log.action,
+        log.uf,
+        log.environment,
+        log.reason || "",
+        log.user_id
+      ]);
+      const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `auditoria_fiscal_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Auditoria exportada!");
     };
 
     const handleExportDeadLetterCSV = () => {
@@ -1350,6 +1394,9 @@ export default function Sefaz() {
                     <Package className="w-4 h-4" /> Backlog & Controle Granular (UF/Ambiente)
                   </p>
                   <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={handleExportAuditCSV} className="gap-2 h-8 text-[10px]">
+                      <Download className="w-3 h-3" /> Exportar Auditoria
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => setShowAuditLogs(true)} className="gap-2 h-8 text-[10px]">
                       <History className="w-3 h-3" /> Ver Auditoria
                     </Button>
@@ -1380,7 +1427,11 @@ export default function Sefaz() {
                     <Label className="text-[10px] uppercase text-muted-foreground">A partir de:</Label>
                     <Input type="date" value={backlogFilters.date} onChange={e => setBacklogFilters(p => ({ ...p, date: e.target.value }))} className="w-32 h-8 text-[10px]" />
                   </div>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setBacklogFilters({ uf: "all", env: "all", date: "" })} title="Limpar Filtros"><X className="w-3 h-3" /></Button>
+                   <div className="flex items-center gap-2">
+                     <Input placeholder="cStat" value={backlogFilters.cStat} onChange={e => setBacklogFilters(p => ({ ...p, cStat: e.target.value }))} className="w-20 h-8 text-[10px]" />
+                     <Input placeholder="xMotivo" value={backlogFilters.xMotivo} onChange={e => setBacklogFilters(p => ({ ...p, xMotivo: e.target.value }))} className="w-32 h-8 text-[10px]" />
+                   </div>
+                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setBacklogFilters({ uf: "all", env: "all", date: "", cStat: "", xMotivo: "" })} title="Limpar Filtros"><X className="w-3 h-3" /></Button>
                 </div>
 
                 <div className="overflow-x-auto border rounded-lg">
@@ -1421,15 +1472,31 @@ export default function Sefaz() {
                             </td>
                             <td className="py-2 px-4 text-right">
                               <div className="flex justify-end gap-1">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-7 text-[10px] text-primary"
-                                  onClick={() => handleManualRetryBatch(b.uf, b.env)}
-                                  title="Reprocessar Imediatamente"
-                                >
-                                  <RefreshCw className="w-3 h-3 mr-1" /> Agora
-                                </Button>
+                                {manualRetryProgress[`${b.uf}-${b.env}`] ? (
+                                  <div className="flex flex-col items-end gap-1 px-2">
+                                    <div className="flex items-center gap-2">
+                                      {manualRetryProgress[`${b.uf}-${b.env}`].status === 'processing' && <Loader2 className="w-3 h-3 animate-spin text-primary" />}
+                                      <span className="text-[9px] font-medium capitalize">
+                                        {manualRetryProgress[`${b.uf}-${b.env}`].status === 'queued' ? 'Enfileirado' : 
+                                         manualRetryProgress[`${b.uf}-${b.env}`].status === 'processing' ? 'Processando' : 
+                                         manualRetryProgress[`${b.uf}-${b.env}`].status === 'done' ? 'Concluído' : 'Erro'}
+                                      </span>
+                                    </div>
+                                    {manualRetryProgress[`${b.uf}-${b.env}`].status === 'done' && (
+                                      <span className="text-[8px] text-green-600">{manualRetryProgress[`${b.uf}-${b.env}`].count} docs ok</span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-7 text-[10px] text-primary"
+                                    onClick={() => setShowPauseDialog({ uf: b.uf, env: b.env, paused: !!isPaused, manual: true })}
+                                    title="Reprocessar Imediatamente"
+                                  >
+                                    <RefreshCw className="w-3 h-3 mr-1" /> Agora
+                                  </Button>
+                                )}
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
@@ -1520,12 +1587,21 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
              </div>
              <div className="flex justify-end gap-2">
                <Button variant="outline" onClick={() => setShowPauseDialog(null)}>Cancelar</Button>
-               <Button 
-                 variant={showPauseDialog?.paused ? "default" : "destructive"}
-                 onClick={() => showPauseDialog && togglePause(showPauseDialog.uf, showPauseDialog.env, showPauseDialog.paused, pauseReason)}
-               >
-                 Confirmar
-               </Button>
+               {showPauseDialog?.manual ? (
+                 <Button onClick={() => {
+                   if (showPauseDialog) {
+                     handleManualRetryBatch(showPauseDialog.uf, showPauseDialog.env);
+                     setShowPauseDialog(null);
+                   }
+                 }}>Confirmar Reprocessamento</Button>
+               ) : (
+                 <Button 
+                   variant={showPauseDialog?.paused ? "default" : "destructive"}
+                   onClick={() => showPauseDialog && togglePause(showPauseDialog.uf, showPauseDialog.env, showPauseDialog.paused, pauseReason)}
+                 >
+                   Confirmar
+                 </Button>
+               )}
              </div>
            </div>
          </DialogContent>
