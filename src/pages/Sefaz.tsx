@@ -520,16 +520,18 @@ export default function Sefaz() {
 
     const handleExportAuditCSV = () => {
       if (auditLogs.length === 0) return;
-      const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "Usuário ID"];
+      const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "cStat", "Usuário ID"];
       const rows = auditLogs.map(log => [
-        new Date(log.created_at).toLocaleString(),
-        log.action,
+        new Date(log.created_at).toLocaleString('pt-BR'),
+        log.action.toUpperCase(),
         log.uf,
         log.environment,
         log.reason || "",
+        log.sefaz_response_code || "",
         log.user_id
       ]);
-      const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
+      // Excel-friendly CSV with semicolon and BOM
+      const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -538,7 +540,7 @@ export default function Sefaz() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success("Auditoria exportada!");
+      toast.success("Auditoria CSV (Excel-friendly) exportada!");
     };
 
     const loadExportHistory = async () => {
@@ -720,13 +722,14 @@ export default function Sefaz() {
         const status = state?.is_suspended ? "Suspenso" : (state?.is_paused ? "Pausado" : "Ativo");
         return [
           b.uf,
-          b.env,
+          b.env.toUpperCase(),
           b.count,
-          b.next ? new Date(b.next).toLocaleString() : "—",
+          b.next ? new Date(b.next).toLocaleString('pt-BR') : "—",
           status
         ];
       });
-      const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
+      // Excel-friendly CSV with semicolon and BOM
+      const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -735,7 +738,7 @@ export default function Sefaz() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success("Backlog CSV exportado!");
+      toast.success("Backlog CSV (Excel-friendly) exportado!");
     };
 
     const handleExportBacklogPDF = () => {
