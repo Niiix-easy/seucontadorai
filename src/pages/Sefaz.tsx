@@ -518,11 +518,6 @@ export default function Sefaz() {
                   </div>
                   <Button variant="outline" size="sm" onClick={loadProcessedDocs}><Search className="w-4 h-4" /></Button>
                 </div>
-                 <Input type="date" value={periodo.de} onChange={e => setPeriodo(prev => ({ ...prev, de: e.target.value }))} className="w-32 h-9" />
-                 <span className="text-muted-foreground text-xs">até</span>
-                 <Input type="date" value={periodo.ate} onChange={e => setPeriodo(prev => ({ ...prev, ate: e.target.value }))} className="w-32 h-9" />
-                 <Button variant="outline" size="sm" onClick={loadProcessedDocs}><Search className="w-4 h-4" /></Button>
-               </div>
  
                <div className="overflow-x-auto border rounded-lg">
                  <table className="w-full text-xs">
