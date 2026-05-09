@@ -186,6 +186,15 @@ export default function Sefaz() {
     const [cStatFilter, setCStatFilter] = useState("");
     const [xMotivoFilter, setXMotivoFilter] = useState("");
     const [statusFilter, setStatusFilter] = useState<string>("all");
+    const [historyFilters, setHistoryFilters] = useState({
+      status: "all",
+      divergence: "all",
+      uf: "all",
+      env: "all",
+      dateStart: "",
+      dateEnd: "",
+      recipient: ""
+    });
     const [configLoading, setConfigLoading] = useState(false);
     const [certPassword, setCertPassword] = useState("");
     const [showCertPassword, setShowCertPassword] = useState(false);
@@ -559,11 +568,21 @@ export default function Sefaz() {
 
     const loadExportHistory = async () => {
       if (!user) return;
-      const { data } = await supabase
+      let query = supabase
         .from("fiscal_export_logs")
         .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50);
+        .order("created_at", { ascending: false });
+
+      if (historyFilters.status !== "all") query = query.eq("status", historyFilters.status);
+      if (historyFilters.divergence === "true") query = query.eq("validation_divergence", true);
+      if (historyFilters.divergence === "false") query = query.eq("validation_divergence", false);
+      if (historyFilters.uf !== "all") query = query.filter("filters->>uf", "eq", historyFilters.uf);
+      if (historyFilters.env !== "all") query = query.filter("filters->>env", "eq", historyFilters.env);
+      if (historyFilters.dateStart) query = query.gte("created_at", historyFilters.dateStart);
+      if (historyFilters.dateEnd) query = query.lte("created_at", historyFilters.dateEnd + "T23:59:59");
+      if (historyFilters.recipient) query = query.filter("recipients", "cs", `{"${historyFilters.recipient}"}`);
+
+      const { data } = await query.limit(50);
       if (data) setExportHistory(data);
     };
 
@@ -644,63 +663,64 @@ export default function Sefaz() {
        }
      };
  
-      const handleRunScheduleNow = async (schedule: any) => {
-        if (!user) return;
-        setManualScheduleStatus({ id: schedule.id, status: 'initializing', progress: 10 });
-        toast.info("Iniciando processamento manual da exportação...");
-        
-        try {
-          setManualScheduleStatus(prev => prev ? { ...prev, status: 'running', progress: 30 } : null);
-           const { data, error } = await supabase.functions.invoke("fiscal-scheduler", {
-             body: { 
-               action: "run_now", 
-               schedule_id: schedule.id,
-               technical_info: {
-                 sorting: schedule.report_type === 'backlog' ? backlogSort : auditSort,
-                 page: schedule.report_type === 'backlog' ? backlogPage : auditPage,
-                 page_size: 10
-               }
-             }
-           });
-  
-          if (error) throw error;
-          
-          setManualScheduleStatus(prev => prev ? { ...prev, progress: 60 } : null);
-          
-          // Poll for completion to show the download link
-          let completed = false;
-          let attempts = 0;
-          while (!completed && attempts < 15) {
-            await new Promise(r => setTimeout(r, 2000));
-            const { data: latestLog } = await supabase
-              .from("fiscal_export_logs")
-              .select("*")
-              .eq("report_id", schedule.id)
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .single();
-            
-            if (latestLog) {
-              if (latestLog.status === 'success') {
-                setManualScheduleStatus(prev => prev ? { ...prev, status: 'success', progress: 100, zipUrl: latestLog.file_url } : null);
-                completed = true;
-                toast.success("Exportação concluída!");
-              } else if (latestLog.status === 'error') {
-                setManualScheduleStatus(prev => prev ? { ...prev, status: 'error', progress: 100 } : null);
-                completed = true;
-                toast.error("Falha na exportação: " + latestLog.error_message);
-              }
+    const handleRunScheduleNow = async (schedule: any) => {
+      if (!user) return;
+      setManualScheduleStatus({ id: schedule.id, status: 'initializing', progress: 5 });
+      toast.info("Iniciando processamento manual da exportação...");
+      
+      try {
+        setManualScheduleStatus(prev => prev ? { ...prev, status: 'running', progress: 20 } : null);
+        const { error } = await supabase.functions.invoke("fiscal-scheduler", {
+          body: { 
+            action: "run_now", 
+            schedule_id: schedule.id,
+            technical_info: {
+              sorting: schedule.report_type === 'backlog' ? backlogSort : auditSort,
+              page: schedule.report_type === 'backlog' ? backlogPage : auditPage,
+              page_size: 10
             }
-            attempts++;
           }
+        });
 
-          const { data: logs } = await supabase.from("fiscal_export_logs").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
-          if (logs) setExportHistory(logs);
-        } catch (err: any) {
-          setManualScheduleStatus(prev => prev ? { ...prev, status: 'error', progress: 100 } : null);
-          toast.error("Erro ao disparar exportação: " + err.message);
+        if (error) throw error;
+        
+        setManualScheduleStatus(prev => prev ? { ...prev, status: 'generating_csv', progress: 40 } : null);
+        
+        let completed = false;
+        let attempts = 0;
+        while (!completed && attempts < 20) {
+          await new Promise(r => setTimeout(r, 2000));
+          const { data: latestLog } = await supabase
+            .from("fiscal_export_logs")
+            .select("*")
+            .eq("report_id", schedule.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
+          
+          if (latestLog) {
+            if (latestLog.status === 'processing') {
+               // Simulating stage progress based on steps
+               const currentProgress = 40 + (attempts * 2);
+               setManualScheduleStatus(prev => prev ? { ...prev, progress: Math.min(85, currentProgress) } : null);
+            } else if (latestLog.status === 'success') {
+              setManualScheduleStatus(prev => prev ? { ...prev, status: 'success', progress: 100, zipUrl: latestLog.file_url } : null);
+              completed = true;
+              toast.success("Exportação concluída!");
+            } else if (latestLog.status === 'error') {
+              setManualScheduleStatus(prev => prev ? { ...prev, status: 'error', progress: 100 } : null);
+              completed = true;
+              toast.error("Falha na exportação: " + latestLog.error_message);
+            }
+          }
+          attempts++;
         }
-      };
+        loadExportHistory();
+      } catch (err: any) {
+        setManualScheduleStatus(prev => prev ? { ...prev, status: 'error', progress: 100 } : null);
+        toast.error("Erro ao disparar exportação: " + err.message);
+      }
+    };
  
      const handleResendEmail = async (logId: string) => {
        toast.info("Reenviando e-mail...");
@@ -781,37 +801,41 @@ export default function Sefaz() {
       }
     };
 
-    const downloadAuditSummary = (log: any) => {
-      const summary = {
-        id_execucao: log.id,
-        report_id: log.report_id,
-        data_criacao: log.created_at,
-        tipo: log.report_type,
-        filtros: log.filters,
-        contagens: {
-          total: log.record_count,
-          csv: log.csv_count,
-          pdf: log.pdf_count
-        },
-        hashes: {
-          csv: log.csv_hash,
-          pdf: log.pdf_hash
-        },
-        destinatarios: log.recipients,
-        tecnico: log.technical_log,
-        status: log.status,
-        divergencia: log.validation_divergence
+    const downloadAuditSummary = (log: any, format: 'json' | 'xlsx' = 'json') => {
+      const summaryData = {
+        "ID Execução": log.id,
+        "Data Criação": new Date(log.created_at).toLocaleString(),
+        "Tipo": log.report_type,
+        "Status": log.status,
+        "Divergência": log.validation_divergence ? "SIM" : "NÃO",
+        "Registros Total": log.record_count,
+        "CSV Count": log.csv_count,
+        "PDF Count": log.pdf_count,
+        "Hash CSV": log.csv_hash,
+        "Hash PDF": log.pdf_hash,
+        "Filtros": JSON.stringify(log.filters),
+        "Destinatários": (log.recipients || []).join(", "),
+        "Tamanho Página": log.technical_log?.page_size || 10,
+        "Ordenação": log.technical_log?.field || "",
+        "Direção": log.technical_log?.direction || ""
       };
 
-      const blob = new Blob([JSON.stringify(summary, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `resumo_auditoria_${log.id.substring(0, 8)}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success("Resumo de auditoria exportado.");
+      if (format === 'json') {
+        const blob = new Blob([JSON.stringify(summaryData, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `resumo_auditoria_${log.id.substring(0, 8)}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        const ws = XLSX.utils.json_to_sheet([summaryData]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Resumo Auditoria");
+        XLSX.writeFile(wb, `resumo_auditoria_${log.id.substring(0, 8)}.xlsx`);
+      }
+      toast.success(`Resumo de auditoria (${format.toUpperCase()}) exportado.`);
     };
 
     const handleRunProofFromHistory = (log: any) => {
@@ -934,9 +958,10 @@ export default function Sefaz() {
       const confirmExportZip = async () => {
          if (!showZipPreviewDialog || !user) return;
          const { type, previewCount, filters, sort } = showZipPreviewDialog;
+        
+        setManualScheduleStatus({ id: 'manual-zip', status: 'initializing', progress: 5 });
         setShowZipPreviewDialog(null);
         
-        toast.info("Gerando pacote ZIP...");
         const zip = new JSZip();
         const dateStr = new Date().toISOString().split('T')[0];
         
@@ -957,16 +982,20 @@ export default function Sefaz() {
             return [b.uf, b.env.toUpperCase(), b.count, b.next ? new Date(b.next).toLocaleString() : "—", status];
           });
            const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
-           const csvHash = await calculateHash(csvContent);
-           zip.file(`backlog_fiscal_${dateStr}.csv`, csvContent);
+            setManualScheduleStatus(prev => prev ? { ...prev, status: 'generating_csv', progress: 20 } : null);
+            const csvHash = await calculateHash(csvContent);
+            zip.file(`backlog_fiscal_${dateStr}.csv`, csvContent);
+            
+            setManualScheduleStatus(prev => prev ? { ...prev, status: 'generating_pdf', progress: 50 } : null);
 
            const doc = new jsPDF();
            doc.text("Backlog Fiscal", 14, 15);
            autoTable(doc, { head: [headers], body: rows, startY: 25 });
            const pdfContent = doc.output('blob');
-           const pdfHash = await calculateHash(pdfContent);
-           zip.file(`backlog_fiscal_${dateStr}.pdf`, pdfContent);
+            const pdfHash = await calculateHash(pdfContent);
+            zip.file(`backlog_fiscal_${dateStr}.pdf`, pdfContent);
 
+            setManualScheduleStatus(prev => prev ? { ...prev, status: 'calculating_hashes', progress: 80 } : null);
             const techLog = { 
               execution_id: crypto.randomUUID(),
               sorting: sort, 
@@ -989,15 +1018,20 @@ export default function Sefaz() {
            const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "cStat", "xMotivo"];
            const rows = auditLogs.map(log => [new Date(log.created_at).toLocaleString(), log.action.toUpperCase(), log.uf, log.environment, log.reason || "", log.cstat || "", log.xmotivo || ""]);
            const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
-           const csvHash = await calculateHash(csvContent);
-           zip.file(`auditoria_fiscal_${dateStr}.csv`, csvContent);
+            setManualScheduleStatus(prev => prev ? { ...prev, status: 'generating_csv', progress: 20 } : null);
+            const csvHash = await calculateHash(csvContent);
+            zip.file(`auditoria_fiscal_${dateStr}.csv`, csvContent);
+            
+            setManualScheduleStatus(prev => prev ? { ...prev, status: 'generating_pdf', progress: 50 } : null);
 
            const doc = new jsPDF();
            doc.text("Auditoria Fiscal", 14, 15);
            autoTable(doc, { head: [headers], body: rows, startY: 25 });
            const pdfContent = doc.output('blob');
-           const pdfHash = await calculateHash(pdfContent);
-           zip.file(`auditoria_fiscal_${dateStr}.pdf`, pdfContent);
+            const pdfHash = await calculateHash(pdfContent);
+            zip.file(`auditoria_fiscal_${dateStr}.pdf`, pdfContent);
+
+            setManualScheduleStatus(prev => prev ? { ...prev, status: 'calculating_hashes', progress: 80 } : null);
 
             const techLog = { 
               execution_id: crypto.randomUUID(),
@@ -1019,6 +1053,7 @@ export default function Sefaz() {
             }]);
          }
   
+        setManualScheduleStatus(prev => prev ? { ...prev, status: 'finalizing_zip', progress: 95 } : null);
         const content = await zip.generateAsync({ type: "blob" });
         const url = URL.createObjectURL(content);
         const link = document.createElement("a");
@@ -1027,6 +1062,8 @@ export default function Sefaz() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        
+        setManualScheduleStatus(prev => prev ? { ...prev, status: 'success', progress: 100, zipUrl: url } : null);
         toast.success("Pacote ZIP exportado!");
       };
     const handleExportAuditXLSX = () => {
@@ -2789,13 +2826,24 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                       <span className="text-muted-foreground">Tamanho:</span>
                       <span className="font-mono font-bold">{showAuditDetailDialog.technical_log?.page_size || '10'}</span>
                     </div>
+                    <div className="flex justify-between col-span-2 pt-1">
+                      <span className="text-muted-foreground">Destinatários:</span>
+                      <span className="font-mono font-bold truncate max-w-[300px]" title={showAuditDetailDialog.recipients?.join(", ")}>
+                        {showAuditDetailDialog.recipients?.join(", ") || 'Nenhum'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-4 border-t mt-4">
-                  <Button variant="outline" size="sm" onClick={() => downloadAuditSummary(showAuditDetailDialog)}>
-                    <Download className="w-4 h-4 mr-2" /> Baixar Resumo Consolidado
-                  </Button>
+                <div className="flex justify-end gap-2 pt-4 border-t mt-4 flex-wrap">
+                  <div className="flex gap-1">
+                    <Button variant="outline" size="sm" onClick={() => downloadAuditSummary(showAuditDetailDialog, 'json')}>
+                      <Download className="w-4 h-4 mr-2" /> Resumo JSON
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => downloadAuditSummary(showAuditDetailDialog, 'xlsx')}>
+                      <Download className="w-4 h-4 mr-2" /> Resumo XLSX
+                    </Button>
+                  </div>
                   <Button variant="default" size="sm" onClick={() => handleRunProofFromHistory(showAuditDetailDialog)}>
                     <Zap className="w-4 h-4 mr-2" /> Reexecutar Modo Prova
                   </Button>
@@ -3024,8 +3072,12 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                 
                 <div className="text-center space-y-1">
                   <p className="font-medium">
-                    {manualScheduleStatus.status === 'initializing' && 'Validando agendamento...'}
+                    {manualScheduleStatus.status === 'initializing' && 'Inicializando...'}
                     {manualScheduleStatus.status === 'running' && 'Processando dados no servidor...'}
+                    {manualScheduleStatus.status === 'generating_csv' && 'Gerando arquivo CSV...'}
+                    {manualScheduleStatus.status === 'generating_pdf' && 'Gerando arquivo PDF...'}
+                    {manualScheduleStatus.status === 'calculating_hashes' && 'Calculando Hashes de integridade...'}
+                    {manualScheduleStatus.status === 'finalizing_zip' && 'Finalizando pacote ZIP...'}
                     {manualScheduleStatus.status === 'success' && 'Exportação concluída!'}
                     {manualScheduleStatus.status === 'error' && 'Erro no processamento'}
                   </p>
@@ -3067,8 +3119,52 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                    <TabsTrigger value="schedules">Agendamentos Ativos</TabsTrigger>
                  </TabsList>
                  
-                 <TabsContent value="history" className="mt-4">
-                   <div className="overflow-x-auto border rounded-lg">
+                 <TabsContent value="history" className="mt-4 space-y-4">
+                    <div className="grid grid-cols-4 gap-2 bg-muted/20 p-3 rounded-lg border text-[10px]">
+                      <div className="space-y-1">
+                        <Label className="text-[9px]">Status</Label>
+                        <Select value={historyFilters.status} onValueChange={v => setHistoryFilters(p => ({ ...p, status: v }))}>
+                          <SelectTrigger className="h-7 text-[10px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Todos</SelectItem>
+                            <SelectItem value="success">Sucesso</SelectItem>
+                            <SelectItem value="error">Erro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[9px]">Divergência</Label>
+                        <Select value={historyFilters.divergence} onValueChange={v => setHistoryFilters(p => ({ ...p, divergence: v }))}>
+                          <SelectTrigger className="h-7 text-[10px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Ambos</SelectItem>
+                            <SelectItem value="true">Com Divergência</SelectItem>
+                            <SelectItem value="false">Sem Divergência</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[9px]">Início</Label>
+                        <Input type="date" className="h-7 text-[10px]" value={historyFilters.dateStart} onChange={e => setHistoryFilters(p => ({ ...p, dateStart: e.target.value }))} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[9px]">Fim</Label>
+                        <Input type="date" className="h-7 text-[10px]" value={historyFilters.dateEnd} onChange={e => setHistoryFilters(p => ({ ...p, dateEnd: e.target.value }))} />
+                      </div>
+                      <div className="space-y-1 col-span-2">
+                        <Label className="text-[9px]">Destinatário (Busca)</Label>
+                        <Input placeholder="email@exemplo.com" className="h-7 text-[10px]" value={historyFilters.recipient} onChange={e => setHistoryFilters(p => ({ ...p, recipient: e.target.value }))} />
+                      </div>
+                      <div className="flex items-end gap-1 col-span-2">
+                        <Button variant="outline" size="sm" className="h-7 text-[9px] flex-1" onClick={loadExportHistory}>
+                          <Search className="w-3 h-3 mr-1" /> Filtrar
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-[9px] flex-1" onClick={() => setHistoryFilters({ status: "all", divergence: "all", uf: "all", env: "all", dateStart: "", dateEnd: "", recipient: "" })}>
+                          Limpar
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto border rounded-lg">
                 <table className="w-full text-xs">
                   <thead className="bg-muted uppercase">
                     <tr>
