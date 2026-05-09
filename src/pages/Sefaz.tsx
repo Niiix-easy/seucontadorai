@@ -583,17 +583,22 @@ export default function Sefaz() {
              <CardHeader>
                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                  <CardTitle className="font-display">Relatórios de Processamento</CardTitle>
-                 <div className="flex items-center gap-2">
-                   <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-2">
-                     <FileDown className="w-4 h-4" /> Exportar CSV
-                   </Button>
-                   {selectedIds.length > 0 && (
-                     <Button variant="default" size="sm" onClick={handleBatchRetry} disabled={isBatchProcessing} className="gap-2">
-                       {isBatchProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                       Reprocessar ({selectedIds.length})
-                     </Button>
-                   )}
-                 </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {selectedIds.length > 0 && (
+                      <>
+                        <Button variant="outline" size="sm" onClick={handleBatchDownloadZip} className="gap-2 text-primary border-primary/20 hover:bg-primary/5">
+                          <FileArchive className="w-4 h-4" /> ZIP ({selectedIds.length})
+                        </Button>
+                        <Button variant="default" size="sm" onClick={handleBatchRetry} disabled={isBatchProcessing} className="gap-2">
+                          {isBatchProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                          Reprocessar ({selectedIds.length})
+                        </Button>
+                      </>
+                    )}
+                    <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-2">
+                      <FileDown className="w-4 h-4" /> Exportar CSV
+                    </Button>
+                  </div>
                </div>
              </CardHeader>
              <CardContent className="space-y-4">
@@ -620,9 +625,17 @@ export default function Sefaz() {
                         <SelectItem value="authorized">Autorizado</SelectItem>
                         <SelectItem value="error">Erro</SelectItem>
                         <SelectItem value="pending">Pendente</SelectItem>
-                        <SelectItem value="failed_permanently">Dead-letter</SelectItem>
+                        <SelectItem value="dead-letter">Dead-letter</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs">cStat:</Label>
+                    <Input placeholder="Ex: 100" value={cStatFilter} onChange={e => setCStatFilter(e.target.value)} className="w-20 h-9 text-xs font-mono" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs">Motivo:</Label>
+                    <Input placeholder="Buscar..." value={xMotivoFilter} onChange={e => setXMotivoFilter(e.target.value)} className="w-32 h-9 text-xs" />
                   </div>
                   <Button variant="outline" size="sm" onClick={loadProcessedDocs}><Search className="w-4 h-4" /></Button>
                 </div>
