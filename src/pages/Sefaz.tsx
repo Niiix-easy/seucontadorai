@@ -1690,7 +1690,10 @@ export default function Sefaz() {
                       <FileDown className="w-3 h-3 text-blue-500" />
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => setShowAuditLogs(true)} className="gap-2 h-8 text-[10px]">
-                      <History className="w-3 h-3" /> Ver Auditoria
+                      <History className="w-3 h-3" /> Auditoria
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => { loadExportHistory(); setShowExportHistory(true); }} className="gap-2 h-8 text-[10px] border-purple-200">
+                      <FileArchive className="w-3 h-3 text-purple-500" /> Histórico Export.
                     </Button>
                   </div>
                 </div>
