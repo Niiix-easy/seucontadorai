@@ -547,6 +547,7 @@ export type Database = {
         Row: {
           created_at: string
           error_message: string | null
+          file_url: string | null
           filters: Json
           format: string
           id: string
@@ -562,6 +563,7 @@ export type Database = {
         Insert: {
           created_at?: string
           error_message?: string | null
+          file_url?: string | null
           filters: Json
           format: string
           id?: string
@@ -577,6 +579,7 @@ export type Database = {
         Update: {
           created_at?: string
           error_message?: string | null
+          file_url?: string | null
           filters?: Json
           format?: string
           id?: string
