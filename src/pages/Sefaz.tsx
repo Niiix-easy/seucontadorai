@@ -1587,12 +1587,21 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
              </div>
              <div className="flex justify-end gap-2">
                <Button variant="outline" onClick={() => setShowPauseDialog(null)}>Cancelar</Button>
-               <Button 
-                 variant={showPauseDialog?.paused ? "default" : "destructive"}
-                 onClick={() => showPauseDialog && togglePause(showPauseDialog.uf, showPauseDialog.env, showPauseDialog.paused, pauseReason)}
-               >
-                 Confirmar
-               </Button>
+               {showPauseDialog?.manual ? (
+                 <Button onClick={() => {
+                   if (showPauseDialog) {
+                     handleManualRetryBatch(showPauseDialog.uf, showPauseDialog.env);
+                     setShowPauseDialog(null);
+                   }
+                 }}>Confirmar Reprocessamento</Button>
+               ) : (
+                 <Button 
+                   variant={showPauseDialog?.paused ? "default" : "destructive"}
+                   onClick={() => showPauseDialog && togglePause(showPauseDialog.uf, showPauseDialog.env, showPauseDialog.paused, pauseReason)}
+                 >
+                   Confirmar
+                 </Button>
+               )}
              </div>
            </div>
          </DialogContent>
