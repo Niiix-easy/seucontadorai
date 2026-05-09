@@ -1887,6 +1887,21 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   </Select>
                 </div>
                 <div className="flex items-center gap-1">
+                  <Select 
+                    onValueChange={v => {
+                      const pref = savedPreferences.find(p => p.id === v);
+                      if (pref) setAuditFilters(pref.filters);
+                    }}
+                  >
+                    <SelectTrigger className="w-24 h-7 text-[9px]"><SelectValue placeholder="Filtros" /></SelectTrigger>
+                    <SelectContent>
+                      {savedPreferences.filter(p => p.preference_key === 'audit_filters').map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.preference_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-1">
                   <Label className="text-[9px] uppercase font-bold text-muted-foreground">Ação:</Label>
                   <Select value={auditFilters.action} onValueChange={v => setAuditFilters(p => ({ ...p, action: v }))}>
                     <SelectTrigger className="w-24 h-7 text-[9px]"><SelectValue /></SelectTrigger>
