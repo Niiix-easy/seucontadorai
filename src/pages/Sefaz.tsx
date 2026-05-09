@@ -696,8 +696,19 @@ export default function Sefaz() {
        }
      };
  
-     const handleExportZip = async (type: 'backlog' | 'audit') => {
-       toast.info("Gerando pacote ZIP...");
+      const handleExportZip = async (type: 'backlog' | 'audit') => {
+        const filters = type === 'backlog' ? backlogFilters : auditFilters;
+        const count = type === 'backlog' ? backlogData.reduce((acc, b) => acc + b.count, 0) : auditLogs.length;
+        
+        setShowZipPreviewDialog({ type, count, filters });
+      };
+
+      const confirmExportZip = async () => {
+        if (!showZipPreviewDialog) return;
+        const { type } = showZipPreviewDialog;
+        setShowZipPreviewDialog(null);
+        
+        toast.info("Gerando pacote ZIP...");
        const zip = new JSZip();
        const dateStr = new Date().toISOString().split('T')[0];
        
@@ -1822,10 +1833,10 @@ export default function Sefaz() {
                      <Button variant="outline" size="sm" onClick={handleExportBacklogPDF} title="PDF Backlog" className="h-8 w-8 p-0 border-blue-200 hover:bg-blue-50">
                        <FileDown className="w-3 h-3 text-blue-500" />
                      </Button>
-                     <Button variant="outline" size="sm" onClick={() => handleExportZip('backlog')} title="Exportar ZIP Backlog" className="h-8 w-8 p-0 border-purple-200 hover:bg-purple-50">
+                <Button variant="outline" size="sm" onClick={() => handleExportZip('backlog')} title="Exportar ZIP Backlog" className="h-8 w-8 p-0 border-purple-200 hover:bg-purple-50">
                        <FileArchive className="w-3 h-3 text-purple-500" />
                      </Button>
-                     <Button variant="outline" size="sm" onClick={() => handleExportZip('audit')} title="Exportar ZIP Auditoria" className="h-8 w-8 p-0 border-purple-200 hover:bg-purple-50">
+                <Button variant="outline" size="sm" onClick={() => handleExportZip('audit')} title="Exportar ZIP Auditoria" className="h-8 w-8 p-0 border-purple-200 hover:bg-purple-50">
                        <FileArchive className="w-3 h-3 text-purple-600" />
                      </Button>
                     <Button variant="outline" size="sm" onClick={() => setShowAuditLogs(true)} className="gap-2 h-8 text-[10px]">
