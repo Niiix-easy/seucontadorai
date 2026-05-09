@@ -935,23 +935,47 @@ export default function Sefaz() {
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <p className="text-sm font-medium text-muted-foreground">Políticas de Reprocessamento</p>
-                  <div className="space-y-2">
-                    <Label>Máximo de Tentativas (Dead-letter limit)</Label>
-                    <Input 
-                      type="number" 
-                      value={fiscalConfig.max_retries} 
-                      onChange={e => setFiscalConfig(p => ({ ...p, max_retries: Number(e.target.value) }))} 
-                    />
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <p className="text-sm font-medium text-muted-foreground">Status do Motor Fiscal</p>
+                    <div className={cn("p-4 rounded-lg border flex items-center justify-between", fiscalConfig.is_suspended ? "bg-destructive/10 border-destructive/20" : "bg-green-500/10 border-green-500/20")}>
+                      <div className="flex items-center gap-3">
+                        {fiscalConfig.is_suspended ? <AlertCircle className="w-5 h-5 text-destructive" /> : <CheckCircle2 className="w-5 h-5 text-green-500" />}
+                        <div>
+                          <p className="font-medium text-sm">{fiscalConfig.is_suspended ? "Motor Suspenso" : "Motor Ativo"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {fiscalConfig.is_suspended 
+                              ? `Suspenso após ${fiscalConfig.consecutive_validation_failures} falhas consecutivas.` 
+                              : "Processando documentos normalmente."}
+                          </p>
+                        </div>
+                      </div>
+                      {fiscalConfig.is_suspended && (
+                        <Button size="sm" variant="outline" onClick={handleReactivateEngine}>Reativar</Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Intervalo entre Tentativas (minutos)</Label>
-                    <Input 
-                      type="number" 
-                      value={fiscalConfig.retry_delay_minutes} 
-                      onChange={e => setFiscalConfig(p => ({ ...p, retry_delay_minutes: Number(e.target.value) }))} 
-                    />
+
+                  <div className="space-y-4">
+                    <p className="text-sm font-medium text-muted-foreground">Políticas de Reprocessamento</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Máximo de Tentativas</Label>
+                        <Input 
+                          type="number" 
+                          value={fiscalConfig.max_retries} 
+                          onChange={e => setFiscalConfig(p => ({ ...p, max_retries: Number(e.target.value) }))} 
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Intervalo (minutos)</Label>
+                        <Input 
+                          type="number" 
+                          value={fiscalConfig.retry_delay_minutes} 
+                          onChange={e => setFiscalConfig(p => ({ ...p, retry_delay_minutes: Number(e.target.value) }))} 
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
