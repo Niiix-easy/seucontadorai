@@ -681,6 +681,16 @@ export default function Sefaz() {
          email_recipients: recipients,
          is_active: true
        });
+ 
+       if (!error) {
+         toast.success("Agendamento criado com sucesso!");
+         loadScheduledReports();
+         setShowScheduleDialog(null);
+       } else {
+         toast.error("Erro ao criar agendamento: " + error.message);
+       }
+     };
+ 
      const handleRunScheduleNow = async (schedule: any) => {
        if (!user) return;
        toast.info("Iniciando processamento manual da exportação...");
