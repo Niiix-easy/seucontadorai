@@ -102,25 +102,53 @@ async function updateSuspensionState(supabase: any, userId: string, uf: string, 
   return false;
 }
 
-async function queueDeadLetterNotification(supabase: any, userId: string, docId: string, cStat: string, xMotivo: string) {
-  const { data: prefs } = await supabase
-    .from("notification_preferences")
-    .select("dead_letter_alerts_email, dead_letter_alerts_push")
-    .eq("user_id", userId)
-    .single();
+ async function queueDeadLetterNotification(supabase: any, userId: string, doc: any, cStat: string, xMotivo: string) {
+   const { data: prefs } = await supabase
+     .from("notification_preferences")
+     .select("dead_letter_alerts_email, dead_letter_alerts_push")
+     .eq("user_id", userId)
+     .maybeSingle();
 
-  const channels = [];
-  if (prefs?.dead_letter_alerts_push !== false) channels.push('push');
-  if (prefs?.dead_letter_alerts_email) channels.push('email');
+   const channels = [];
+   if (prefs?.dead_letter_alerts_push !== false) channels.push('push');
+   if (prefs?.dead_letter_alerts_email) channels.push('email');
 
-  await supabase.from("dead_letter_notifications").insert({
-    user_id: userId,
-    document_id: docId,
-    cstat: cStat,
-    xmotivo: xMotivo,
-    channels,
-    status: 'pending'
-  });
+   await supabase.from("dead_letter_notifications").insert({
+     user_id: userId,
+     document_id: doc.id,
+     cstat: cStat,
+     xmotivo: xMotivo,
+     channels,
+     status: 'pending',
+     retry_count_at_failure: doc.retry_count,
+     last_receipt_number: doc.receipt_number
+   });
+
+   // Also create/update a summary for batch alerts
+   const { data: summary } = await supabase
+     .from("dead_letter_summaries")
+     .select("*")
+     .match({ user_id: userId, status: 'pending' })
+     .maybeSingle();
+
+   if (summary) {
+     const docIds = [...(summary.document_ids || []), doc.id];
+     const cstats = Array.from(new Set([...(summary.cstat_summary || []), cStat]));
+     await supabase.from("dead_letter_summaries").update({
+       document_ids: docIds,
+       cstat_summary: cstats,
+       event_summary: `Resumo: ${docIds.length} documentos em dead-letter. cStats: ${cstats.join(', ')}`
+     }).eq("id", summary.id);
+   } else {
+     await supabase.from("dead_letter_summaries").insert({
+       user_id: userId,
+       document_ids: [doc.id],
+       cstat_summary: [cStat],
+       event_summary: `Documento ${doc.id.slice(0, 8)} entrou em dead-letter. cStat: ${cStat}`,
+       channels,
+       status: 'pending'
+     });
+   }
 }
 
 serve(async (req) => {
@@ -214,7 +242,7 @@ serve(async (req) => {
         }).eq("id", documentId);
 
         if (status === "dead-letter") {
-          await queueDeadLetterNotification(supabaseClient, doc.user_id, documentId, cStat, xMotivo);
+          await queueDeadLetterNotification(supabaseClient, doc.user_id, { ...doc, retry_count: newRetryCount }, cStat, xMotivo);
         }
       }
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

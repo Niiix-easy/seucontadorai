@@ -142,9 +142,14 @@ export default function Sefaz() {
       reactivation_throughput: 5
     });
     const [deadLetterNotifs, setDeadLetterNotifs] = useState<any[]>([]);
+    const [dlSearch, setDlSearch] = useState("");
+    const [dlPeriodo, setDlPeriodo] = useState({ de: "", ate: "" });
+    const [dlCStatFilter, setDlCStatFilter] = useState("");
+    const [dlXMotivoFilter, setDlXMotivoFilter] = useState("");
+    const [dlSelectedNotif, setDlSelectedNotif] = useState<any | null>(null);
     const [cStatFilter, setCStatFilter] = useState("");
     const [xMotivoFilter, setXMotivoFilter] = useState("");
-   const [statusFilter, setStatusFilter] = useState<string>("all");
+    const [statusFilter, setStatusFilter] = useState<string>("all");
     const [configLoading, setConfigLoading] = useState(false);
     const [certPassword, setCertPassword] = useState("");
     const [showCertPassword, setShowCertPassword] = useState(false);
@@ -301,15 +306,47 @@ export default function Sefaz() {
       const { data } = await query;
       if (data) setProcessedDocs(data as ProcessedDocument[]);
       
-      // Load dead-letter notifications
+      // Load dead-letter notifications with filters
       if (user) {
-        const { data: dlNotifs } = await supabase
+        let dlQuery = supabase
           .from("dead_letter_notifications")
-          .select("*, processed_documents(id, document_type)")
-          .order("created_at", { ascending: false })
-          .limit(50);
+          .select("*, processed_documents(*)")
+          .order("created_at", { ascending: false });
+        
+        if (dlPeriodo.de) dlQuery = dlQuery.gte("created_at", `${dlPeriodo.de}T00:00:00`);
+        if (dlPeriodo.ate) dlQuery = dlQuery.lte("created_at", `${dlPeriodo.ate}T23:59:59`);
+        if (dlCStatFilter) dlQuery = dlQuery.ilike("cstat", `%${dlCStatFilter}%`);
+        if (dlXMotivoFilter) dlQuery = dlQuery.ilike("xmotivo", `%${dlXMotivoFilter}%`);
+        
+        const { data: dlNotifs } = await dlQuery.limit(100);
         if (dlNotifs) setDeadLetterNotifs(dlNotifs);
       }
+    };
+
+    const handleExportDeadLetterCSV = () => {
+      if (deadLetterNotifs.length === 0) return;
+      const headers = ["ID", "Documento ID", "Data", "Status Alerta", "Canais", "cStat", "xMotivo", "Retentativas", "Erro"];
+      const rows = deadLetterNotifs.map(n => [
+        n.id,
+        n.document_id,
+        new Date(n.created_at).toLocaleString(),
+        n.status,
+        (n.channels || []).join(", "),
+        n.cstat || "",
+        n.xmotivo || "",
+        n.retry_count_at_failure || "",
+        n.error_message || ""
+      ]);
+      const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `fila_dead_letter_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Fila Dead-Letter exportada!");
     };
 
     const handleBatchDownloadZip = async () => {
@@ -376,6 +413,14 @@ export default function Sefaz() {
         }, { onConflict: "user_id" });
         
         if (error) throw error;
+
+        // Also update the granular suspension state throughput
+        await supabase.from("fiscal_suspension_states").upsert({
+          user_id: user.id,
+          uf: fiscalConfig.uf,
+          environment: fiscalConfig.environment,
+          throughput_per_minute: fiscalConfig.reactivation_throughput || 5
+        }, { onConflict: "user_id, uf, environment" });
 
         if (certPassword) {
           const { data, error: funcError } = await supabase.functions.invoke("fiscal-engine", {
@@ -618,49 +663,82 @@ export default function Sefaz() {
         <TabsContent value="alertas">
           <Card>
             <CardHeader>
-              <CardTitle className="font-display flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-destructive" /> Fila de Alertas Dead-Letter
-              </CardTitle>
-              <CardDescription>Visualize o histórico de notificações de erros fatais.</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="font-display flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-destructive" /> Fila Dead-Letter
+                  </CardTitle>
+                  <CardDescription>Documentos que excederam o limite de retentativas.</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleExportDeadLetterCSV} className="gap-2">
+                  <Download className="w-4 h-4" /> Exportar CSV
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto border rounded-lg">
-                <table className="w-full text-xs">
-                  <thead className="bg-muted/50 uppercase">
-                    <tr>
-                      <th className="text-left py-3 px-4">Documento</th>
-                      <th className="text-left py-3 px-4">Data</th>
-                      <th className="text-left py-3 px-4">cStat/Motivo</th>
-                      <th className="text-center py-3 px-4">Canais</th>
-                      <th className="text-right py-3 px-4">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {deadLetterNotifs.length > 0 ? deadLetterNotifs.map(n => (
-                      <tr key={n.id} className="border-t hover:bg-muted/30">
-                        <td className="py-3 px-4 font-mono">{n.document_id.slice(0, 8)}</td>
-                        <td className="py-3 px-4">{new Date(n.created_at).toLocaleString()}</td>
-                        <td className="py-3 px-4 max-w-[200px] truncate">
-                          <span className="font-bold">[{n.cstat}]</span> {n.xmotivo}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <div className="flex justify-center gap-1">
-                            {n.channels?.map((c: string) => (
-                              <Badge key={c} variant="outline" className="text-[9px]">{c}</Badge>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <Badge variant={n.status === 'sent' ? 'default' : n.status === 'error' ? 'destructive' : 'secondary'}>
-                            {n.status}
-                          </Badge>
-                        </td>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input 
+                      placeholder="ID Documento..." 
+                      value={dlSearch} 
+                      onChange={e => setDlSearch(e.target.value)} 
+                      className="pl-9 h-9"
+                    />
+                  </div>
+                  <Input type="date" value={dlPeriodo.de} onChange={e => setDlPeriodo(p => ({ ...p, de: e.target.value }))} className="h-9" />
+                  <Input type="date" value={dlPeriodo.ate} onChange={e => setDlPeriodo(p => ({ ...p, ate: e.target.value }))} className="h-9" />
+                  <div className="flex gap-2">
+                    <Input placeholder="cStat" value={dlCStatFilter} onChange={e => setDlCStatFilter(e.target.value)} className="h-9 w-20" />
+                    <Button variant="ghost" size="sm" onClick={loadProcessedDocs} className="h-9">Filtrar</Button>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/50 uppercase">
+                      <tr>
+                        <th className="text-left py-3 px-4">Documento</th>
+                        <th className="text-left py-3 px-4">Data</th>
+                        <th className="text-left py-3 px-4">cStat/Motivo</th>
+                        <th className="text-center py-3 px-4">Canais</th>
+                        <th className="text-right py-3 px-4">Status</th>
+                        <th className="text-center py-3 px-4 w-10"></th>
                       </tr>
-                    )) : (
-                      <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">Nenhum alerta registrado.</td></tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {deadLetterNotifs.length > 0 ? deadLetterNotifs.map(n => (
+                        <tr key={n.id} className="border-t hover:bg-muted/30">
+                          <td className="py-3 px-4 font-mono">{n.document_id.slice(0, 8)}</td>
+                          <td className="py-3 px-4">{new Date(n.created_at).toLocaleString()}</td>
+                          <td className="py-3 px-4 max-w-[200px] truncate">
+                            <span className="font-bold">[{n.cstat}]</span> {n.xmotivo}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex justify-center gap-1">
+                              {n.channels?.map((c: string) => (
+                                <Badge key={c} variant="outline" className="text-[9px]">{c}</Badge>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <Badge variant={n.status === 'sent' ? 'default' : n.status === 'error' ? 'destructive' : 'secondary'}>
+                              {n.status}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDlSelectedNotif(n)}>
+                              <Eye className="w-3 h-3" />
+                            </Button>
+                          </td>
+                        </tr>
+                      )) : (
+                        <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhum alerta registrado.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1095,6 +1173,15 @@ export default function Sefaz() {
                           onChange={e => setFiscalConfig(p => ({ ...p, retry_delay_minutes: Number(e.target.value) }))} 
                         />
                       </div>
+                      <div className="space-y-2 col-span-2">
+                        <Label>Throughput (Docs/Min)</Label>
+                        <Input 
+                          type="number" 
+                          value={fiscalConfig.reactivation_throughput} 
+                          onChange={e => setFiscalConfig(p => ({ ...p, reactivation_throughput: Number(e.target.value) }))} 
+                          placeholder="Vazão para esta UF/Ambiente"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -1188,6 +1275,66 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
           )}
         </DialogContent>
       </Dialog>
+       {/* Dead-Letter Detail Dialog */}
+       <Dialog open={!!dlSelectedNotif} onOpenChange={() => setDlSelectedNotif(null)}>
+         <DialogContent className="max-w-2xl">
+           <DialogHeader>
+             <DialogTitle className="font-display">Detalhes do Alerta Dead-Letter</DialogTitle>
+           </DialogHeader>
+           {dlSelectedNotif && (
+             <div className="space-y-4">
+               <div className="grid grid-cols-2 gap-4">
+                 <div className="p-3 bg-muted/30 rounded-lg">
+                   <p className="text-xs text-muted-foreground uppercase">ID Alerta</p>
+                   <p className="font-mono text-sm">{dlSelectedNotif.id}</p>
+                 </div>
+                 <div className="p-3 bg-muted/30 rounded-lg">
+                   <p className="text-xs text-muted-foreground uppercase">ID Documento</p>
+                   <p className="font-mono text-sm">{dlSelectedNotif.document_id}</p>
+                 </div>
+                 <div className="p-3 bg-muted/30 rounded-lg">
+                   <p className="text-xs text-muted-foreground uppercase">Retentativas</p>
+                   <p className="font-mono text-sm">{dlSelectedNotif.retry_count_at_failure || 'N/A'}</p>
+                 </div>
+                 <div className="p-3 bg-muted/30 rounded-lg">
+                   <p className="text-xs text-muted-foreground uppercase">Canais</p>
+                   <div className="flex gap-1 mt-1">
+                    {dlSelectedNotif.channels?.map((c: string) => <Badge key={c} variant="outline" className="text-[10px]">{c}</Badge>)}
+                   </div>
+                 </div>
+               </div>
+
+               <div className="p-4 bg-destructive/5 border border-destructive/20 rounded-lg">
+                 <p className="text-xs font-bold text-destructive uppercase">Erro Retornado (SEFAZ)</p>
+                 <div className="mt-2 flex gap-2">
+                   <Badge variant="destructive" className="h-5">cStat: {dlSelectedNotif.cstat}</Badge>
+                   <p className="text-xs text-muted-foreground font-medium">{dlSelectedNotif.xmotivo}</p>
+                 </div>
+                 {dlSelectedNotif.error_message && (
+                   <div className="mt-3 p-2 bg-background/50 rounded border text-[10px] font-mono whitespace-pre-wrap">
+                     {dlSelectedNotif.error_message}
+                   </div>
+                 )}
+               </div>
+
+               <div className="flex justify-end gap-2">
+                 <Button variant="outline" size="sm" onClick={() => {
+                   const doc = dlSelectedNotif.processed_documents;
+                   if (doc) setDocInDetail(doc);
+                   else toast.error("Documento não encontrado");
+                 }}>Ver Documento</Button>
+                 {dlSelectedNotif.last_xml_url && (
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={dlSelectedNotif.last_xml_url} target="_blank" rel="noopener noreferrer">Baixar XML Transmitido</a>
+                    </Button>
+                 )}
+                 <Button size="sm" onClick={() => handleRetry(dlSelectedNotif.document_id)}>Reprocessar Manual</Button>
+               </div>
+             </div>
+           )}
+         </DialogContent>
+       </Dialog>
+
        {/* Document Detail Dialog */}
        <Dialog open={!!docInDetail} onOpenChange={() => setDocInDetail(null)}>
          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">

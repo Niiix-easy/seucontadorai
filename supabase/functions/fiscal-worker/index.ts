@@ -8,29 +8,45 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Find documents that need retry, filtering out those with suspended configurations
+    // Find documents that need retry, including those in dead-letter if auto_retry_on_reactivation is enabled
     const { data: docs, error: fetchError } = await supabaseClient
       .from("processed_documents")
       .select(`
         id,
         user_id,
+        uf,
+        environment,
+        status,
         fiscal_configurations (
-          is_suspended
+          is_suspended,
+          auto_retry_on_reactivation,
+          reactivation_throughput
         )
       `)
-      .in("status", ["error", "pending"])
+      .or('status.in.("error","pending"),and(status.eq.dead-letter,next_retry_at.lte.now())')
       .lte("next_retry_at", new Date().toISOString())
       .eq("is_processing", false)
-      .limit(10);
+      .limit(20);
 
     if (fetchError) throw fetchError;
 
     const results = [];
     if (docs && docs.length > 0) {
+      // Group by user/uf/env to check granular suspension
       for (const doc of docs) {
-        // Skip if config is suspended
-        if (doc.fiscal_configurations?.is_suspended) {
-          console.log(`Skipping document ${doc.id} because engine is suspended for user ${doc.user_id}`);
+        const { data: susp } = await supabaseClient
+          .from("fiscal_suspension_states")
+          .select("is_suspended, throughput_per_minute")
+          .match({ user_id: doc.user_id, uf: doc.uf || 'SP', environment: doc.environment || 'homologacao' })
+          .maybeSingle();
+
+        if (susp?.is_suspended) {
+          console.log(`Skipping doc ${doc.id} - suspended for ${doc.uf}/${doc.environment}`);
+          continue;
+        }
+
+        // Handle dead-letter auto-retry logic
+        if (doc.status === 'dead-letter' && !doc.fiscal_configurations?.auto_retry_on_reactivation) {
           continue;
         }
 

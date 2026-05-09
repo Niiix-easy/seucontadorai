@@ -268,8 +268,12 @@ export type Database = {
           document_id: string | null
           error_message: string | null
           id: string
+          last_receipt_number: string | null
+          last_xml_url: string | null
+          retry_count_at_failure: number | null
           sent_at: string | null
           status: string | null
+          summary_id: string | null
           user_id: string | null
           xmotivo: string | null
         }
@@ -280,8 +284,12 @@ export type Database = {
           document_id?: string | null
           error_message?: string | null
           id?: string
+          last_receipt_number?: string | null
+          last_xml_url?: string | null
+          retry_count_at_failure?: number | null
           sent_at?: string | null
           status?: string | null
+          summary_id?: string | null
           user_id?: string | null
           xmotivo?: string | null
         }
@@ -292,8 +300,12 @@ export type Database = {
           document_id?: string | null
           error_message?: string | null
           id?: string
+          last_receipt_number?: string | null
+          last_xml_url?: string | null
+          retry_count_at_failure?: number | null
           sent_at?: string | null
           status?: string | null
+          summary_id?: string | null
           user_id?: string | null
           xmotivo?: string | null
         }
@@ -305,7 +317,53 @@ export type Database = {
             referencedRelation: "processed_documents"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "dead_letter_notifications_summary_id_fkey"
+            columns: ["summary_id"]
+            isOneToOne: false
+            referencedRelation: "dead_letter_summaries"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      dead_letter_summaries: {
+        Row: {
+          channels: string[] | null
+          created_at: string | null
+          cstat_summary: string[] | null
+          document_ids: string[] | null
+          error_message: string | null
+          event_summary: string | null
+          id: string
+          sent_at: string | null
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          channels?: string[] | null
+          created_at?: string | null
+          cstat_summary?: string[] | null
+          document_ids?: string[] | null
+          error_message?: string | null
+          event_summary?: string | null
+          id?: string
+          sent_at?: string | null
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          channels?: string[] | null
+          created_at?: string | null
+          cstat_summary?: string[] | null
+          document_ids?: string[] | null
+          error_message?: string | null
+          event_summary?: string | null
+          id?: string
+          sent_at?: string | null
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       documents: {
         Row: {
@@ -459,6 +517,7 @@ export type Database = {
           id: string
           is_suspended: boolean | null
           last_failure_at: string | null
+          throughput_per_minute: number | null
           uf: string
           updated_at: string | null
           user_id: string | null
@@ -469,6 +528,7 @@ export type Database = {
           id?: string
           is_suspended?: boolean | null
           last_failure_at?: string | null
+          throughput_per_minute?: number | null
           uf: string
           updated_at?: string | null
           user_id?: string | null
@@ -479,6 +539,7 @@ export type Database = {
           id?: string
           is_suspended?: boolean | null
           last_failure_at?: string | null
+          throughput_per_minute?: number | null
           uf?: string
           updated_at?: string | null
           user_id?: string | null
