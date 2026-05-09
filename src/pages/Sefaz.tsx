@@ -2598,6 +2598,112 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
           </DialogContent>
         </Dialog>
 
+        {/* ZIP Preview Dialog */}
+        <Dialog open={!!showZipPreviewDialog} onOpenChange={(open) => !open && setShowZipPreviewDialog(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileArchive className="w-5 h-5 text-purple-500" /> Confirmar Exportação ZIP
+              </DialogTitle>
+              <DialogDescription>
+                Verifique o recorte antes de gerar o pacote contendo CSV e PDF.
+              </DialogDescription>
+            </DialogHeader>
+            {showZipPreviewDialog && (
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="border rounded p-3 bg-muted/30">
+                    <span className="text-[10px] text-muted-foreground uppercase block mb-1">Volume Previsto</span>
+                    <span className="text-xl font-bold">{showZipPreviewDialog.count} registros</span>
+                  </div>
+                  <div className="border rounded p-3 bg-muted/30">
+                    <span className="text-[10px] text-muted-foreground uppercase block mb-1">Relatório</span>
+                    <span className="text-xl font-bold capitalize">{showZipPreviewDialog.type}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 border rounded-lg p-3 text-xs bg-muted/10">
+                  <div className="flex justify-between border-b pb-1">
+                    <span className="text-muted-foreground">UF:</span>
+                    <span className="font-medium">{showZipPreviewDialog.filters.uf || 'Todas'}</span>
+                  </div>
+                  <div className="flex justify-between border-b pb-1">
+                    <span className="text-muted-foreground">Ambiente:</span>
+                    <span className="font-medium capitalize">{showZipPreviewDialog.filters.env || 'Todos'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Período:</span>
+                    <span className="font-medium">
+                      {showZipPreviewDialog.type === 'backlog' 
+                        ? (showZipPreviewDialog.filters.date || 'Todo histórico')
+                        : (showZipPreviewDialog.filters.dateStart || 'Início') + ' até ' + (showZipPreviewDialog.filters.dateEnd || 'Hoje')}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={() => setShowZipPreviewDialog(null)}>Cancelar</Button>
+                  <Button className="bg-purple-600 hover:bg-purple-700" onClick={confirmExportZip}>
+                    <Download className="w-4 h-4 mr-2" /> Gerar ZIP Agora
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Manual Run Progress Dialog */}
+        <Dialog open={!!manualScheduleStatus} onOpenChange={(open) => {
+          if (!open && (manualScheduleStatus?.status === 'success' || manualScheduleStatus?.status === 'error')) {
+            setManualScheduleStatus(null);
+          }
+        }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="text-center">Executando Exportação</DialogTitle>
+            </DialogHeader>
+            {manualScheduleStatus && (
+              <div className="py-6 flex flex-col items-center gap-4">
+                <div className="relative w-24 h-24">
+                  <svg className="w-full h-full transform -rotate-90">
+                    <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-muted" />
+                    <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={251.2} strokeDashoffset={251.2 * (1 - manualScheduleStatus.progress / 100)} className="text-primary transition-all duration-500" />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center font-bold text-lg">
+                    {manualScheduleStatus.progress}%
+                  </div>
+                </div>
+                
+                <div className="text-center space-y-1">
+                  <p className="font-medium">
+                    {manualScheduleStatus.status === 'initializing' && 'Validando agendamento...'}
+                    {manualScheduleStatus.status === 'running' && 'Processando dados no servidor...'}
+                    {manualScheduleStatus.status === 'success' && 'Exportação concluída!'}
+                    {manualScheduleStatus.status === 'error' && 'Erro no processamento'}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                    {manualScheduleStatus.status !== 'success' && manualScheduleStatus.status !== 'error' ? 'Aguarde a conclusão...' : 'Pronto'}
+                  </p>
+                </div>
+
+                {manualScheduleStatus.status === 'success' && manualScheduleStatus.zipUrl && (
+                  <Button asChild className="w-full mt-2 bg-green-600 hover:bg-green-700">
+                    <a href={manualScheduleStatus.zipUrl} target="_blank" rel="noopener noreferrer">
+                      <Download className="w-4 h-4 mr-2" /> Baixar Pacote ZIP
+                    </a>
+                  </Button>
+                )}
+
+                {(manualScheduleStatus.status === 'success' || manualScheduleStatus.status === 'error') && (
+                  <Button variant="outline" className="w-full" onClick={() => setManualScheduleStatus(null)}>
+                    Fechar
+                  </Button>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
         {/* Export History Dialog */}
         <Dialog open={showExportHistory} onOpenChange={setShowExportHistory}>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
