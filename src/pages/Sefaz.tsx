@@ -663,63 +663,64 @@ export default function Sefaz() {
        }
      };
  
-      const handleRunScheduleNow = async (schedule: any) => {
-        if (!user) return;
-        setManualScheduleStatus({ id: schedule.id, status: 'initializing', progress: 10 });
-        toast.info("Iniciando processamento manual da exportação...");
-        
-        try {
-          setManualScheduleStatus(prev => prev ? { ...prev, status: 'running', progress: 30 } : null);
-           const { data, error } = await supabase.functions.invoke("fiscal-scheduler", {
-             body: { 
-               action: "run_now", 
-               schedule_id: schedule.id,
-               technical_info: {
-                 sorting: schedule.report_type === 'backlog' ? backlogSort : auditSort,
-                 page: schedule.report_type === 'backlog' ? backlogPage : auditPage,
-                 page_size: 10
-               }
-             }
-           });
-  
-          if (error) throw error;
-          
-          setManualScheduleStatus(prev => prev ? { ...prev, progress: 60 } : null);
-          
-          // Poll for completion to show the download link
-          let completed = false;
-          let attempts = 0;
-          while (!completed && attempts < 15) {
-            await new Promise(r => setTimeout(r, 2000));
-            const { data: latestLog } = await supabase
-              .from("fiscal_export_logs")
-              .select("*")
-              .eq("report_id", schedule.id)
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .single();
-            
-            if (latestLog) {
-              if (latestLog.status === 'success') {
-                setManualScheduleStatus(prev => prev ? { ...prev, status: 'success', progress: 100, zipUrl: latestLog.file_url } : null);
-                completed = true;
-                toast.success("Exportação concluída!");
-              } else if (latestLog.status === 'error') {
-                setManualScheduleStatus(prev => prev ? { ...prev, status: 'error', progress: 100 } : null);
-                completed = true;
-                toast.error("Falha na exportação: " + latestLog.error_message);
-              }
+    const handleRunScheduleNow = async (schedule: any) => {
+      if (!user) return;
+      setManualScheduleStatus({ id: schedule.id, status: 'initializing', progress: 5 });
+      toast.info("Iniciando processamento manual da exportação...");
+      
+      try {
+        setManualScheduleStatus(prev => prev ? { ...prev, status: 'running', progress: 20 } : null);
+        const { error } = await supabase.functions.invoke("fiscal-scheduler", {
+          body: { 
+            action: "run_now", 
+            schedule_id: schedule.id,
+            technical_info: {
+              sorting: schedule.report_type === 'backlog' ? backlogSort : auditSort,
+              page: schedule.report_type === 'backlog' ? backlogPage : auditPage,
+              page_size: 10
             }
-            attempts++;
           }
+        });
 
-          const { data: logs } = await supabase.from("fiscal_export_logs").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
-          if (logs) setExportHistory(logs);
-        } catch (err: any) {
-          setManualScheduleStatus(prev => prev ? { ...prev, status: 'error', progress: 100 } : null);
-          toast.error("Erro ao disparar exportação: " + err.message);
+        if (error) throw error;
+        
+        setManualScheduleStatus(prev => prev ? { ...prev, status: 'generating_csv', progress: 40 } : null);
+        
+        let completed = false;
+        let attempts = 0;
+        while (!completed && attempts < 20) {
+          await new Promise(r => setTimeout(r, 2000));
+          const { data: latestLog } = await supabase
+            .from("fiscal_export_logs")
+            .select("*")
+            .eq("report_id", schedule.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
+          
+          if (latestLog) {
+            if (latestLog.status === 'processing') {
+               // Simulating stage progress based on steps
+               const currentProgress = 40 + (attempts * 2);
+               setManualScheduleStatus(prev => prev ? { ...prev, progress: Math.min(85, currentProgress) } : null);
+            } else if (latestLog.status === 'success') {
+              setManualScheduleStatus(prev => prev ? { ...prev, status: 'success', progress: 100, zipUrl: latestLog.file_url } : null);
+              completed = true;
+              toast.success("Exportação concluída!");
+            } else if (latestLog.status === 'error') {
+              setManualScheduleStatus(prev => prev ? { ...prev, status: 'error', progress: 100 } : null);
+              completed = true;
+              toast.error("Falha na exportação: " + latestLog.error_message);
+            }
+          }
+          attempts++;
         }
-      };
+        loadExportHistory();
+      } catch (err: any) {
+        setManualScheduleStatus(prev => prev ? { ...prev, status: 'error', progress: 100 } : null);
+        toast.error("Erro ao disparar exportação: " + err.message);
+      }
+    };
  
      const handleResendEmail = async (logId: string) => {
        toast.info("Reenviando e-mail...");
