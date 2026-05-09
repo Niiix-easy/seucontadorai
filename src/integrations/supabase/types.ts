@@ -357,6 +357,8 @@ export type Database = {
           created_at: string
           environment: Database["public"]["Enums"]["sefaz_environment"]
           id: string
+          max_retries: number | null
+          retry_delay_minutes: number | null
           uf: string
           updated_at: string
           user_id: string
@@ -369,6 +371,8 @@ export type Database = {
           created_at?: string
           environment?: Database["public"]["Enums"]["sefaz_environment"]
           id?: string
+          max_retries?: number | null
+          retry_delay_minutes?: number | null
           uf: string
           updated_at?: string
           user_id: string
@@ -381,6 +385,8 @@ export type Database = {
           created_at?: string
           environment?: Database["public"]["Enums"]["sefaz_environment"]
           id?: string
+          max_retries?: number | null
+          retry_delay_minutes?: number | null
           uf?: string
           updated_at?: string
           user_id?: string
@@ -820,6 +826,7 @@ export type Database = {
           created_at: string
           document_type: string
           id: string
+          is_processing: boolean | null
           last_error: string | null
           next_retry_at: string | null
           period_date: string
@@ -839,6 +846,7 @@ export type Database = {
           created_at?: string
           document_type: string
           id?: string
+          is_processing?: boolean | null
           last_error?: string | null
           next_retry_at?: string | null
           period_date?: string
@@ -858,6 +866,7 @@ export type Database = {
           created_at?: string
           document_type?: string
           id?: string
+          is_processing?: boolean | null
           last_error?: string | null
           next_retry_at?: string | null
           period_date?: string
