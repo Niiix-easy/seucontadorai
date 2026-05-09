@@ -100,6 +100,8 @@ function generateChave() {
     retry_delay_minutes?: number;
     is_suspended?: boolean;
     consecutive_validation_failures?: number;
+    auto_retry_on_reactivation?: boolean;
+    reactivation_throughput?: number;
   };
 
  type ProcessedDocument = {
@@ -135,8 +137,11 @@ export default function Sefaz() {
       max_retries: 5,
       retry_delay_minutes: 15,
       is_suspended: false,
-      consecutive_validation_failures: 0
+      consecutive_validation_failures: 0,
+      auto_retry_on_reactivation: false,
+      reactivation_throughput: 5
     });
+    const [deadLetterNotifs, setDeadLetterNotifs] = useState<any[]>([]);
     const [cStatFilter, setCStatFilter] = useState("");
     const [xMotivoFilter, setXMotivoFilter] = useState("");
    const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -295,6 +300,16 @@ export default function Sefaz() {
       
       const { data } = await query;
       if (data) setProcessedDocs(data as ProcessedDocument[]);
+      
+      // Load dead-letter notifications
+      if (user) {
+        const { data: dlNotifs } = await supabase
+          .from("dead_letter_notifications")
+          .select("*, processed_documents(id, document_type)")
+          .order("created_at", { ascending: false })
+          .limit(50);
+        if (dlNotifs) setDeadLetterNotifs(dlNotifs);
+      }
     };
 
     const handleBatchDownloadZip = async () => {
@@ -355,7 +370,9 @@ export default function Sefaz() {
           uf: fiscalConfig.uf,
           environment: fiscalConfig.environment,
           max_retries: fiscalConfig.max_retries,
-          retry_delay_minutes: fiscalConfig.retry_delay_minutes
+          retry_delay_minutes: fiscalConfig.retry_delay_minutes,
+          auto_retry_on_reactivation: fiscalConfig.auto_retry_on_reactivation,
+          reactivation_throughput: fiscalConfig.reactivation_throughput
         }, { onConflict: "user_id" });
         
         if (error) throw error;
@@ -594,9 +611,60 @@ export default function Sefaz() {
           <TabsTrigger value="webservices">WebServices</TabsTrigger>
           <TabsTrigger value="consultas">Consultas</TabsTrigger>
            <TabsTrigger value="integradores">Integradores</TabsTrigger>
-           <TabsTrigger value="processamento">Relatórios de Processamento</TabsTrigger>
-            <TabsTrigger value="config_avancada">Config. Certificado</TabsTrigger>
+           <TabsTrigger value="processamento">Processamento</TabsTrigger>
+           <TabsTrigger value="alertas">Alertas Dead-Letter</TabsTrigger>
+           <TabsTrigger value="config_avancada">Configurações</TabsTrigger>
         </TabsList>
+        <TabsContent value="alertas">
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-display flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-destructive" /> Fila de Alertas Dead-Letter
+              </CardTitle>
+              <CardDescription>Visualize o histórico de notificações de erros fatais.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/50 uppercase">
+                    <tr>
+                      <th className="text-left py-3 px-4">Documento</th>
+                      <th className="text-left py-3 px-4">Data</th>
+                      <th className="text-left py-3 px-4">cStat/Motivo</th>
+                      <th className="text-center py-3 px-4">Canais</th>
+                      <th className="text-right py-3 px-4">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deadLetterNotifs.length > 0 ? deadLetterNotifs.map(n => (
+                      <tr key={n.id} className="border-t hover:bg-muted/30">
+                        <td className="py-3 px-4 font-mono">{n.document_id.slice(0, 8)}</td>
+                        <td className="py-3 px-4">{new Date(n.created_at).toLocaleString()}</td>
+                        <td className="py-3 px-4 max-w-[200px] truncate">
+                          <span className="font-bold">[{n.cstat}]</span> {n.xmotivo}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex justify-center gap-1">
+                            {n.channels?.map((c: string) => (
+                              <Badge key={c} variant="outline" className="text-[9px]">{c}</Badge>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <Badge variant={n.status === 'sent' ? 'default' : n.status === 'error' ? 'destructive' : 'secondary'}>
+                            {n.status}
+                          </Badge>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">Nenhum alerta registrado.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
          <TabsContent value="processamento">
            <Card>
@@ -1025,6 +1093,27 @@ export default function Sefaz() {
                           type="number" 
                           value={fiscalConfig.retry_delay_minutes} 
                           onChange={e => setFiscalConfig(p => ({ ...p, retry_delay_minutes: Number(e.target.value) }))} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t">
+                    <p className="text-sm font-medium text-muted-foreground">Automação ao Reativar</p>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs">Auto-reprocessar Dead-Letters</Label>
+                        <Switch 
+                          checked={fiscalConfig.auto_retry_on_reactivation} 
+                          onCheckedChange={c => setFiscalConfig(p => ({ ...p, auto_retry_on_reactivation: c }))} 
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[10px] uppercase text-muted-foreground">Limite de Vazão (throughput)</Label>
+                        <Input 
+                          type="number" 
+                          value={fiscalConfig.reactivation_throughput} 
+                          onChange={e => setFiscalConfig(p => ({ ...p, reactivation_throughput: Number(e.target.value) }))} 
                         />
                       </div>
                     </div>

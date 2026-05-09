@@ -8,11 +8,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Simple encryption/decryption using the secret key
 async function decryptPassword(encryptedBase64: string) {
   const keyStr = Deno.env.get("FISCAL_ENCRYPTION_KEY");
   if (!keyStr) return encryptedBase64;
-
   try {
     const key = await crypto.subtle.importKey(
       "raw",
@@ -21,17 +19,14 @@ async function decryptPassword(encryptedBase64: string) {
       false,
       ["decrypt"]
     );
-
     const combined = forge.util.decode64(encryptedBase64);
     const iv = new TextEncoder().encode(combined.slice(0, 16));
     const data = combined.slice(16);
-
     const decrypted = await crypto.subtle.decrypt(
       { name: "AES-CBC", iv },
       key,
       new Uint8Array([...data].map(c => c.charCodeAt(0)))
     );
-
     return new TextDecoder().decode(decrypted);
   } catch (e) {
     console.error("Decryption error:", e);
@@ -39,49 +34,20 @@ async function decryptPassword(encryptedBase64: string) {
   }
 }
 
-async function encryptPassword(password: string) {
-  const keyStr = Deno.env.get("FISCAL_ENCRYPTION_KEY");
-  if (!keyStr) return password;
-
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(keyStr.padEnd(32, '0').slice(0, 32)),
-    { name: "AES-CBC" },
-    false,
-    ["encrypt"]
-  );
-
-  const iv = crypto.getRandomValues(new Uint8Array(16));
-  const encrypted = await crypto.subtle.encrypt(
-    { name: "AES-CBC", iv },
-    key,
-    new TextEncoder().encode(password)
-  );
-
-  const ivStr = String.fromCharCode(...iv);
-  const encryptedStr = String.fromCharCode(...new Uint8Array(encrypted));
-  
-  return forge.util.encode64(ivStr + encryptedStr);
-}
-
 async function signXml(xml: string, privateKeyPem: string, certPem: string) {
   const sig = new SignedXml();
-  
   sig.addReference("//*[local-name(.)='infNFe']", 
     ["http://www.w3.org/2000/09/xmldsig#enveloped-signature", "http://www.w3.org/TR/2001/REC-xml-c14n-20010315"],
     "http://www.w3.org/2000/09/xmldsig#sha1"
   );
-  
   sig.signingKey = privateKeyPem;
   sig.keyInfoProvider = {
-    getKeyInfo: () => `<X509Data><X509Certificate>${certPem.replace(/-----(BEGIN|END) CERTIFICATE-----|n/g, '')}</X509Certificate></X509Data>`,
+    getKeyInfo: () => `<X509Data><X509Certificate>${certPem.replace(/-----(BEGIN|END) CERTIFICATE-----|\n/g, '')}</X509Certificate></X509Data>`,
     getKey: () => privateKeyPem
   };
-  
   sig.computeSignature(xml, { 
     location: { reference: "//*[local-name(.)='infNFe']", action: "after" } 
   });
-  
   return sig.getSignedXml();
 }
 
@@ -104,126 +70,67 @@ async function sendToSefaz(signedXml: string, uf: string, env: string) {
   });
 }
 
-async function sendDeadLetterNotification(supabase: any, userId: string, docId: string, maxRetries: number) {
+async function updateSuspensionState(supabase: any, userId: string, uf: string, environment: string, success: boolean) {
+  const { data: state } = await supabase
+    .from("fiscal_suspension_states")
+    .select("*")
+    .match({ user_id: userId, uf, environment })
+    .maybeSingle();
+
+  if (success) {
+    if (state) {
+      await supabase.from("fiscal_suspension_states").update({ 
+        consecutive_failures: 0, 
+        is_suspended: false,
+        updated_at: new Date().toISOString() 
+      }).match({ user_id: userId, uf, environment });
+    }
+  } else {
+    const failures = (state?.consecutive_failures || 0) + 1;
+    const isSuspended = failures >= 5;
+    await supabase.from("fiscal_suspension_states").upsert({
+      user_id: userId,
+      uf,
+      environment,
+      consecutive_failures: failures,
+      is_suspended: isSuspended,
+      last_failure_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
+    return isSuspended;
+  }
+  return false;
+}
+
+async function queueDeadLetterNotification(supabase: any, userId: string, docId: string, cStat: string, xMotivo: string) {
   const { data: prefs } = await supabase
     .from("notification_preferences")
     .select("dead_letter_alerts_email, dead_letter_alerts_push")
     .eq("user_id", userId)
     .single();
 
-  if (prefs?.dead_letter_alerts_push !== false) {
-    await supabase.from("notifications").insert({
-      user_id: userId,
-      title: "Documento em Dead-Letter",
-      message: `O documento ${docId} excedeu o limite de ${maxRetries} tentativas e foi movido para dead-letter.`,
-      type: "error"
-    });
-  }
+  const channels = [];
+  if (prefs?.dead_letter_alerts_push !== false) channels.push('push');
+  if (prefs?.dead_letter_alerts_email) channels.push('email');
 
-  if (prefs?.dead_letter_alerts_email) {
-    console.log(`[EMAIL ALERT] Sending dead-letter email to user ${userId} for doc ${docId}`);
-  }
+  await supabase.from("dead_letter_notifications").insert({
+    user_id: userId,
+    document_id: docId,
+    cstat: cStat,
+    xmotivo: xMotivo,
+    channels,
+    status: 'pending'
+  });
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
-    const { action, documentId, password, uf, environment, userId: forcedUserId } = await req.json();
-
-    if (action === "validate") {
-      const authHeader = req.headers.get("Authorization");
-      let userId = forcedUserId;
-      if (!userId) {
-        const { data: { user } } = await supabaseClient.auth.getUser(authHeader?.split(" ")[1] ?? "");
-        if (!user) throw new Error("Não autorizado");
-        userId = user.id;
-      }
-
-      const { data: config } = await supabaseClient
-        .from("fiscal_configurations")
-        .select("*")
-        .eq("user_id", userId)
-        .single();
-
-      if (!config || !config.certificate_path) {
-        return new Response(JSON.stringify({ valid: false, error: "Certificado não configurado" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      const { data: pfxData, error: downloadError } = await supabaseClient.storage
-        .from("certificates")
-        .download(config.certificate_path);
-
-      if (downloadError) return new Response(JSON.stringify({ valid: false, error: "Erro ao acessar arquivo do certificado" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
-      try {
-        const decryptedPass = await decryptPassword(config.certificate_password_encrypted);
-        const pfxArrayBuffer = await pfxData.arrayBuffer();
-        const pfxBytes = new Uint8Array(pfxArrayBuffer);
-        const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(pfxBytes as any).getBytes());
-        const p12 = forge.pkcs12.fromP12(p12Asn1, decryptedPass);
-        
-        const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
-        const cert = certBags[forge.pki.oids.certBag]?.[0]?.cert;
-
-        if (!cert) throw new Error("Certificado não encontrado no arquivo");
-
-        const now = new Date();
-        if (new Date(cert.validity.notAfter) < now) {
-          return new Response(JSON.stringify({ valid: false, error: "Certificado expirado em " + cert.validity.notAfter }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        }
-
-        // Success: reset failures
-        await supabaseClient.from("fiscal_configurations").update({
-          consecutive_validation_failures: 0,
-          is_suspended: false
-        }).eq("user_id", userId);
-
-        return new Response(JSON.stringify({ 
-          valid: true, 
-          expiry: cert.validity.notAfter,
-          subject: cert.subject.getField('CN')?.value
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      } catch (e) {
-        const newFailCount = (config.consecutive_validation_failures || 0) + 1;
-        const isSuspended = newFailCount >= 5;
-        await supabaseClient.from("fiscal_configurations").update({
-          consecutive_validation_failures: newFailCount,
-          is_suspended: isSuspended
-        }).eq("user_id", userId);
-
-        return new Response(JSON.stringify({ 
-          valid: false, 
-          error: "Senha incorreta ou certificado corrompido",
-          suspended: isSuspended
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-    }
-
-    if (action === "update_password") {
-      const encrypted = await encryptPassword(password);
-      const authHeader = req.headers.get("Authorization");
-      const { data: { user } } = await supabaseClient.auth.getUser(authHeader?.split(" ")[1] ?? "");
-      
-      if (!user) throw new Error("Não autorizado");
-
-      const { error } = await supabaseClient
-        .from("fiscal_configurations")
-        .update({ certificate_password_encrypted: encrypted, is_suspended: false, consecutive_validation_failures: 0 })
-        .eq("user_id", user.id);
-      
-      if (error) throw error;
-      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    const supabaseClient = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
+    const { action, documentId, userId: forcedUserId, uf: forcedUf, environment: forcedEnv } = await req.json();
 
     if (action === "sign_and_send") {
-      await supabaseClient.from("processed_documents").update({ is_processing: true }).eq("id", documentId);
-
       const { data: doc, error: docError } = await supabaseClient
         .from("processed_documents")
         .select("*, fiscal_configurations(*)")
@@ -233,56 +140,42 @@ serve(async (req) => {
       if (docError || !doc) throw new Error("Documento não encontrado");
 
       const config = doc.fiscal_configurations;
-      if (config.is_suspended) {
-        await supabaseClient.from("processed_documents").update({ is_processing: false, last_error: "Motor suspenso" }).eq("id", documentId);
-        throw new Error("Motor fiscal suspenso por falhas consecutivas.");
+      const uf = doc.uf || config.uf;
+      const env = doc.environment || config.environment;
+
+      const { data: suspState } = await supabaseClient
+        .from("fiscal_suspension_states")
+        .select("is_suspended")
+        .match({ user_id: doc.user_id, uf, environment: env })
+        .maybeSingle();
+
+      if (suspState?.is_suspended) {
+        throw new Error(`Motor fiscal suspenso para ${uf} em ${env}.`);
       }
 
-      if (!config.certificate_path || !config.certificate_password_encrypted) {
-        throw new Error("Certificado ou senha não configurados");
-      }
+      await supabaseClient.from("processed_documents").update({ is_processing: true }).eq("id", documentId);
 
-      const decryptedPass = await decryptPassword(config.certificate_password_encrypted);
-
-      const { data: pfxData, error: downloadError } = await supabaseClient.storage
-        .from("certificates")
-        .download(config.certificate_path);
-
-      if (downloadError) throw new Error("Erro ao baixar certificado: " + downloadError.message);
-
-      const pfxArrayBuffer = await pfxData.arrayBuffer();
-      const pfxBytes = new Uint8Array(pfxArrayBuffer);
-      
       try {
+        const decryptedPass = await decryptPassword(config.certificate_password_encrypted);
+        const { data: pfxData, error: downloadError } = await supabaseClient.storage.from("certificates").download(config.certificate_path);
+        if (downloadError) throw downloadError;
+
+        const pfxBytes = new Uint8Array(await pfxData.arrayBuffer());
         const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(pfxBytes as any).getBytes());
         const p12 = forge.pkcs12.fromP12(p12Asn1, decryptedPass);
         
-        const bags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
-        const keyBag = bags[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0];
-        const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
-        const certBag = certBags[forge.pki.oids.certBag]?.[0];
+        const keyBag = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0];
+        const certBag = p12.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag]?.[0];
 
-        if (!keyBag || !certBag) throw new Error("Certificado inválido ou senha incorreta");
+        if (!keyBag || !certBag) throw new Error("Certificado ou senha inválidos.");
 
-        // Reset failure count on success
-        await supabaseClient.from("fiscal_configurations").update({
-          consecutive_validation_failures: 0,
-          is_suspended: false
-        }).eq("user_id", doc.user_id);
+        await updateSuspensionState(supabaseClient, doc.user_id, uf, env, true);
 
-        const privateKeyPem = forge.pki.privateKeyToPem(keyBag.key);
-        const certPem = forge.pki.certificateToPem(certBag.cert);
-
-        const signedXml = await signXml(doc.xml_content, privateKeyPem, certPem);
-
-        const response = await sendToSefaz(signedXml, config.uf, config.environment);
+        const signedXml = await signXml(doc.xml_content, forge.pki.privateKeyToPem(keyBag.key), forge.pki.certificateToPem(certBag.cert));
+        const response = await sendToSefaz(signedXml, uf, env);
         const responseText = await response.text();
-
-        const getTag = (tag: string) => {
-          const match = responseText.match(new RegExp(`<${tag}[^>]*>(.*?)</${tag}>`, 'i'));
-          return match ? match[1] : null;
-        };
-
+        
+        const getTag = (tag: string) => (responseText.match(new RegExp(`<${tag}[^>]*>(.*?)</${tag}>`, 'i')) || [])[1];
         const cStat = getTag("cStat");
         const xMotivo = getTag("xMotivo");
         const nProt = getTag("nProt");
@@ -301,25 +194,15 @@ serve(async (req) => {
           throw new Error(`SEFAZ [${cStat || 'ERRO'}]: ${xMotivo || 'Erro desconhecido'}`);
         }
       } catch (error) {
-        const isValidationError = error.message.includes("Certificado inválido") || error.message.includes("senha incorreta") || error.message.includes("Decryption error");
+        const cStat = error.message.match(/\[(.*?)\]/)?.[1] || "ERROR";
+        const xMotivo = error.message;
         
-        if (isValidationError) {
-          const newFailCount = (config.consecutive_validation_failures || 0) + 1;
-          const isSuspended = newFailCount >= 5;
-          await supabaseClient.from("fiscal_configurations").update({
-            consecutive_validation_failures: newFailCount,
-            is_suspended: isSuspended
-          }).eq("user_id", doc.user_id);
-        }
+        await updateSuspensionState(supabaseClient, doc.user_id, uf, env, false);
 
         const newRetryCount = (doc.retry_count || 0) + 1;
         const maxRetries = config.max_retries || 5;
-        const delay = config.retry_delay_minutes || 15;
-        
         const status = newRetryCount >= maxRetries ? "dead-letter" : "error";
-        const nextRetry = status === "error" 
-          ? new Date(Date.now() + 1000 * 60 * delay).toISOString() 
-          : null;
+        const nextRetry = status === "error" ? new Date(Date.now() + 1000 * 60 * (config.retry_delay_minutes || 15)).toISOString() : null;
 
         await supabaseClient.from("processed_documents").update({
           status,
@@ -327,29 +210,17 @@ serve(async (req) => {
           retry_count: newRetryCount,
           next_retry_at: nextRetry,
           is_processing: false,
-          processing_log: [...(doc.processing_log || []), { 
-            timestamp: new Date().toISOString(), 
-            event: `Tentativa ${newRetryCount}: ${error.message}`,
-            cStat: error.message.match(/[(.*?)]/)?.[1] || null
-          }]
+          processing_log: [...(doc.processing_log || []), { timestamp: new Date().toISOString(), event: `Falha: ${error.message}`, cStat }]
         }).eq("id", documentId);
 
         if (status === "dead-letter") {
-          await sendDeadLetterNotification(supabaseClient, doc.user_id, documentId, maxRetries);
+          await queueDeadLetterNotification(supabaseClient, doc.user_id, documentId, cStat, xMotivo);
         }
       }
-
-      return new Response(JSON.stringify({ success: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-
     return new Response(JSON.stringify({ error: "Ação inválida" }), { status: 400 });
   } catch (error) {
-    console.error(error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    return new Response(JSON.stringify({ error: error.message }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
   }
 });
