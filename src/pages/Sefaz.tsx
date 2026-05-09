@@ -11,8 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { 
     Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
-     Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle, CheckCircle2,
-     FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X
+     Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
+     FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X, CheckCircle2
  } from "lucide-react";
 import JSZip from "jszip";
 import { toast } from "sonner";
