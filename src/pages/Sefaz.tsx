@@ -709,6 +709,65 @@ export default function Sefaz() {
         setShowZipPreviewDialog(null);
         
         toast.info("Gerando pacote ZIP...");
+        const zip = new JSZip();
+        const dateStr = new Date().toISOString().split('T')[0];
+        
+        if (type === 'backlog') {
+          // Applying consistent sorting from backlogSort
+          const sortedData = [...backlogData].sort((a: any, b: any) => {
+            const field = backlogSort.field;
+            const modifier = backlogSort.order === 'asc' ? 1 : -1;
+            if (a[field] < b[field]) return -1 * modifier;
+            if (a[field] > b[field]) return 1 * modifier;
+            return 0;
+          });
+
+          const headers = ["UF", "Ambiente", "Quantidade", "Próximo Envio", "Status"];
+          const rows = sortedData.map(b => {
+            const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
+            const status = state?.is_suspended ? "Suspenso" : (state?.is_paused ? "Pausado" : "Ativo");
+            return [b.uf, b.env.toUpperCase(), b.count, b.next ? new Date(b.next).toLocaleString() : "—", status];
+          });
+          const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
+          zip.file(`backlog_fiscal_${dateStr}.csv`, csvContent);
+  
+          const doc = new jsPDF();
+          doc.text("Backlog Fiscal", 14, 15);
+          autoTable(doc, { head: [headers], body: rows, startY: 25 });
+          const pdfContent = doc.output('blob');
+          zip.file(`backlog_fiscal_${dateStr}.pdf`, pdfContent);
+        } else {
+          // Audit logs are already sorted in loadAuditLogs by auditSort
+          const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "cStat", "xMotivo"];
+          const rows = auditLogs.map(log => [
+            new Date(log.created_at).toLocaleString(),
+            log.action.toUpperCase(),
+            log.uf,
+            log.environment,
+            log.reason || "",
+            log.cstat || "",
+            log.xmotivo || ""
+          ]);
+          const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
+          zip.file(`auditoria_fiscal_${dateStr}.csv`, csvContent);
+  
+          const doc = new jsPDF();
+          doc.text("Auditoria Fiscal", 14, 15);
+          autoTable(doc, { head: [headers], body: rows, startY: 25 });
+          const pdfContent = doc.output('blob');
+          zip.file(`auditoria_fiscal_${dateStr}.pdf`, pdfContent);
+        }
+  
+        const content = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(content);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${type}_fiscal_${dateStr}.zip`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("Pacote ZIP exportado!");
+      };
        const zip = new JSZip();
        const dateStr = new Date().toISOString().split('T')[0];
        
