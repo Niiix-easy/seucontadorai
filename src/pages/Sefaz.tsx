@@ -2417,12 +2417,12 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                           </div>
                           {log.status === 'error' && (
                             <div className="text-[8px] text-destructive max-w-[150px] text-right truncate" title={log.error_message}>
-                              Etapa: Geração -> Falha: {log.error_message || 'Desconhecido'}
+                              Etapa: Geração {'→'} Falha: {log.error_message || 'Desconhecido'}
                             </div>
                           )}
                           {log.status === 'success' && (
                             <div className="text-[8px] text-green-600">
-                              Etapas: Geração (OK) -> Anexo (OK) -> Envio (OK)
+                              Etapas: Geração (OK) {'→'} Anexo (OK) {'→'} Envio (OK)
                             </div>
                           )}
                         </td>
