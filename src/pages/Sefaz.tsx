@@ -764,17 +764,6 @@ export default function Sefaz() {
        document.body.removeChild(link);
        toast.success("Pacote ZIP exportado!");
      };
- 
-
-      if (!error) {
-        toast.success("Agendamento criado com sucesso!");
-        loadScheduledReports();
-        setShowScheduleDialog(null);
-      } else {
-        toast.error("Erro ao criar agendamento: " + error.message);
-      }
-    };
-
     const handleExportAuditXLSX = () => {
       if (auditLogs.length === 0) return;
       const data = auditLogs.map(log => ({
