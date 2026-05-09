@@ -1032,7 +1032,11 @@ export default function Sefaz() {
            zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(techLog, null, 2));
            const divergence = previewCount !== rows.length;
             await supabase.from("fiscal_export_logs").insert([{
-              user_id: user.id, report_type: 'backlog', format: 'zip', status: 'success', record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, csv_hash: csvHash, pdf_hash: pdfHash, validation_divergence: divergence, filters: filters, technical_log: techLog as any, recipients: []
+              user_id: user.id, report_type: 'backlog', format: 'zip', status: 'success', 
+              record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, 
+              csv_hash: csvHash, pdf_hash: pdfHash, zip_hash: zipHash,
+              validation_divergence: divergence, filters: filters, technical_log: techLog as any, recipients: [],
+              expected_data: { csv_hash: expectedCsvHash, pdf_hash: expectedPdfHash, count: previewCount }
             }]);
          } else {
            const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "cStat", "xMotivo"];
@@ -1069,7 +1073,11 @@ export default function Sefaz() {
            zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(techLog, null, 2));
            const divergence = previewCount !== rows.length;
             await supabase.from("fiscal_export_logs").insert([{
-              user_id: user.id, report_type: 'audit', format: 'zip', status: 'success', record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, csv_hash: csvHash, pdf_hash: pdfHash, validation_divergence: divergence, filters: filters, technical_log: techLog as any, recipients: []
+              user_id: user.id, report_type: 'audit', format: 'zip', status: 'success', 
+              record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, 
+              csv_hash: csvHash, pdf_hash: pdfHash, zip_hash: zipHash,
+              validation_divergence: divergence, filters: filters, technical_log: techLog as any, recipients: [],
+              expected_data: { csv_hash: expectedCsvHash, pdf_hash: expectedPdfHash, count: previewCount }
             }]);
          }
   
