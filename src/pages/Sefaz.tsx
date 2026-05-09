@@ -145,7 +145,7 @@ export default function Sefaz() {
     const [suspensionStates, setSuspensionStates] = useState<any[]>([]);
     const [backlogData, setBacklogData] = useState<any[]>([]);
      const [backlogFilters, setBacklogFilters] = useState({ uf: "all", env: "all", date: "", cStat: "", xMotivo: "" });
-    const [auditFilters, setAuditFilters] = useState({ dateStart: "", dateEnd: "", uf: "all", env: "all", action: "all" });
+    const [auditFilters, setAuditFilters] = useState({ dateStart: "", dateEnd: "", uf: "all", env: "all", action: "all", cStat: "", xMotivo: "" });
      const [showPauseDialog, setShowPauseDialog] = useState<{ uf: string, env: string, paused: boolean, manual?: boolean } | null>(null);
      const [manualRetryProgress, setManualRetryProgress] = useState<{ [key: string]: { status: 'queued' | 'processing' | 'done' | 'error', count: number, total: number } }>({});
     const [pauseReason, setPauseReason] = useState("");
@@ -361,6 +361,8 @@ export default function Sefaz() {
       if (auditFilters.action !== "all") query = query.eq("action", auditFilters.action);
       if (auditFilters.dateStart) query = query.gte("created_at", `${auditFilters.dateStart}T00:00:00`);
       if (auditFilters.dateEnd) query = query.lte("created_at", `${auditFilters.dateEnd}T23:59:59`);
+      if (auditFilters.cStat) query = query.ilike("sefaz_response_code", `%${auditFilters.cStat}%`);
+      if (auditFilters.xMotivo) query = query.ilike("reason", `%${auditFilters.xMotivo}%`);
 
       const from = (auditPage - 1) * 10;
       const to = from + 9;
@@ -518,16 +520,18 @@ export default function Sefaz() {
 
     const handleExportAuditCSV = () => {
       if (auditLogs.length === 0) return;
-      const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "Usuário ID"];
+      const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "cStat", "Usuário ID"];
       const rows = auditLogs.map(log => [
-        new Date(log.created_at).toLocaleString(),
-        log.action,
+        new Date(log.created_at).toLocaleString('pt-BR'),
+        log.action.toUpperCase(),
         log.uf,
         log.environment,
         log.reason || "",
+        log.sefaz_response_code || "",
         log.user_id
       ]);
-      const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
+      // Excel-friendly CSV with semicolon and BOM
+      const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -536,7 +540,7 @@ export default function Sefaz() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success("Auditoria exportada!");
+      toast.success("Auditoria CSV (Excel-friendly) exportada!");
     };
 
     const loadExportHistory = async () => {
@@ -596,12 +600,23 @@ export default function Sefaz() {
 
     const handleCreateSchedule = async () => {
       if (!user || !showScheduleDialog || !newSchedule.email) return;
+      
+      const currentFilters = showScheduleDialog.type === 'backlog' ? backlogFilters : auditFilters;
+      const hasUF = currentFilters.uf && currentFilters.uf !== 'all';
+      const hasEnv = (currentFilters as any).env && (currentFilters as any).env !== 'all';
+      const hasDate = showScheduleDialog.type === 'backlog' ? !!(currentFilters as any).date : (!!(currentFilters as any).dateStart || !!(currentFilters as any).dateEnd);
+
+      if (!hasUF || !hasEnv || !hasDate) {
+        toast.error("Validação falhou: Selecione UF, Ambiente e um Período válido para agendar.");
+        return;
+      }
+
       const { error } = await supabase.from("fiscal_scheduled_reports").insert({
         user_id: user.id,
         report_type: showScheduleDialog.type,
         format: newSchedule.format,
         frequency: newSchedule.frequency,
-        filters: showScheduleDialog.type === 'backlog' ? backlogFilters : auditFilters,
+        filters: currentFilters,
         email_recipients: [newSchedule.email],
         is_active: true
       });
@@ -611,7 +626,7 @@ export default function Sefaz() {
         loadScheduledReports();
         setShowScheduleDialog(null);
       } else {
-        toast.error("Erro ao criar agendamento");
+        toast.error("Erro ao criar agendamento: " + error.message);
       }
     };
 
@@ -707,13 +722,14 @@ export default function Sefaz() {
         const status = state?.is_suspended ? "Suspenso" : (state?.is_paused ? "Pausado" : "Ativo");
         return [
           b.uf,
-          b.env,
+          b.env.toUpperCase(),
           b.count,
-          b.next ? new Date(b.next).toLocaleString() : "—",
+          b.next ? new Date(b.next).toLocaleString('pt-BR') : "—",
           status
         ];
       });
-      const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
+      // Excel-friendly CSV with semicolon and BOM
+      const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -722,7 +738,7 @@ export default function Sefaz() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success("Backlog CSV exportado!");
+      toast.success("Backlog CSV (Excel-friendly) exportado!");
     };
 
     const handleExportBacklogPDF = () => {
@@ -2008,7 +2024,11 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   <span className="text-muted-foreground text-[8px]">até</span>
                   <Input type="date" value={auditFilters.dateEnd} onChange={e => setAuditFilters(p => ({ ...p, dateEnd: e.target.value }))} className="w-28 h-7 text-[9px]" />
                 </div>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setAuditFilters({ dateStart: "", dateEnd: "", uf: "all", env: "all", action: "all" })} title="Limpar Filtros">
+                <div className="flex items-center gap-1">
+                  <Input placeholder="cStat" value={auditFilters.cStat} onChange={e => setAuditFilters(p => ({ ...p, cStat: e.target.value }))} className="w-16 h-7 text-[9px]" />
+                  <Input placeholder="Motivo" value={auditFilters.xMotivo} onChange={e => setAuditFilters(p => ({ ...p, xMotivo: e.target.value }))} className="w-24 h-7 text-[9px]" />
+                </div>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setAuditFilters({ dateStart: "", dateEnd: "", uf: "all", env: "all", action: "all", cStat: "", xMotivo: "" })} title="Limpar Filtros">
                   <X className="w-3 h-3" />
                 </Button>
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowSavePrefDialog({ type: 'audit', filters: auditFilters })} title="Salvar Filtro">
@@ -2389,10 +2409,22 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                             {log.status === 'success' ? 'Enviado' : 'Erro'}
                           </Badge>
                         </td>
-                        <td className="py-2 px-4 text-right">
-                          <Button variant="ghost" size="sm" onClick={() => handleResendEmail(log.id)} className="h-7 text-[10px] text-purple-600">
-                            <Send className="w-3 h-3 mr-1" /> Reenviar
-                          </Button>
+                        <td className="py-2 px-4 text-right flex flex-col items-end gap-1">
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => handleResendEmail(log.id)} className="h-7 text-[10px] text-purple-600">
+                              <Send className="w-3 h-3 mr-1" /> Reenviar
+                            </Button>
+                          </div>
+                          {log.status === 'error' && (
+                            <div className="text-[8px] text-destructive max-w-[150px] text-right truncate" title={log.error_message}>
+                              Etapa: Geração {'→'} Falha: {log.error_message || 'Desconhecido'}
+                            </div>
+                          )}
+                          {log.status === 'success' && (
+                            <div className="text-[8px] text-green-600">
+                              Etapas: Geração (OK) {'→'} Anexo (OK) {'→'} Envio (OK)
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
