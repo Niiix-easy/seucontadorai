@@ -1212,14 +1212,22 @@ export default function Sefaz() {
                           onChange={e => setFiscalConfig(p => ({ ...p, retry_delay_minutes: Number(e.target.value) }))} 
                         />
                       </div>
-                      <div className="space-y-2 col-span-2">
+                      <div className="space-y-2 col-span-2 relative">
                         <Label>Throughput (Docs/Min)</Label>
                         <Input 
                           type="number" 
                           value={fiscalConfig.reactivation_throughput} 
-                          onChange={e => setFiscalConfig(p => ({ ...p, reactivation_throughput: Number(e.target.value) }))} 
+                           onChange={e => {
+                             const val = Number(e.target.value);
+                             if (val > 100) toast.warning("Throughput alto detectado. Verifique os limites da SEFAZ.");
+                             if (val < 1) toast.error("Throughput mínimo é 1.");
+                             setFiscalConfig(p => ({ ...p, reactivation_throughput: val }));
+                           }} 
                           placeholder="Vazão para esta UF/Ambiente"
                         />
+                        {fiscalConfig.reactivation_throughput && fiscalConfig.reactivation_throughput > 100 && (
+                          <p className="text-[10px] text-amber-600 mt-1 font-medium">Atenção: Valores acima de 100 podem causar bloqueios temporários.</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1246,7 +1254,67 @@ export default function Sefaz() {
                   </div>
                 </div>
               </div>
-              <div className="space-y-4 pt-4 border-t">
+              <div className="space-y-6 pt-4 border-t">
+                <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Package className="w-4 h-4" /> Backlog & Controle Granular (UF/Ambiente)
+                </p>
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/50 uppercase">
+                      <tr>
+                        <th className="text-left py-2 px-4">UF</th>
+                        <th className="text-left py-2 px-4">Ambiente</th>
+                        <th className="text-center py-2 px-4">Fila</th>
+                        <th className="text-left py-2 px-4">Próximo Envio</th>
+                        <th className="text-center py-2 px-4">Status</th>
+                        <th className="text-right py-2 px-4">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {backlogData.length > 0 ? backlogData.map(b => {
+                        const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
+                        const isPaused = state?.is_paused;
+                        const isSuspended = state?.is_suspended;
+                        return (
+                          <tr key={`${b.uf}-${b.env}`} className="border-t hover:bg-muted/30">
+                            <td className="py-2 px-4 font-bold">{b.uf}</td>
+                            <td className="py-2 px-4 capitalize">{b.env}</td>
+                            <td className="py-2 px-4 text-center">
+                              <Badge variant="secondary">{b.count} docs</Badge>
+                            </td>
+                            <td className="py-2 px-4 text-muted-foreground">
+                              {b.next ? new Date(b.next).toLocaleString() : "—"}
+                            </td>
+                            <td className="py-2 px-4 text-center">
+                              {isSuspended ? (
+                                <Badge variant="destructive" className="text-[9px]">Suspenso</Badge>
+                              ) : isPaused ? (
+                                <Badge variant="outline" className="text-[9px] bg-amber-50">Pausado</Badge>
+                              ) : (
+                                <Badge variant="default" className="text-[9px] bg-green-500">Ativo</Badge>
+                              )}
+                            </td>
+                            <td className="py-2 px-4 text-right">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className={cn("h-7 text-[10px]", isPaused ? "text-green-600" : "text-amber-600")}
+                                onClick={() => togglePause(b.uf, b.env, !!isPaused)}
+                              >
+                                {isPaused ? <Play className="w-3 h-3 mr-1" /> : <Square className="w-3 h-3 mr-1" />}
+                                {isPaused ? "Retomar" : "Pausar"}
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      }) : (
+                        <tr><td colSpan={6} className="py-4 text-center text-muted-foreground">Nenhum backlog pendente.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <p className="text-sm font-medium text-muted-foreground">Canais de Alerta (Dead-Letter)</p>
                 <p className="text-sm font-medium text-muted-foreground">Canais de Alerta (Dead-Letter)</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex items-center justify-between p-3 rounded-md border bg-muted/20">
