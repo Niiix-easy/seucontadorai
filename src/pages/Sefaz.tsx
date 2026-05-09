@@ -1476,8 +1476,88 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
   </infNFe>
 </NFe>`}
           </pre>
-        </DialogContent>
-      </Dialog>
+         </DialogContent>
+       </Dialog>
+ 
+       {/* Pause/Resume Dialog */}
+       <Dialog open={!!showPauseDialog} onOpenChange={() => setShowPauseDialog(null)}>
+         <DialogContent>
+           <DialogHeader>
+             <DialogTitle className="font-display">
+               {showPauseDialog?.paused ? "Retomar Reprocessamento" : "Pausar Reprocessamento"}
+             </DialogTitle>
+             <DialogDescription>
+               UF: {showPauseDialog?.uf} | Ambiente: {showPauseDialog?.env}
+             </DialogDescription>
+           </DialogHeader>
+           <div className="space-y-4">
+             <div className="space-y-2">
+               <Label>Motivo da ação (Auditoria)</Label>
+               <Textarea 
+                 placeholder="Descreva o motivo..." 
+                 value={pauseReason} 
+                 onChange={e => setPauseReason(e.target.value)}
+                 rows={3}
+               />
+             </div>
+             <div className="flex justify-end gap-2">
+               <Button variant="outline" onClick={() => setShowPauseDialog(null)}>Cancelar</Button>
+               <Button 
+                 variant={showPauseDialog?.paused ? "default" : "destructive"}
+                 onClick={() => showPauseDialog && togglePause(showPauseDialog.uf, showPauseDialog.env, showPauseDialog.paused, pauseReason)}
+               >
+                 Confirmar
+               </Button>
+             </div>
+           </div>
+         </DialogContent>
+       </Dialog>
+ 
+       {/* Audit Logs Dialog */}
+       <Dialog open={showAuditLogs} onOpenChange={setShowAuditLogs}>
+         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+           <DialogHeader>
+             <DialogTitle className="font-display flex items-center gap-2">
+               <History className="w-5 h-5" /> Auditoria de Ações Fiscais
+             </DialogTitle>
+           </DialogHeader>
+           <div className="space-y-4">
+             <div className="overflow-x-auto border rounded-lg">
+               <table className="w-full text-xs">
+                 <thead className="bg-muted uppercase">
+                   <tr>
+                     <th className="text-left py-2 px-4">Data/Hora</th>
+                     <th className="text-left py-2 px-4">Ação</th>
+                     <th className="text-left py-2 px-4">UF/Amb</th>
+                     <th className="text-left py-2 px-4">Motivo</th>
+                   </tr>
+                 </thead>
+                 <tbody>
+                   {auditLogs.map(log => (
+                     <tr key={log.id} className="border-t hover:bg-muted/30">
+                       <td className="py-2 px-4 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
+                       <td className="py-2 px-4">
+                         <Badge variant="outline" className={cn("text-[9px]", 
+                           log.action === 'pause' ? 'border-amber-500 text-amber-500' : 
+                           log.action === 'resume' ? 'border-green-500 text-green-500' : 
+                           'border-blue-500 text-blue-500'
+                         )}>
+                           {log.action.toUpperCase()}
+                         </Badge>
+                       </td>
+                       <td className="py-2 px-4">{log.uf}/{log.environment}</td>
+                       <td className="py-2 px-4 text-muted-foreground">{log.reason || '—'}</td>
+                     </tr>
+                   ))}
+                   {auditLogs.length === 0 && (
+                     <tr><td colSpan={4} className="py-8 text-center text-muted-foreground">Nenhum log encontrado.</td></tr>
+                   )}
+                 </tbody>
+               </table>
+             </div>
+           </div>
+         </DialogContent>
+       </Dialog>
 
       {/* NF-e Detail */}
       <Dialog open={!!nfeDetalhe} onOpenChange={() => setNfeDetalhe(null)}>
