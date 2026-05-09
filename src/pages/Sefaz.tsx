@@ -616,6 +616,12 @@ export default function Sefaz() {
       doc.setFontSize(8);
       doc.text(`Gerado em: ${new Date().toLocaleString()}`, 14, 22);
       
+      if (auditLogs.length > 0) {
+        doc.setFontSize(7);
+        doc.setTextColor(100);
+        doc.text("Links e IDs de Referência (Ações Manuais):", 14, 28);
+      }
+      
       const tableData = auditLogs.map(log => [
         new Date(log.created_at).toLocaleString(),
         log.action.toUpperCase(),
@@ -627,7 +633,7 @@ export default function Sefaz() {
       autoTable(doc, {
         head: [["Data/Hora", "Ação", "UF/Amb", "Motivo", "Usuário"]],
         body: tableData,
-        startY: 25,
+        startY: 32,
         theme: 'grid',
         styles: { fontSize: 8 },
         headStyles: { fillColor: [66, 66, 66] }
@@ -670,6 +676,10 @@ export default function Sefaz() {
       doc.setFontSize(8);
       doc.text(`Filtros: UF=${backlogFilters.uf}, Amb=${backlogFilters.env}, Data=${backlogFilters.date || 'Todas'}`, 14, 22);
       
+      doc.setFontSize(7);
+      doc.setTextColor(100);
+      doc.text("Referências de Lote e links de consulta SEFAZ:", 14, 28);
+      
       const tableData = backlogData.map(b => {
         const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
         const status = state?.is_suspended ? "Suspenso" : (state?.is_paused ? "Pausado" : "Ativo");
@@ -685,7 +695,7 @@ export default function Sefaz() {
       autoTable(doc, {
         head: [["UF", "Ambiente", "Fila", "Próximo Envio", "Status"]],
         body: tableData,
-        startY: 28,
+        startY: 32,
         theme: 'grid',
         styles: { fontSize: 8 },
         headStyles: { fillColor: [41, 128, 185] }
