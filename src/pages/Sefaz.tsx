@@ -3005,30 +3005,6 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                        Copiar Bloco Técnico
                      </Button>
                    </div>
-                   <div className="grid grid-cols-2 gap-2 text-[11px] bg-muted/20 p-3 rounded-lg border relative">
-                     <div className="flex justify-between border-b pb-1">
-                       <span className="text-muted-foreground">Ordenação:</span>
-                       <span className="font-mono font-bold capitalize">{showAuditDetailDialog.technical_log?.field || showAuditDetailDialog.technical_log?.sorting?.field || '-'}</span>
-                     </div>
-                     <div className="flex justify-between border-b pb-1">
-                       <span className="text-muted-foreground">Direção:</span>
-                       <span className="font-mono font-bold uppercase">{showAuditDetailDialog.technical_log?.direction || showAuditDetailDialog.technical_log?.sorting?.order || '-'}</span>
-                     </div>
-                     <div className="flex justify-between border-b pb-1">
-                       <span className="text-muted-foreground">Página:</span>
-                       <span className="font-mono font-bold">{showAuditDetailDialog.technical_log?.page || '-'}</span>
-                     </div>
-                     <div className="flex justify-between border-b pb-1">
-                       <span className="text-muted-foreground">Tamanho:</span>
-                       <span className="font-mono font-bold">{showAuditDetailDialog.technical_log?.page_size || '10'}</span>
-                     </div>
-                     <div className="flex justify-between col-span-2 pt-1">
-                       <span className="text-muted-foreground">Destinatários:</span>
-                       <span className="font-mono font-bold truncate max-w-[300px]" title={showAuditDetailDialog.recipients?.join(", ")}>
-                         {showAuditDetailDialog.recipients?.join(", ") || 'Nenhum'}
-                       </span>
-                     </div>
-                   </div>
                  </div>
  
                  <div className="space-y-2">
