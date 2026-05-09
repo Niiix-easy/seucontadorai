@@ -1922,9 +1922,18 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setAuditFilters({ dateStart: "", dateEnd: "", uf: "all", env: "all", action: "all" })} title="Limpar Filtros">
                   <X className="w-3 h-3" />
                 </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowSavePrefDialog({ type: 'audit', filters: auditFilters })} title="Salvar Filtro">
+                  <Settings className="w-3 h-3" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-500" onClick={() => setShowScheduleDialog({ type: 'audit' })} title="Agendar Exportação">
+                  <Zap className="w-3 h-3" />
+                </Button>
                 <div className="ml-auto flex gap-1">
                   <Button variant="outline" size="sm" onClick={handleExportAuditCSV} className="h-7 text-[9px] gap-1 px-2">
                     <Download className="w-2.5 h-2.5" /> CSV
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleExportAuditXLSX} className="h-7 text-[9px] gap-1 px-2 border-green-100">
+                    <FileArchive className="w-2.5 h-2.5 text-green-500" /> XLSX
                   </Button>
                   <Button variant="outline" size="sm" onClick={handleExportAuditPDF} className="h-7 text-[9px] gap-1 px-2 border-red-100">
                     <FileDown className="w-2.5 h-2.5 text-red-500" /> PDF
