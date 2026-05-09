@@ -260,6 +260,53 @@ export type Database = {
         }
         Relationships: []
       }
+      dead_letter_notifications: {
+        Row: {
+          channels: string[] | null
+          created_at: string | null
+          cstat: string | null
+          document_id: string | null
+          error_message: string | null
+          id: string
+          sent_at: string | null
+          status: string | null
+          user_id: string | null
+          xmotivo: string | null
+        }
+        Insert: {
+          channels?: string[] | null
+          created_at?: string | null
+          cstat?: string | null
+          document_id?: string | null
+          error_message?: string | null
+          id?: string
+          sent_at?: string | null
+          status?: string | null
+          user_id?: string | null
+          xmotivo?: string | null
+        }
+        Update: {
+          channels?: string[] | null
+          created_at?: string | null
+          cstat?: string | null
+          document_id?: string | null
+          error_message?: string | null
+          id?: string
+          sent_at?: string | null
+          status?: string | null
+          user_id?: string | null
+          xmotivo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dead_letter_notifications_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "processed_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           category: string | null
@@ -350,6 +397,7 @@ export type Database = {
       }
       fiscal_configurations: {
         Row: {
+          auto_retry_on_reactivation: boolean | null
           certificate_filename: string | null
           certificate_password_encrypted: string | null
           certificate_password_hash: string | null
@@ -360,12 +408,14 @@ export type Database = {
           id: string
           is_suspended: boolean | null
           max_retries: number | null
+          reactivation_throughput: number | null
           retry_delay_minutes: number | null
           uf: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          auto_retry_on_reactivation?: boolean | null
           certificate_filename?: string | null
           certificate_password_encrypted?: string | null
           certificate_password_hash?: string | null
@@ -376,12 +426,14 @@ export type Database = {
           id?: string
           is_suspended?: boolean | null
           max_retries?: number | null
+          reactivation_throughput?: number | null
           retry_delay_minutes?: number | null
           uf: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          auto_retry_on_reactivation?: boolean | null
           certificate_filename?: string | null
           certificate_password_encrypted?: string | null
           certificate_password_hash?: string | null
@@ -392,10 +444,44 @@ export type Database = {
           id?: string
           is_suspended?: boolean | null
           max_retries?: number | null
+          reactivation_throughput?: number | null
           retry_delay_minutes?: number | null
           uf?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      fiscal_suspension_states: {
+        Row: {
+          consecutive_failures: number | null
+          environment: string
+          id: string
+          is_suspended: boolean | null
+          last_failure_at: string | null
+          uf: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          consecutive_failures?: number | null
+          environment: string
+          id?: string
+          is_suspended?: boolean | null
+          last_failure_at?: string | null
+          uf: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          consecutive_failures?: number | null
+          environment?: string
+          id?: string
+          is_suspended?: boolean | null
+          last_failure_at?: string | null
+          uf?: string
+          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
