@@ -748,16 +748,31 @@ export default function Sefaz() {
       return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     };
 
-    const verifyAndDownloadFile = async (log: any, fileType: 'csv' | 'pdf') => {
+    const verifyAndDownloadFile = async (log: any, fileType: 'csv' | 'pdf' | 'zip') => {
       if (!log.file_url) {
         toast.error("URL do arquivo não disponível.");
         return;
       }
-      toast.info(`Extraindo e verificando ${fileType.toUpperCase()}...`);
+      toast.info(`Processando download de ${fileType.toUpperCase()}...`);
+      const newEvent = { timestamp: new Date().toISOString(), type: 'download', file: fileType, verified: false };
       try {
         const response = await fetch(log.file_url);
         const blob = await response.blob();
-        const zip = await JSZip.loadAsync(blob);
+        if (fileType === 'zip') {
+          const zipHash = await calculateHash(blob);
+          if (log.zip_hash && zipHash !== log.zip_hash) {
+            toast.error("DIVERGÊNCIA: Hash do ZIP não confere!");
+            return;
+          }
+          newEvent.verified = true;
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(blob);
+          link.download = `${log.report_type}_fiscal.zip`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        } else {
+          const zip = await JSZip.loadAsync(blob);
         let targetFileName = "";
         zip.forEach((path) => { 
           if (path.toLowerCase().endsWith(`.${fileType}`) && !path.startsWith("log_tecnico")) {
@@ -794,8 +809,13 @@ export default function Sefaz() {
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
+          newEvent.verified = true;
           toast.success(`${fileType.toUpperCase()} baixado e verificado.`);
         }
+        } // Close else
+        const updatedEvents = [...(log.audit_events || []), newEvent];
+        await supabase.from("fiscal_export_logs").update({ audit_events: updatedEvents }).eq("id", log.id);
+        loadExportHistory();
       } catch (err) {
         toast.error(`Erro ao processar ${fileType.toUpperCase()}.`);
       }
@@ -838,8 +858,13 @@ export default function Sefaz() {
       toast.success(`Resumo de auditoria (${format.toUpperCase()}) exportado.`);
     };
 
-    const handleRunProofFromHistory = (log: any) => {
+    const handleRunProofFromHistory = async (log: any) => {
       toast.info("Iniciando Modo Prova a partir do histórico...");
+      
+      // We reuse handleExportZip but we'll modify it to return values or we can just implement the proof logging here
+      // To keep it clean, let's just trigger handleExportZip with 'proof' mode
+      // But handleExportZip currently doesn't insert for proof mode. 
+      // Let's modify handleExportZip to handle logging for proof mode too.
       handleExportZip(log.report_type as 'backlog' | 'audit', 'proof', log.filters, log.technical_log?.sorting);
     };
 
@@ -856,7 +881,13 @@ export default function Sefaz() {
        // Pre-calculate hashes for preview/proof
        let csvContent = "";
        let rows: any[] = [];
-       if (type === 'backlog') {
+         let finalCsvHash = "";
+         let finalPdfHash = "";
+         let finalRecordCount = 0;
+         let finalTechLog: any = null;
+         let finalDivergence = false;
+
+         if (type === 'backlog') {
          const sortedData = [...backlogData].sort((a: any, b: any) => {
            const field = sort.field;
            const modifier = sort.order === 'asc' ? 1 : -1;
@@ -887,9 +918,21 @@ export default function Sefaz() {
          isCalculating: false 
        } : null);
 
-       if (mode === 'proof') {
-         toast.success("Modo Prova concluído: Hashes e contagens validados.");
-       }
+        if (mode === 'proof') {
+          const currentActualCount = type === 'backlog' ? backlogData.reduce((acc, b) => acc + b.count, 0) : auditLogs.length;
+          const divergence = count !== currentActualCount;
+          await supabase.from("fiscal_export_logs").insert([{
+            user_id: user.id, report_type: type, format: 'proof', status: 'success', 
+            record_count: count, csv_count: count, pdf_count: count, 
+            csv_hash: csvHash, pdf_hash: pdfHash,
+            validation_divergence: divergence, filters: filters, 
+            technical_log: { mode: 'proof', sorting: sort, timestamp: new Date().toISOString() } as any,
+            expected_data: { csv_hash: csvHash, pdf_hash: pdfHash, count: count },
+            recipients: []
+          }]);
+          loadExportHistory();
+          toast.success("Modo Prova concluído e registrado no histórico.");
+        }
      };
 
      const verifyAndDownload = async (log: any) => {
@@ -957,12 +1000,17 @@ export default function Sefaz() {
 
       const confirmExportZip = async () => {
          if (!showZipPreviewDialog || !user) return;
-         const { type, previewCount, filters, sort } = showZipPreviewDialog;
+         const { type, previewCount, filters, sort, expectedCsvHash, expectedPdfHash } = showZipPreviewDialog;
         
         setManualScheduleStatus({ id: 'manual-zip', status: 'initializing', progress: 5 });
         setShowZipPreviewDialog(null);
         
         const zip = new JSZip();
+        let finalCsvHash = "";
+        let finalPdfHash = "";
+        let finalRecordCount = 0;
+        let finalTechLog: any = null;
+        let finalDivergence = false;
         const dateStr = new Date().toISOString().split('T')[0];
         
         if (type === 'backlog') {
@@ -983,8 +1031,8 @@ export default function Sefaz() {
           });
            const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
             setManualScheduleStatus(prev => prev ? { ...prev, status: 'generating_csv', progress: 20 } : null);
-            const csvHash = await calculateHash(csvContent);
-            zip.file(`backlog_fiscal_${dateStr}.csv`, csvContent);
+             finalCsvHash = await calculateHash(csvContent);
+             zip.file(`backlog_fiscal_${dateStr}.csv`, csvContent);
             
             setManualScheduleStatus(prev => prev ? { ...prev, status: 'generating_pdf', progress: 50 } : null);
 
@@ -992,35 +1040,33 @@ export default function Sefaz() {
            doc.text("Backlog Fiscal", 14, 15);
            autoTable(doc, { head: [headers], body: rows, startY: 25 });
            const pdfContent = doc.output('blob');
-            const pdfHash = await calculateHash(pdfContent);
-            zip.file(`backlog_fiscal_${dateStr}.pdf`, pdfContent);
+             finalPdfHash = await calculateHash(pdfContent);
+             zip.file(`backlog_fiscal_${dateStr}.pdf`, pdfContent);
 
             setManualScheduleStatus(prev => prev ? { ...prev, status: 'calculating_hashes', progress: 80 } : null);
-            const techLog = { 
-              execution_id: crypto.randomUUID(),
-              sorting: sort, 
-              page: backlogPage, 
-              page_size: 10,
-              direction: sort.order,
-              field: sort.field,
-              timestamp: new Date().toISOString(), 
-              csv_hash: csvHash, 
-              pdf_hash: pdfHash, 
-              preview_count: previewCount, 
-              final_count: rows.length 
-            };
-           zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(techLog, null, 2));
-           const divergence = previewCount !== rows.length;
-            await supabase.from("fiscal_export_logs").insert([{
-              user_id: user.id, report_type: 'backlog', format: 'zip', status: 'success', record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, csv_hash: csvHash, pdf_hash: pdfHash, validation_divergence: divergence, filters: filters, technical_log: techLog as any, recipients: []
-            }]);
-         } else {
+             finalTechLog = { 
+               execution_id: crypto.randomUUID(),
+               sorting: sort, 
+               page: backlogPage, 
+               page_size: 10,
+               direction: sort.order,
+               field: sort.field,
+               timestamp: new Date().toISOString(), 
+               csv_hash: finalCsvHash, 
+               pdf_hash: finalPdfHash, 
+               preview_count: previewCount, 
+               final_count: rows.length 
+             };
+             finalRecordCount = rows.length;
+             finalDivergence = previewCount !== rows.length;
+            zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(finalTechLog, null, 2));
+          } else {
            const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "cStat", "xMotivo"];
            const rows = auditLogs.map(log => [new Date(log.created_at).toLocaleString(), log.action.toUpperCase(), log.uf, log.environment, log.reason || "", log.cstat || "", log.xmotivo || ""]);
            const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
             setManualScheduleStatus(prev => prev ? { ...prev, status: 'generating_csv', progress: 20 } : null);
-            const csvHash = await calculateHash(csvContent);
-            zip.file(`auditoria_fiscal_${dateStr}.csv`, csvContent);
+             finalCsvHash = await calculateHash(csvContent);
+             zip.file(`auditoria_fiscal_${dateStr}.csv`, csvContent);
             
             setManualScheduleStatus(prev => prev ? { ...prev, status: 'generating_pdf', progress: 50 } : null);
 
@@ -1028,34 +1074,46 @@ export default function Sefaz() {
            doc.text("Auditoria Fiscal", 14, 15);
            autoTable(doc, { head: [headers], body: rows, startY: 25 });
            const pdfContent = doc.output('blob');
-            const pdfHash = await calculateHash(pdfContent);
-            zip.file(`auditoria_fiscal_${dateStr}.pdf`, pdfContent);
+             finalPdfHash = await calculateHash(pdfContent);
+             zip.file(`auditoria_fiscal_${dateStr}.pdf`, pdfContent);
 
             setManualScheduleStatus(prev => prev ? { ...prev, status: 'calculating_hashes', progress: 80 } : null);
 
-            const techLog = { 
-              execution_id: crypto.randomUUID(),
-              sorting: sort, 
-              page: auditPage, 
-              page_size: 10,
-              direction: sort.order,
-              field: sort.field,
-              timestamp: new Date().toISOString(), 
-              csv_hash: csvHash, 
-              pdf_hash: pdfHash, 
-              preview_count: previewCount, 
-              final_count: rows.length 
-            };
-           zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(techLog, null, 2));
-           const divergence = previewCount !== rows.length;
-            await supabase.from("fiscal_export_logs").insert([{
-              user_id: user.id, report_type: 'audit', format: 'zip', status: 'success', record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, csv_hash: csvHash, pdf_hash: pdfHash, validation_divergence: divergence, filters: filters, technical_log: techLog as any, recipients: []
-            }]);
-         }
+             finalTechLog = { 
+               execution_id: crypto.randomUUID(),
+               sorting: sort, 
+               page: auditPage, 
+               page_size: 10,
+               direction: sort.order,
+               field: sort.field,
+               timestamp: new Date().toISOString(), 
+               csv_hash: finalCsvHash, 
+               pdf_hash: finalPdfHash, 
+               preview_count: previewCount, 
+               final_count: rows.length 
+             };
+             finalRecordCount = rows.length;
+             finalDivergence = previewCount !== rows.length;
+            zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(finalTechLog, null, 2));
+          }
   
         setManualScheduleStatus(prev => prev ? { ...prev, status: 'finalizing_zip', progress: 95 } : null);
         const content = await zip.generateAsync({ type: "blob" });
+        const zipHash = await calculateHash(content);
+        
+        // Determine which counts/hashes to use for log
+        // We'll need to store these during the generation above
+        // ... actually let's just use local variables that we'll pull out
+        
         const url = URL.createObjectURL(content);
+
+        await supabase.from("fiscal_export_logs").insert([{
+          user_id: user.id, report_type: type, format: 'zip', status: 'success', 
+          record_count: finalRecordCount, csv_count: finalRecordCount, pdf_count: finalRecordCount, 
+          csv_hash: finalCsvHash, pdf_hash: finalPdfHash, zip_hash: zipHash,
+          validation_divergence: finalDivergence, filters: filters, technical_log: finalTechLog as any, recipients: [],
+          expected_data: { csv_hash: expectedCsvHash, pdf_hash: expectedPdfHash, count: previewCount }
+        }]);
         const link = document.createElement("a");
         link.href = url;
         link.download = `${type}_fiscal_${dateStr}.zip`;
@@ -2509,7 +2567,10 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                  </thead>
                  <tbody>
                    {auditLogs.map(log => (
-                     <tr key={log.id} className="border-t hover:bg-muted/30">
+                       <tr key={log.id} className={cn(
+                         "border-t hover:bg-muted/30 transition-colors",
+                         log.validation_divergence ? "bg-red-50/50" : ""
+                       )}>
                        <td className="py-2 px-4 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
                        <td className="py-2 px-4">
                          <Badge variant="outline" className={cn("text-[9px]", 
@@ -2776,29 +2837,52 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   <h4 className="text-sm font-bold flex items-center gap-2">
                     <FileCode className="w-4 h-4" /> Validação de Hashes (SHA-256)
                   </h4>
-                  <div className="border rounded-lg overflow-hidden">
-                    <table className="w-full text-xs">
-                      <thead className="bg-muted">
+                  <div className="border rounded-lg overflow-hidden bg-white">
+                    <table className="w-full text-[10px]">
+                      <thead className="bg-muted/50 border-b">
                         <tr>
-                          <th className="text-left py-2 px-3">Arquivo</th>
-                          <th className="text-left py-2 px-3">Hash Registrado</th>
-                          <th className="text-center py-2 px-3">Status</th>
+                          <th className="text-left py-1.5 px-3">Indicador</th>
+                          <th className="text-left py-1.5 px-3">Esperado (Pré-visualização)</th>
+                          <th className="text-left py-1.5 px-3">Obtido (Processado)</th>
+                          <th className="text-center py-1.5 px-3">Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr className="border-t">
-                          <td className="py-2 px-3 font-medium">CSV</td>
-                          <td className="py-2 px-3 font-mono text-[10px] break-all">{showAuditDetailDialog.csv_hash || 'N/A'}</td>
+                          <td className="py-2 px-3 font-medium">Contagem (Registros)</td>
+                          <td className="py-2 px-3 font-mono">{showAuditDetailDialog.expected_data?.count || '-'}</td>
+                          <td className="py-2 px-3 font-mono">{showAuditDetailDialog.record_count || '-'}</td>
                           <td className="py-2 px-3 text-center">
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">VALIDADO</Badge>
+                            <Badge variant={showAuditDetailDialog.expected_data?.count === showAuditDetailDialog.record_count ? "outline" : "destructive"} className="h-4 text-[8px]">
+                              {showAuditDetailDialog.expected_data?.count === showAuditDetailDialog.record_count ? 'OK' : 'DIVERGENTE'}
+                            </Badge>
                           </td>
                         </tr>
                         <tr className="border-t">
-                          <td className="py-2 px-3 font-medium">PDF</td>
-                          <td className="py-2 px-3 font-mono text-[10px] break-all">{showAuditDetailDialog.pdf_hash || 'N/A'}</td>
+                          <td className="py-2 px-3 font-medium">Hash CSV</td>
+                          <td className="py-2 px-3 font-mono text-[8px] break-all opacity-60">{showAuditDetailDialog.expected_data?.csv_hash || 'N/A'}</td>
+                          <td className="py-2 px-3 font-mono text-[8px] break-all">{showAuditDetailDialog.csv_hash || 'N/A'}</td>
                           <td className="py-2 px-3 text-center">
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">VALIDADO</Badge>
+                            <Badge variant={showAuditDetailDialog.expected_data?.csv_hash === showAuditDetailDialog.csv_hash ? "outline" : "destructive"} className="h-4 text-[8px]">
+                              {showAuditDetailDialog.expected_data?.csv_hash === showAuditDetailDialog.csv_hash ? 'OK' : 'FALHA'}
+                            </Badge>
                           </td>
+                        </tr>
+                        <tr className="border-t">
+                          <td className="py-2 px-3 font-medium">Hash PDF</td>
+                          <td className="py-2 px-3 font-mono text-[8px] break-all opacity-60">{showAuditDetailDialog.expected_data?.pdf_hash || 'N/A'}</td>
+                          <td className="py-2 px-3 font-mono text-[8px] break-all">{showAuditDetailDialog.pdf_hash || 'N/A'}</td>
+                          <td className="py-2 px-3 text-center">
+                            <Badge variant={showAuditDetailDialog.expected_data?.pdf_hash === showAuditDetailDialog.pdf_hash ? "outline" : "destructive"} className="h-4 text-[8px]">
+                              {showAuditDetailDialog.expected_data?.pdf_hash === showAuditDetailDialog.pdf_hash ? 'OK' : 'FALHA'}
+                            </Badge>
+                          </td>
+                        </tr>
+                        <tr className="border-t bg-muted/10">
+                          <td className="py-2 px-3 font-medium">Hash ZIP</td>
+                          <td className="py-2 px-3 font-mono text-[8px] italic opacity-60">Indisponível na Pré-viz</td>
+                          <td className="py-2 px-3 font-mono text-[8px] break-all">{showAuditDetailDialog.zip_hash || 'Pendente'}</td>
+                          <td className="py-2 px-3 text-center">-</td>
                         </tr>
                       </tbody>
                     </table>
@@ -3218,7 +3302,15 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                                 {log.file_url && (
                                   <div className="flex flex-col gap-1">
                                     <div className="flex gap-1">
-                                      <Button variant="ghost" size="sm" onClick={() => verifyAndDownload(log)} className="h-6 text-[9px] text-green-600 border border-green-100 bg-green-50/50">
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={() => verifyAndDownloadFile(log, 'zip')} 
+                                        className={cn(
+                                          "h-6 text-[9px] border",
+                                          log.validation_divergence ? "text-red-600 border-red-200 bg-red-50" : "text-green-600 border-green-100 bg-green-50/50"
+                                        )}
+                                      >
                                          <FileArchive className="w-3 h-3 mr-1" /> ZIP
                                       </Button>
                                       <Button variant="ghost" size="sm" onClick={() => verifyAndDownloadFile(log, 'csv')} className="h-6 text-[9px] text-green-600 border border-green-100 bg-green-50/50">
