@@ -414,6 +414,14 @@ export default function Sefaz() {
         
         if (error) throw error;
 
+        // Also update the granular suspension state throughput
+        await supabase.from("fiscal_suspension_states").upsert({
+          user_id: user.id,
+          uf: fiscalConfig.uf,
+          environment: fiscalConfig.environment,
+          throughput_per_minute: fiscalConfig.reactivation_throughput || 5
+        }, { onConflict: "user_id, uf, environment" });
+
         if (certPassword) {
           const { data, error: funcError } = await supabase.functions.invoke("fiscal-engine", {
             body: { action: "update_password", password: certPassword }
