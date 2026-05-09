@@ -469,7 +469,7 @@ export default function Sefaz() {
           supabase.removeChannel(channel);
         };
       }
-    }, [user, backlogFilters, periodo, cStatFilter, xMotivoFilter, dlPeriodo, dlCStatFilter, dlXMotivoFilter]);
+    }, [user, backlogFilters, backlogSort, periodo, cStatFilter, xMotivoFilter, dlPeriodo, dlCStatFilter, dlXMotivoFilter]);
 
     useEffect(() => {
       if (user) {
