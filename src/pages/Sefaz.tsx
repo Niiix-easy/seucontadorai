@@ -369,7 +369,17 @@ export default function Sefaz() {
     useEffect(() => {
       if (user) {
         loadNfes();
+      }
+    }, [user]);
+
+    useEffect(() => {
+      if (user) {
         loadFiscalConfig();
+      }
+    }, [user, fiscalConfig.uf, fiscalConfig.environment]);
+
+    useEffect(() => {
+      if (user) {
         loadProcessedDocs();
         loadBacklogData();
         loadAuditLogs();
