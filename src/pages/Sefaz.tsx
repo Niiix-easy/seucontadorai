@@ -2567,7 +2567,10 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                  </thead>
                  <tbody>
                    {auditLogs.map(log => (
-                     <tr key={log.id} className="border-t hover:bg-muted/30">
+                       <tr key={log.id} className={cn(
+                         "border-t hover:bg-muted/30 transition-colors",
+                         log.validation_divergence ? "bg-red-50/50" : ""
+                       )}>
                        <td className="py-2 px-4 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
                        <td className="py-2 px-4">
                          <Badge variant="outline" className={cn("text-[9px]", 
@@ -3299,7 +3302,15 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                                 {log.file_url && (
                                   <div className="flex flex-col gap-1">
                                     <div className="flex gap-1">
-                                      <Button variant="ghost" size="sm" onClick={() => verifyAndDownload(log)} className="h-6 text-[9px] text-green-600 border border-green-100 bg-green-50/50">
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={() => verifyAndDownloadFile(log, 'zip')} 
+                                        className={cn(
+                                          "h-6 text-[9px] border",
+                                          log.validation_divergence ? "text-red-600 border-red-200 bg-red-50" : "text-green-600 border-green-100 bg-green-50/50"
+                                        )}
+                                      >
                                          <FileArchive className="w-3 h-3 mr-1" /> ZIP
                                       </Button>
                                       <Button variant="ghost" size="sm" onClick={() => verifyAndDownloadFile(log, 'csv')} className="h-6 text-[9px] text-green-600 border border-green-100 bg-green-50/50">
