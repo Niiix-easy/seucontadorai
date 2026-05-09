@@ -1167,20 +1167,32 @@ export default function Sefaz() {
         
         const url = URL.createObjectURL(content);
 
-        await supabase.from("fiscal_export_logs").insert([{
-          user_id: user.id, report_type: type, format: 'zip', status: 'success', 
-          record_count: finalRecordCount, csv_count: finalRecordCount, pdf_count: finalRecordCount, 
-          csv_hash: finalCsvHash, pdf_hash: finalPdfHash, zip_hash: zipHash,
+         const auditEvents = [
+           { timestamp: new Date().toISOString(), stage: 'initializing', message: 'Iniciando exportação completa do relatório.' },
+           { timestamp: new Date().toISOString(), stage: 'csv_gen', message: `Arquivo CSV gerado com ${finalRecordCount} registros.` },
+           { timestamp: new Date().toISOString(), stage: 'pdf_gen', message: 'Documento PDF formatado e pronto.' },
+           { timestamp: new Date().toISOString(), stage: 'hash_calc', message: 'Hashes SHA-256 calculados e validados.' },
+           { timestamp: new Date().toISOString(), stage: 'finalizing', message: 'Pacote ZIP finalizado e pronto para download.' }
+         ];
+ 
+         if (finalDivergence) {
+           auditEvents.push({
+             timestamp: new Date().toISOString(),
+             stage: 'validation',
+             message: 'Divergência de contagem detectada!',
+             status: 'error',
+             reason: `Esperado: ${previewCount} | Obtido: ${finalRecordCount}`
+           });
+         }
+ 
+         await supabase.from("fiscal_export_logs").insert([{
+           user_id: user.id, report_type: type, format: 'zip', status: 'success', 
+           record_count: finalRecordCount, csv_count: finalRecordCount, pdf_count: finalRecordCount, 
+           csv_hash: finalCsvHash, pdf_hash: finalPdfHash, zip_hash: zipHash,
            validation_divergence: finalDivergence, filters: filters, technical_log: finalTechLog as any, recipients: [],
            expected_data: { csv_hash: expectedCsvHash, pdf_hash: expectedPdfHash, count: previewCount },
-           audit_events: [
-             { timestamp: new Date().toISOString(), stage: 'initializing', message: 'Iniciando exportação completa do relatório.' },
-             { timestamp: new Date().toISOString(), stage: 'csv_gen', message: `Arquivo CSV gerado com ${finalRecordCount} registros.` },
-             { timestamp: new Date().toISOString(), stage: 'pdf_gen', message: 'Documento PDF formatado e pronto.' },
-             { timestamp: new Date().toISOString(), stage: 'hash_calc', message: 'Hashes SHA-256 calculados e validados.' },
-             { timestamp: new Date().toISOString(), stage: 'finalizing', message: 'Pacote ZIP finalizado e pronto para download.' }
-           ]
-        }]);
+           audit_events: auditEvents
+         }]);
         const link = document.createElement("a");
         link.href = url;
         link.download = `${type}_fiscal_${dateStr}.zip`;
