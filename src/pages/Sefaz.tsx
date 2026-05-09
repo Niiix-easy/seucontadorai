@@ -704,18 +704,59 @@ export default function Sefaz() {
        }
      };
  
-      const handleExportZip = async (type: 'backlog' | 'audit') => {
-        const filters = type === 'backlog' ? backlogFilters : auditFilters;
-        const count = type === 'backlog' 
-          ? backlogData.reduce((acc, b) => acc + b.count, 0) 
-          : auditLogs.length;
-        
-        setShowZipPreviewDialog({ type, count, filters });
-      };
+     const calculateHash = async (content: string | Blob) => {
+       const data = typeof content === 'string' ? new TextEncoder().encode(content) : new Uint8Array(await (content as Blob).arrayBuffer());
+       const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+       const hashArray = Array.from(new Uint8Array(hashBuffer));
+       return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+     };
+
+     const handleExportZip = async (type: 'backlog' | 'audit') => {
+       const filters = type === 'backlog' ? backlogFilters : auditFilters;
+       const count = type === 'backlog' 
+         ? backlogData.reduce((acc, b) => acc + b.count, 0) 
+         : auditLogs.length;
+       
+       setShowZipPreviewDialog({ type, count, filters, previewCount: count });
+     };
+
+     const handleRerunExport = async (log: any) => {
+       if (!user) return;
+       toast.info("Reexecutando exportação com snapshot de filtros...");
+       
+       const schedule = {
+         id: log.report_id,
+         report_type: log.report_type,
+         filters: log.filters
+       };
+
+       const technicalInfo = {
+         ...log.technical_log,
+         is_rerun: true,
+         original_log_id: log.id
+       };
+
+       setManualScheduleStatus({ id: log.report_id, status: 'initializing', progress: 10 });
+       
+       try {
+         const { error } = await supabase.functions.invoke("fiscal-scheduler", {
+           body: { 
+             action: "run_now", 
+             schedule_id: log.report_id,
+             technical_info: technicalInfo
+           }
+         });
+
+         if (error) throw error;
+         handleRunScheduleNow(schedule); 
+       } catch (err: any) {
+         toast.error("Erro ao reexecutar: " + err.message);
+       }
+     };
 
       const confirmExportZip = async () => {
-        if (!showZipPreviewDialog) return;
-        const { type } = showZipPreviewDialog;
+         if (!showZipPreviewDialog || !user) return;
+         const { type, previewCount } = showZipPreviewDialog;
         setShowZipPreviewDialog(null);
         
         toast.info("Gerando pacote ZIP...");
@@ -752,9 +793,9 @@ export default function Sefaz() {
            const techLog = { sorting: backlogSort, page: backlogPage, timestamp: new Date().toISOString(), csv_hash: csvHash, pdf_hash: pdfHash, preview_count: previewCount, final_count: rows.length };
            zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(techLog, null, 2));
            const divergence = previewCount !== rows.length;
-           await supabase.from("fiscal_export_logs").insert({
-             user_id: user.id, report_type: 'backlog', format: 'zip', status: 'success', record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, csv_hash: csvHash, pdf_hash: pdfHash, validation_divergence: divergence, filters: backlogFilters, technical_log: techLog
-           });
+           await supabase.from("fiscal_export_logs").insert([{
+             user_id: user.id, report_type: 'backlog', format: 'zip', status: 'success', record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, csv_hash: csvHash, pdf_hash: pdfHash, validation_divergence: divergence, filters: backlogFilters, technical_log: techLog as any
+           }]);
          } else {
            const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "cStat", "xMotivo"];
            const rows = auditLogs.map(log => [new Date(log.created_at).toLocaleString(), log.action.toUpperCase(), log.uf, log.environment, log.reason || "", log.cstat || "", log.xmotivo || ""]);
@@ -772,9 +813,9 @@ export default function Sefaz() {
            const techLog = { sorting: auditSort, page: auditPage, timestamp: new Date().toISOString(), csv_hash: csvHash, pdf_hash: pdfHash, preview_count: previewCount, final_count: rows.length };
            zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(techLog, null, 2));
            const divergence = previewCount !== rows.length;
-           await supabase.from("fiscal_export_logs").insert({
-             user_id: user.id, report_type: 'audit', format: 'zip', status: 'success', record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, csv_hash: csvHash, pdf_hash: pdfHash, validation_divergence: divergence, filters: auditFilters, technical_log: techLog
-           });
+           await supabase.from("fiscal_export_logs").insert([{
+             user_id: user.id, report_type: 'audit', format: 'zip', status: 'success', record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, csv_hash: csvHash, pdf_hash: pdfHash, validation_divergence: divergence, filters: auditFilters, technical_log: techLog as any
+           }]);
          }
   
         const content = await zip.generateAsync({ type: "blob" });
