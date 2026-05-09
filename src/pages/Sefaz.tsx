@@ -362,8 +362,30 @@ export default function Sefaz() {
         loadFiscalConfig();
         loadProcessedDocs();
         loadBacklogData();
+        loadAuditLogs();
+
+        const channel = supabase
+          .channel('fiscal_monitoring')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'processed_documents' }, () => {
+            loadBacklogData();
+            loadProcessedDocs();
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'fiscal_suspension_states' }, () => {
+            loadBacklogData();
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'dead_letter_notifications' }, () => {
+            loadProcessedDocs();
+          })
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'fiscal_action_logs' }, () => {
+            loadAuditLogs();
+          })
+          .subscribe();
+
+        return () => {
+          supabase.removeChannel(channel);
+        };
       }
-    }, [user]);
+    }, [user, backlogFilters]);
 
    const loadFiscalConfig = async () => {
      const { data, error } = await supabase.from("fiscal_configurations").select("*").single();
