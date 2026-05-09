@@ -792,6 +792,90 @@ export default function Sefaz() {
             ))}
           </div>
         </TabsContent>
+
+        <TabsContent value="config_avancada">
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-display flex items-center gap-2">
+                <Settings className="w-5 h-5 text-primary" /> Configurações do Certificado & SEFAZ
+              </CardTitle>
+              <CardDescription>Gerencie limites de retentativa, ambiente e senha do e-CNPJ A1.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <p className="text-sm font-medium text-muted-foreground">Parâmetros de Conexão</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>UF</Label>
+                      <Select value={fiscalConfig.uf} onValueChange={v => setFiscalConfig(p => ({ ...p, uf: v }))}>
+                        <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                        <SelectContent>{ufs.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Ambiente</Label>
+                      <Select value={fiscalConfig.environment} onValueChange={(v: any) => setFiscalConfig(p => ({ ...p, environment: v }))}>
+                        <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="homologacao">Homologação</SelectItem>
+                          <SelectItem value="producao">Produção</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Senha do Certificado (Criptografada no Servidor)</Label>
+                    <div className="relative">
+                      <Input 
+                        type={showCertPassword ? "text" : "password"} 
+                        value={certPassword} 
+                        onChange={e => setCertPassword(e.target.value)} 
+                        placeholder="Nova senha do .pfx" 
+                        className="pr-10"
+                      />
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="absolute right-0 top-0 h-full px-3" 
+                        onClick={() => setShowCertPassword(!showCertPassword)}
+                      >
+                        {showCertPassword ? <Eye className="w-4 h-4" /> : <Eye className="w-4 h-4 text-muted-foreground" />}
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">A senha é enviada via canal seguro e criptografada com AES-256 no servidor.</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <p className="text-sm font-medium text-muted-foreground">Políticas de Reprocessamento</p>
+                  <div className="space-y-2">
+                    <Label>Máximo de Tentativas (Dead-letter limit)</Label>
+                    <Input 
+                      type="number" 
+                      value={fiscalConfig.max_retries} 
+                      onChange={e => setFiscalConfig(p => ({ ...p, max_retries: Number(e.target.value) }))} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Intervalo entre Tentativas (minutos)</Label>
+                    <Input 
+                      type="number" 
+                      value={fiscalConfig.retry_delay_minutes} 
+                      onChange={e => setFiscalConfig(p => ({ ...p, retry_delay_minutes: Number(e.target.value) }))} 
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end pt-4 border-t">
+                <Button onClick={handleSaveConfig} disabled={configLoading} className="gap-2">
+                  {configLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                  Salvar Configurações
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* XML Preview */}
