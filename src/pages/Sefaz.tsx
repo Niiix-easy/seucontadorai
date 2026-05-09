@@ -157,6 +157,8 @@ export default function Sefaz() {
     const [showScheduleDialog, setShowScheduleDialog] = useState<{ type: 'backlog' | 'audit' } | null>(null);
      const [newSchedule, setNewSchedule] = useState({ format: 'pdf', frequency: 'daily', emails: [] as string[] as string[], currentEmail: "" });
     const [showExportPreview, setShowExportPreview] = useState(false);
+    const [showZipPreviewDialog, setShowZipPreviewDialog] = useState<{ type: 'backlog' | 'audit', count: number, filters: any } | null>(null);
+    const [manualScheduleStatus, setManualScheduleStatus] = useState<{ id: string, status: string, progress: number, zipUrl?: string } | null>(null);
     const [exportHistory, setExportHistory] = useState<any[]>([]);
     const [showExportHistory, setShowExportHistory] = useState(false);
     const [backlogPage, setBacklogPage] = useState(1);
@@ -632,23 +634,55 @@ export default function Sefaz() {
        }
      };
  
-     const handleRunScheduleNow = async (schedule: any) => {
-       if (!user) return;
-       toast.info("Iniciando processamento manual da exportação...");
-       
-       try {
-         const { error } = await supabase.functions.invoke("fiscal-scheduler", {
-           body: { action: "run_now", schedule_id: schedule.id }
-         });
- 
-         if (error) throw error;
-         toast.success("Exportação enfileirada com sucesso!");
-         const { data: logs } = await supabase.from("fiscal_export_logs").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
-         if (logs) setExportHistory(logs);
-       } catch (err: any) {
-         toast.error("Erro ao disparar exportação: " + err.message);
-       }
-     };
+      const handleRunScheduleNow = async (schedule: any) => {
+        if (!user) return;
+        setManualScheduleStatus({ id: schedule.id, status: 'initializing', progress: 10 });
+        toast.info("Iniciando processamento manual da exportação...");
+        
+        try {
+          setManualScheduleStatus(prev => prev ? { ...prev, status: 'running', progress: 30 } : null);
+          const { data, error } = await supabase.functions.invoke("fiscal-scheduler", {
+            body: { action: "run_now", schedule_id: schedule.id }
+          });
+  
+          if (error) throw error;
+          
+          setManualScheduleStatus(prev => prev ? { ...prev, progress: 60 } : null);
+          
+          // Poll for completion to show the download link
+          let completed = false;
+          let attempts = 0;
+          while (!completed && attempts < 15) {
+            await new Promise(r => setTimeout(r, 2000));
+            const { data: latestLog } = await supabase
+              .from("fiscal_export_logs")
+              .select("*")
+              .eq("report_id", schedule.id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .single();
+            
+            if (latestLog) {
+              if (latestLog.status === 'success') {
+                setManualScheduleStatus(prev => prev ? { ...prev, status: 'success', progress: 100, zipUrl: latestLog.file_url } : null);
+                completed = true;
+                toast.success("Exportação concluída!");
+              } else if (latestLog.status === 'error') {
+                setManualScheduleStatus(prev => prev ? { ...prev, status: 'error', progress: 100 } : null);
+                completed = true;
+                toast.error("Falha na exportação: " + latestLog.error_message);
+              }
+            }
+            attempts++;
+          }
+
+          const { data: logs } = await supabase.from("fiscal_export_logs").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+          if (logs) setExportHistory(logs);
+        } catch (err: any) {
+          setManualScheduleStatus(prev => prev ? { ...prev, status: 'error', progress: 100 } : null);
+          toast.error("Erro ao disparar exportação: " + err.message);
+        }
+      };
  
      const handleResendEmail = async (logId: string) => {
        toast.info("Reenviando e-mail...");
