@@ -1,3 +1,17 @@
+                <div className="space-y-4 pt-4 border-t">
+                  <p className="text-sm font-medium text-muted-foreground">Canais de Alerta (Dead-Letter)</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center justify-between p-3 rounded-md border bg-muted/20">
+                      <Label className="text-xs">Notificações no App</Label>
+                      <Switch checked={notifPrefs.push} onCheckedChange={c => setNotifPrefs(p => ({ ...p, push: c }))} />
+                    </div>
+                    <div className="flex items-center justify-between p-3 rounded-md border bg-muted/20">
+                      <Label className="text-xs">Alertas por E-mail</Label>
+                      <Switch checked={notifPrefs.email} onCheckedChange={c => setNotifPrefs(p => ({ ...p, email: c }))} />
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={handleSaveNotifPrefs} className="w-full">Salvar Canais de Alerta</Button>
+                </div>
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
