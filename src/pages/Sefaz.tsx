@@ -641,9 +641,17 @@ export default function Sefaz() {
         
         try {
           setManualScheduleStatus(prev => prev ? { ...prev, status: 'running', progress: 30 } : null);
-          const { data, error } = await supabase.functions.invoke("fiscal-scheduler", {
-            body: { action: "run_now", schedule_id: schedule.id }
-          });
+           const { data, error } = await supabase.functions.invoke("fiscal-scheduler", {
+             body: { 
+               action: "run_now", 
+               schedule_id: schedule.id,
+               technical_info: {
+                 sorting: schedule.report_type === 'backlog' ? backlogSort : auditSort,
+                 page: schedule.report_type === 'backlog' ? backlogPage : auditPage,
+                 page_size: 10
+               }
+             }
+           });
   
           if (error) throw error;
           
@@ -2570,17 +2578,20 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                     <div className="flex justify-between items-end">
                       <div>
                         <span className="text-xl font-bold">{showZipPreviewDialog.count}</span>
-                        <span className="text-[10px] text-muted-foreground ml-1">total de registros</span>
+                        <span className="text-[10px] text-muted-foreground ml-1">total (pacote ZIP)</span>
                       </div>
                       <div className="text-[10px] text-right space-y-0.5">
-                        <p className="text-blue-600 font-medium">CSV: {showZipPreviewDialog.count} registros</p>
-                        <p className="text-red-600 font-medium">PDF: {showZipPreviewDialog.count} registros</p>
+                        <p className="text-blue-600 font-medium">CSV: {showZipPreviewDialog.count} reg. (separado)</p>
+                        <p className="text-red-600 font-medium">PDF: {showZipPreviewDialog.count} reg. (separado)</p>
                       </div>
                     </div>
                   </div>
                   <div className="border rounded p-3 bg-muted/30">
                     <span className="text-[10px] text-muted-foreground uppercase block mb-1">Relatório</span>
-                    <span className="text-xl font-bold capitalize">{showZipPreviewDialog.type}</span>
+                      <span className="text-xl font-bold capitalize">{showZipPreviewDialog.type}</span>
+                      {showZipPreviewDialog.filters.action && showZipPreviewDialog.filters.action !== 'all' && (
+                        <span className="text-[9px] block text-muted-foreground">Ação: {showZipPreviewDialog.filters.action}</span>
+                      )}
                   </div>
                 </div>
 
@@ -2689,7 +2700,7 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                       <th className="text-left py-2 px-4">Data/Hora</th>
                       <th className="text-left py-2 px-4">Relatório</th>
                       <th className="text-left py-2 px-4">Formato</th>
-                      <th className="text-center py-2 px-4">Registros</th>
+                       <th className="text-center py-2 px-4">Recorte (Reg)</th>
                       <th className="text-left py-2 px-4">Status</th>
                       <th className="text-right py-2 px-4">Ação</th>
                     </tr>
@@ -2709,42 +2720,57 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                            </div>
                          </td>
                         <td className="py-2 px-4 uppercase font-bold">{log.format}</td>
-                        <td className="py-2 px-4 text-center">{log.record_count}</td>
+                         <td className="py-2 px-4 text-center">
+                           <div className="flex flex-col items-center">
+                             <span className="font-bold">{log.record_count || 0}</span>
+                             <span className="text-[8px] text-muted-foreground">CSV: {log.csv_count || 0} | PDF: {log.pdf_count || 0}</span>
+                           </div>
+                         </td>
                         <td className="py-2 px-4">
                           <Badge variant={log.status === 'success' ? 'default' : 'destructive'} className="text-[9px]">
                             {log.status === 'success' ? 'Enviado' : 'Erro'}
                           </Badge>
                         </td>
-                        <td className="py-2 px-4 text-right flex flex-col items-end gap-1">
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => handleResendEmail(log.id)} className="h-7 text-[10px] text-purple-600">
-                               <Send className="w-3 h-3 mr-1" /> Reenviar E-mail
-                            </Button>
-                            {log.file_url && (
-                              <Button variant="ghost" size="sm" asChild className="h-7 text-[10px] text-green-600">
-                                <a href={log.file_url} target="_blank" rel="noopener noreferrer">
-                                  <Download className="w-3 h-3 mr-1" /> Baixar ZIP
-                                </a>
-                              </Button>
-                            )}
-                          </div>
-                          {log.status === 'error' && (
-                            <div className="text-[8px] text-destructive max-w-[150px] text-right truncate" title={log.error_message}>
-                              Etapa: Geração {'→'} Falha: {log.error_message || 'Desconhecido'}
-                            </div>
-                          )}
-                           <div className="text-[8px] mt-1">
-                             {log.status === 'success' ? (
-                               <span className="text-green-600">
-                                 Geração ({log.record_count} reg) {'→'} ZIP {'→'} Envio (OK)
-                               </span>
-                             ) : (
-                               <span className="text-destructive">
-                                 Falha: {log.error_message || 'Erro inesperado'}
-                               </span>
-                             )}
+                         <td className="py-2 px-4 text-right">
+                           <div className="flex flex-col items-end gap-1">
+                             <div className="flex gap-1">
+                               <Button 
+                                 variant="ghost" 
+                                 size="sm" 
+                                 onClick={() => handleResendEmail(log.id)} 
+                                 className={cn("h-7 text-[10px]", log.resend_status === 'sent' ? "text-green-600" : "text-purple-600")}
+                                 disabled={log.resend_status === 'sending'}
+                               >
+                                  {log.resend_status === 'sending' ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Send className="w-3 h-3 mr-1" />}
+                                  {log.resend_status === 'sent' ? 'E-mail Enviado' : (log.resend_status === 'sending' ? 'Enviando...' : 'Reenviar E-mail')}
+                               </Button>
+                               {log.file_url && (
+                                 <Button variant="ghost" size="sm" asChild className="h-7 text-[10px] text-green-600">
+                                   <a href={log.file_url} target="_blank" rel="noopener noreferrer">
+                                     <Download className="w-3 h-3 mr-1" /> Baixar ZIP
+                                   </a>
+                                 </Button>
+                               )}
+                             </div>
+                             <div className="flex flex-col items-end">
+                               {log.status === 'success' ? (
+                                 <div className="flex flex-col items-end text-[8px] text-green-600">
+                                   <span>Geração: {log.stage_counts?.generation || 0} reg | Proc: {log.stage_counts?.processing || 0} reg</span>
+                                   {log.technical_log?.sorting && (
+                                     <span className="text-muted-foreground font-mono">
+                                       Log: {log.technical_log.sorting.field} ({log.technical_log.sorting.order}), P{log.technical_log.page}
+                                     </span>
+                                   )}
+                                 </div>
+                               ) : (
+                                 <div className="text-[8px] text-destructive max-w-[200px] text-right" title={log.full_error_details || log.error_message}>
+                                   <span className="font-bold">Falha (Etapa: {log.technical_log?.stage || 'Geração'}):</span>
+                                   <p className="line-clamp-2">{log.full_error_details || log.error_message || 'Erro inesperado'}</p>
+                                 </div>
+                               )}
+                             </div>
                            </div>
-                        </td>
+                         </td>
                       </tr>
                     ))}
                      {exportHistory.length === 0 && (
