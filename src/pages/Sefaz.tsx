@@ -3090,8 +3090,52 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                    <TabsTrigger value="schedules">Agendamentos Ativos</TabsTrigger>
                  </TabsList>
                  
-                 <TabsContent value="history" className="mt-4">
-                   <div className="overflow-x-auto border rounded-lg">
+                 <TabsContent value="history" className="mt-4 space-y-4">
+                    <div className="grid grid-cols-4 gap-2 bg-muted/20 p-3 rounded-lg border text-[10px]">
+                      <div className="space-y-1">
+                        <Label className="text-[9px]">Status</Label>
+                        <Select value={historyFilters.status} onValueChange={v => setHistoryFilters(p => ({ ...p, status: v }))}>
+                          <SelectTrigger className="h-7 text-[10px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Todos</SelectItem>
+                            <SelectItem value="success">Sucesso</SelectItem>
+                            <SelectItem value="error">Erro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[9px]">Divergência</Label>
+                        <Select value={historyFilters.divergence} onValueChange={v => setHistoryFilters(p => ({ ...p, divergence: v }))}>
+                          <SelectTrigger className="h-7 text-[10px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Ambos</SelectItem>
+                            <SelectItem value="true">Com Divergência</SelectItem>
+                            <SelectItem value="false">Sem Divergência</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[9px]">Início</Label>
+                        <Input type="date" className="h-7 text-[10px]" value={historyFilters.dateStart} onChange={e => setHistoryFilters(p => ({ ...p, dateStart: e.target.value }))} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[9px]">Fim</Label>
+                        <Input type="date" className="h-7 text-[10px]" value={historyFilters.dateEnd} onChange={e => setHistoryFilters(p => ({ ...p, dateEnd: e.target.value }))} />
+                      </div>
+                      <div className="space-y-1 col-span-2">
+                        <Label className="text-[9px]">Destinatário (Busca)</Label>
+                        <Input placeholder="email@exemplo.com" className="h-7 text-[10px]" value={historyFilters.recipient} onChange={e => setHistoryFilters(p => ({ ...p, recipient: e.target.value }))} />
+                      </div>
+                      <div className="flex items-end gap-1 col-span-2">
+                        <Button variant="outline" size="sm" className="h-7 text-[9px] flex-1" onClick={loadExportHistory}>
+                          <Filter className="w-3 h-3 mr-1" /> Filtrar
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-[9px] flex-1" onClick={() => setHistoryFilters({ status: "all", divergence: "all", uf: "all", env: "all", dateStart: "", dateEnd: "", recipient: "" })}>
+                          Limpar
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto border rounded-lg">
                 <table className="w-full text-xs">
                   <thead className="bg-muted uppercase">
                     <tr>
