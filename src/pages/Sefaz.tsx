@@ -963,7 +963,19 @@ export default function Sefaz() {
            const pdfHash = await calculateHash(pdfContent);
            zip.file(`backlog_fiscal_${dateStr}.pdf`, pdfContent);
 
-           const techLog = { sorting: backlogSort, page: backlogPage, timestamp: new Date().toISOString(), csv_hash: csvHash, pdf_hash: pdfHash, preview_count: previewCount, final_count: rows.length };
+            const techLog = { 
+              execution_id: crypto.randomUUID(),
+              sorting: backlogSort, 
+              page: backlogPage, 
+              page_size: 10,
+              direction: backlogSort.order,
+              field: backlogSort.field,
+              timestamp: new Date().toISOString(), 
+              csv_hash: csvHash, 
+              pdf_hash: pdfHash, 
+              preview_count: previewCount, 
+              final_count: rows.length 
+            };
            zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(techLog, null, 2));
            const divergence = previewCount !== rows.length;
            await supabase.from("fiscal_export_logs").insert([{
@@ -983,7 +995,19 @@ export default function Sefaz() {
            const pdfHash = await calculateHash(pdfContent);
            zip.file(`auditoria_fiscal_${dateStr}.pdf`, pdfContent);
 
-           const techLog = { sorting: auditSort, page: auditPage, timestamp: new Date().toISOString(), csv_hash: csvHash, pdf_hash: pdfHash, preview_count: previewCount, final_count: rows.length };
+            const techLog = { 
+              execution_id: crypto.randomUUID(),
+              sorting: auditSort, 
+              page: auditPage, 
+              page_size: 10,
+              direction: auditSort.order,
+              field: auditSort.field,
+              timestamp: new Date().toISOString(), 
+              csv_hash: csvHash, 
+              pdf_hash: pdfHash, 
+              preview_count: previewCount, 
+              final_count: rows.length 
+            };
            zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(techLog, null, 2));
            const divergence = previewCount !== rows.length;
            await supabase.from("fiscal_export_logs").insert([{
