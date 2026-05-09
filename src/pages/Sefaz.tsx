@@ -142,19 +142,19 @@ export default function Sefaz() {
       const filtered = statusFilter === "all" ? processedDocs : processedDocs.filter(d => d.status === statusFilter);
       if (filtered.length === 0) return;
       const headers = ["ID", "Data", "Tipo", "Status", "Total", "Recibo", "Protocolo", "Sefaz Status", "Sefaz Mensagem", "Erros", "Retentativas"];
-      const rows = filtered.map(doc => [
-        doc.id, 
-        new Date(doc.created_at).toLocaleString(), 
-        doc.document_type, 
-        doc.status,
-        doc.valor_total || 0, 
-        doc.receipt_number || "", 
-        doc.protocol_number || "",
-        doc.last_error || "", 
-        doc.retry_count || 0,
-        doc.sefaz_response_code || "",
-        doc.sefaz_response_message || ""
-      ]);
+       const rows = filtered.map(doc => [
+         doc.id, 
+         new Date(doc.created_at).toLocaleString(), 
+         doc.document_type, 
+         doc.status,
+         doc.valor_total || 0, 
+         doc.receipt_number || "", 
+         doc.protocol_number || "",
+         doc.sefaz_response_code || "",
+         doc.sefaz_response_message || "",
+         doc.last_error || "", 
+         doc.retry_count || 0,
+       ]);
       const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
