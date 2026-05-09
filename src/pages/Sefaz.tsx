@@ -1767,10 +1767,18 @@ export default function Sefaz() {
                   <table className="w-full text-xs">
                     <thead className="bg-muted/50 uppercase">
                       <tr>
-                        <th className="text-left py-2 px-4">UF</th>
-                        <th className="text-left py-2 px-4">Ambiente</th>
-                        <th className="text-center py-2 px-4">Fila</th>
-                        <th className="text-left py-2 px-4">Próximo Envio</th>
+                        <th className="text-left py-2 px-4 cursor-pointer hover:bg-muted" onClick={() => setBacklogSort({ field: 'uf', order: backlogSort.field === 'uf' && backlogSort.order === 'asc' ? 'desc' : 'asc' })}>
+                          UF {backlogSort.field === 'uf' && (backlogSort.order === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th className="text-left py-2 px-4 cursor-pointer hover:bg-muted" onClick={() => setBacklogSort({ field: 'env', order: backlogSort.field === 'env' && backlogSort.order === 'asc' ? 'desc' : 'asc' })}>
+                          Ambiente {backlogSort.field === 'env' && (backlogSort.order === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th className="text-center py-2 px-4 cursor-pointer hover:bg-muted" onClick={() => setBacklogSort({ field: 'count', order: backlogSort.field === 'count' && backlogSort.order === 'asc' ? 'desc' : 'asc' })}>
+                          Fila {backlogSort.field === 'count' && (backlogSort.order === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th className="text-left py-2 px-4 cursor-pointer hover:bg-muted" onClick={() => setBacklogSort({ field: 'next', order: backlogSort.field === 'next' && backlogSort.order === 'asc' ? 'desc' : 'asc' })}>
+                          Próximo Envio {backlogSort.field === 'next' && (backlogSort.order === 'asc' ? '↑' : '↓')}
+                        </th>
                         <th className="text-center py-2 px-4">Status</th>
                         <th className="text-right py-2 px-4">Ação</th>
                       </tr>
