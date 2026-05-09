@@ -1424,7 +1424,11 @@ export default function Sefaz() {
                     <Label className="text-[10px] uppercase text-muted-foreground">A partir de:</Label>
                     <Input type="date" value={backlogFilters.date} onChange={e => setBacklogFilters(p => ({ ...p, date: e.target.value }))} className="w-32 h-8 text-[10px]" />
                   </div>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setBacklogFilters({ uf: "all", env: "all", date: "" })} title="Limpar Filtros"><X className="w-3 h-3" /></Button>
+                   <div className="flex items-center gap-2">
+                     <Input placeholder="cStat" value={backlogFilters.cStat} onChange={e => setBacklogFilters(p => ({ ...p, cStat: e.target.value }))} className="w-20 h-8 text-[10px]" />
+                     <Input placeholder="xMotivo" value={backlogFilters.xMotivo} onChange={e => setBacklogFilters(p => ({ ...p, xMotivo: e.target.value }))} className="w-32 h-8 text-[10px]" />
+                   </div>
+                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setBacklogFilters({ uf: "all", env: "all", date: "", cStat: "", xMotivo: "" })} title="Limpar Filtros"><X className="w-3 h-3" /></Button>
                 </div>
 
                 <div className="overflow-x-auto border rounded-lg">
