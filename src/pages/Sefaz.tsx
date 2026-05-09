@@ -157,6 +157,8 @@ export default function Sefaz() {
     const [showScheduleDialog, setShowScheduleDialog] = useState<{ type: 'backlog' | 'audit' } | null>(null);
      const [newSchedule, setNewSchedule] = useState({ format: 'pdf', frequency: 'daily', emails: [] as string[] as string[], currentEmail: "" });
     const [showExportPreview, setShowExportPreview] = useState(false);
+    const [showZipPreviewDialog, setShowZipPreviewDialog] = useState<{ type: 'backlog' | 'audit', count: number, filters: any } | null>(null);
+    const [manualScheduleStatus, setManualScheduleStatus] = useState<{ id: string, status: string, progress: number, zipUrl?: string } | null>(null);
     const [exportHistory, setExportHistory] = useState<any[]>([]);
     const [showExportHistory, setShowExportHistory] = useState(false);
     const [backlogPage, setBacklogPage] = useState(1);
@@ -632,23 +634,55 @@ export default function Sefaz() {
        }
      };
  
-     const handleRunScheduleNow = async (schedule: any) => {
-       if (!user) return;
-       toast.info("Iniciando processamento manual da exportação...");
-       
-       try {
-         const { error } = await supabase.functions.invoke("fiscal-scheduler", {
-           body: { action: "run_now", schedule_id: schedule.id }
-         });
- 
-         if (error) throw error;
-         toast.success("Exportação enfileirada com sucesso!");
-         const { data: logs } = await supabase.from("fiscal_export_logs").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
-         if (logs) setExportHistory(logs);
-       } catch (err: any) {
-         toast.error("Erro ao disparar exportação: " + err.message);
-       }
-     };
+      const handleRunScheduleNow = async (schedule: any) => {
+        if (!user) return;
+        setManualScheduleStatus({ id: schedule.id, status: 'initializing', progress: 10 });
+        toast.info("Iniciando processamento manual da exportação...");
+        
+        try {
+          setManualScheduleStatus(prev => prev ? { ...prev, status: 'running', progress: 30 } : null);
+          const { data, error } = await supabase.functions.invoke("fiscal-scheduler", {
+            body: { action: "run_now", schedule_id: schedule.id }
+          });
+  
+          if (error) throw error;
+          
+          setManualScheduleStatus(prev => prev ? { ...prev, progress: 60 } : null);
+          
+          // Poll for completion to show the download link
+          let completed = false;
+          let attempts = 0;
+          while (!completed && attempts < 15) {
+            await new Promise(r => setTimeout(r, 2000));
+            const { data: latestLog } = await supabase
+              .from("fiscal_export_logs")
+              .select("*")
+              .eq("report_id", schedule.id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .single();
+            
+            if (latestLog) {
+              if (latestLog.status === 'success') {
+                setManualScheduleStatus(prev => prev ? { ...prev, status: 'success', progress: 100, zipUrl: latestLog.file_url } : null);
+                completed = true;
+                toast.success("Exportação concluída!");
+              } else if (latestLog.status === 'error') {
+                setManualScheduleStatus(prev => prev ? { ...prev, status: 'error', progress: 100 } : null);
+                completed = true;
+                toast.error("Falha na exportação: " + latestLog.error_message);
+              }
+            }
+            attempts++;
+          }
+
+          const { data: logs } = await supabase.from("fiscal_export_logs").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+          if (logs) setExportHistory(logs);
+        } catch (err: any) {
+          setManualScheduleStatus(prev => prev ? { ...prev, status: 'error', progress: 100 } : null);
+          toast.error("Erro ao disparar exportação: " + err.message);
+        }
+      };
  
      const handleResendEmail = async (logId: string) => {
        toast.info("Reenviando e-mail...");
@@ -662,57 +696,78 @@ export default function Sefaz() {
        }
      };
  
-     const handleExportZip = async (type: 'backlog' | 'audit') => {
-       toast.info("Gerando pacote ZIP...");
-       const zip = new JSZip();
-       const dateStr = new Date().toISOString().split('T')[0];
-       
-       if (type === 'backlog') {
-         const headers = ["UF", "Ambiente", "Quantidade", "Próximo Envio", "Status"];
-         const rows = backlogData.map(b => {
-           const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
-           const status = state?.is_suspended ? "Suspenso" : (state?.is_paused ? "Pausado" : "Ativo");
-           return [b.uf, b.env.toUpperCase(), b.count, b.next ? new Date(b.next).toLocaleString() : "—", status];
-         });
-         const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
-         zip.file(`backlog_fiscal_${dateStr}.csv`, csvContent);
- 
-         const doc = new jsPDF();
-         doc.text("Backlog Fiscal", 14, 15);
-         autoTable(doc, { head: [headers], body: rows, startY: 25 });
-         const pdfContent = doc.output('blob');
-         zip.file(`backlog_fiscal_${dateStr}.pdf`, pdfContent);
-       } else {
-         const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "cStat", "xMotivo"];
-         const rows = auditLogs.map(log => [
-           new Date(log.created_at).toLocaleString(),
-           log.action.toUpperCase(),
-           log.uf,
-           log.environment,
-           log.reason || "",
-           log.cstat || "",
-           log.xmotivo || ""
-         ]);
-         const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
-         zip.file(`auditoria_fiscal_${dateStr}.csv`, csvContent);
- 
-         const doc = new jsPDF();
-         doc.text("Auditoria Fiscal", 14, 15);
-         autoTable(doc, { head: [headers], body: rows, startY: 25 });
-         const pdfContent = doc.output('blob');
-         zip.file(`auditoria_fiscal_${dateStr}.pdf`, pdfContent);
-       }
- 
-       const content = await zip.generateAsync({ type: "blob" });
-       const url = URL.createObjectURL(content);
-       const link = document.createElement("a");
-       link.href = url;
-       link.download = `${type}_fiscal_${dateStr}.zip`;
-       document.body.appendChild(link);
-       link.click();
-       document.body.removeChild(link);
-       toast.success("Pacote ZIP exportado!");
-     };
+      const handleExportZip = async (type: 'backlog' | 'audit') => {
+        const filters = type === 'backlog' ? backlogFilters : auditFilters;
+        const count = type === 'backlog' ? backlogData.reduce((acc, b) => acc + b.count, 0) : auditLogs.length;
+        
+        setShowZipPreviewDialog({ type, count, filters });
+      };
+
+      const confirmExportZip = async () => {
+        if (!showZipPreviewDialog) return;
+        const { type } = showZipPreviewDialog;
+        setShowZipPreviewDialog(null);
+        
+        toast.info("Gerando pacote ZIP...");
+        const zip = new JSZip();
+        const dateStr = new Date().toISOString().split('T')[0];
+        
+        if (type === 'backlog') {
+          // Applying consistent sorting from backlogSort
+          const sortedData = [...backlogData].sort((a: any, b: any) => {
+            const field = backlogSort.field;
+            const modifier = backlogSort.order === 'asc' ? 1 : -1;
+            if (a[field] < b[field]) return -1 * modifier;
+            if (a[field] > b[field]) return 1 * modifier;
+            return 0;
+          });
+
+          const headers = ["UF", "Ambiente", "Quantidade", "Próximo Envio", "Status"];
+          const rows = sortedData.map(b => {
+            const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
+            const status = state?.is_suspended ? "Suspenso" : (state?.is_paused ? "Pausado" : "Ativo");
+            return [b.uf, b.env.toUpperCase(), b.count, b.next ? new Date(b.next).toLocaleString() : "—", status];
+          });
+          const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
+          zip.file(`backlog_fiscal_${dateStr}.csv`, csvContent);
+  
+          const doc = new jsPDF();
+          doc.text("Backlog Fiscal", 14, 15);
+          autoTable(doc, { head: [headers], body: rows, startY: 25 });
+          const pdfContent = doc.output('blob');
+          zip.file(`backlog_fiscal_${dateStr}.pdf`, pdfContent);
+        } else {
+          // Audit logs are already sorted in loadAuditLogs by auditSort
+          const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "cStat", "xMotivo"];
+          const rows = auditLogs.map(log => [
+            new Date(log.created_at).toLocaleString(),
+            log.action.toUpperCase(),
+            log.uf,
+            log.environment,
+            log.reason || "",
+            log.cstat || "",
+            log.xmotivo || ""
+          ]);
+          const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
+          zip.file(`auditoria_fiscal_${dateStr}.csv`, csvContent);
+  
+          const doc = new jsPDF();
+          doc.text("Auditoria Fiscal", 14, 15);
+          autoTable(doc, { head: [headers], body: rows, startY: 25 });
+          const pdfContent = doc.output('blob');
+          zip.file(`auditoria_fiscal_${dateStr}.pdf`, pdfContent);
+        }
+  
+        const content = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(content);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${type}_fiscal_${dateStr}.zip`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("Pacote ZIP exportado!");
+      };
     const handleExportAuditXLSX = () => {
       if (auditLogs.length === 0) return;
       const data = auditLogs.map(log => ({
@@ -1788,10 +1843,10 @@ export default function Sefaz() {
                      <Button variant="outline" size="sm" onClick={handleExportBacklogPDF} title="PDF Backlog" className="h-8 w-8 p-0 border-blue-200 hover:bg-blue-50">
                        <FileDown className="w-3 h-3 text-blue-500" />
                      </Button>
-                     <Button variant="outline" size="sm" onClick={() => handleExportZip('backlog')} title="Exportar ZIP Backlog" className="h-8 w-8 p-0 border-purple-200 hover:bg-purple-50">
+                <Button variant="outline" size="sm" onClick={() => handleExportZip('backlog')} title="Exportar ZIP Backlog" className="h-8 w-8 p-0 border-purple-200 hover:bg-purple-50">
                        <FileArchive className="w-3 h-3 text-purple-500" />
                      </Button>
-                     <Button variant="outline" size="sm" onClick={() => handleExportZip('audit')} title="Exportar ZIP Auditoria" className="h-8 w-8 p-0 border-purple-200 hover:bg-purple-50">
+                <Button variant="outline" size="sm" onClick={() => handleExportZip('audit')} title="Exportar ZIP Auditoria" className="h-8 w-8 p-0 border-purple-200 hover:bg-purple-50">
                        <FileArchive className="w-3 h-3 text-purple-600" />
                      </Button>
                     <Button variant="outline" size="sm" onClick={() => setShowAuditLogs(true)} className="gap-2 h-8 text-[10px]">
@@ -2494,6 +2549,112 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
           </DialogContent>
         </Dialog>
 
+        {/* ZIP Preview Dialog */}
+        <Dialog open={!!showZipPreviewDialog} onOpenChange={(open) => !open && setShowZipPreviewDialog(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileArchive className="w-5 h-5 text-purple-500" /> Confirmar Exportação ZIP
+              </DialogTitle>
+              <DialogDescription>
+                Verifique o recorte antes de gerar o pacote contendo CSV e PDF.
+              </DialogDescription>
+            </DialogHeader>
+            {showZipPreviewDialog && (
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="border rounded p-3 bg-muted/30">
+                    <span className="text-[10px] text-muted-foreground uppercase block mb-1">Volume Previsto</span>
+                    <span className="text-xl font-bold">{showZipPreviewDialog.count} registros</span>
+                  </div>
+                  <div className="border rounded p-3 bg-muted/30">
+                    <span className="text-[10px] text-muted-foreground uppercase block mb-1">Relatório</span>
+                    <span className="text-xl font-bold capitalize">{showZipPreviewDialog.type}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 border rounded-lg p-3 text-xs bg-muted/10">
+                  <div className="flex justify-between border-b pb-1">
+                    <span className="text-muted-foreground">UF:</span>
+                    <span className="font-medium">{showZipPreviewDialog.filters.uf || 'Todas'}</span>
+                  </div>
+                  <div className="flex justify-between border-b pb-1">
+                    <span className="text-muted-foreground">Ambiente:</span>
+                    <span className="font-medium capitalize">{showZipPreviewDialog.filters.env || 'Todos'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Período:</span>
+                    <span className="font-medium">
+                      {showZipPreviewDialog.type === 'backlog' 
+                        ? (showZipPreviewDialog.filters.date || 'Todo histórico')
+                        : (showZipPreviewDialog.filters.dateStart || 'Início') + ' até ' + (showZipPreviewDialog.filters.dateEnd || 'Hoje')}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={() => setShowZipPreviewDialog(null)}>Cancelar</Button>
+                  <Button className="bg-purple-600 hover:bg-purple-700" onClick={confirmExportZip}>
+                    <Download className="w-4 h-4 mr-2" /> Gerar ZIP Agora
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Manual Run Progress Dialog */}
+        <Dialog open={!!manualScheduleStatus} onOpenChange={(open) => {
+          if (!open && (manualScheduleStatus?.status === 'success' || manualScheduleStatus?.status === 'error')) {
+            setManualScheduleStatus(null);
+          }
+        }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="text-center">Executando Exportação</DialogTitle>
+            </DialogHeader>
+            {manualScheduleStatus && (
+              <div className="py-6 flex flex-col items-center gap-4">
+                <div className="relative w-24 h-24">
+                  <svg className="w-full h-full transform -rotate-90">
+                    <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-muted" />
+                    <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={251.2} strokeDashoffset={251.2 * (1 - manualScheduleStatus.progress / 100)} className="text-primary transition-all duration-500" />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center font-bold text-lg">
+                    {manualScheduleStatus.progress}%
+                  </div>
+                </div>
+                
+                <div className="text-center space-y-1">
+                  <p className="font-medium">
+                    {manualScheduleStatus.status === 'initializing' && 'Validando agendamento...'}
+                    {manualScheduleStatus.status === 'running' && 'Processando dados no servidor...'}
+                    {manualScheduleStatus.status === 'success' && 'Exportação concluída!'}
+                    {manualScheduleStatus.status === 'error' && 'Erro no processamento'}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                    {manualScheduleStatus.status !== 'success' && manualScheduleStatus.status !== 'error' ? 'Aguarde a conclusão...' : 'Pronto'}
+                  </p>
+                </div>
+
+                {manualScheduleStatus.status === 'success' && manualScheduleStatus.zipUrl && (
+                  <Button asChild className="w-full mt-2 bg-green-600 hover:bg-green-700">
+                    <a href={manualScheduleStatus.zipUrl} target="_blank" rel="noopener noreferrer">
+                      <Download className="w-4 h-4 mr-2" /> Baixar Pacote ZIP
+                    </a>
+                  </Button>
+                )}
+
+                {(manualScheduleStatus.status === 'success' || manualScheduleStatus.status === 'error') && (
+                  <Button variant="outline" className="w-full" onClick={() => setManualScheduleStatus(null)}>
+                    Fechar
+                  </Button>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
         {/* Export History Dialog */}
         <Dialog open={showExportHistory} onOpenChange={setShowExportHistory}>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
@@ -2526,7 +2687,16 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                     {exportHistory.map(log => (
                       <tr key={log.id} className="border-t hover:bg-muted/30">
                         <td className="py-2 px-4 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
-                        <td className="py-2 px-4 capitalize">{log.report_type}</td>
+                         <td className="py-2 px-4">
+                           <div className="flex flex-col">
+                             <span className="capitalize font-medium">{log.report_type}</span>
+                             {log.filters && (
+                               <span className="text-[8px] text-muted-foreground truncate max-w-[120px]">
+                                 UF: {log.filters.uf || 'Todas'} | Env: {log.filters.env || 'Todos'}
+                               </span>
+                             )}
+                           </div>
+                         </td>
                         <td className="py-2 px-4 uppercase font-bold">{log.format}</td>
                         <td className="py-2 px-4 text-center">{log.record_count}</td>
                         <td className="py-2 px-4">
@@ -2545,11 +2715,17 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                               Etapa: Geração {'→'} Falha: {log.error_message || 'Desconhecido'}
                             </div>
                           )}
-                          {log.status === 'success' && (
-                            <div className="text-[8px] text-green-600">
-                              Etapas: Geração (OK) {'→'} Anexo (OK) {'→'} Envio (OK)
-                            </div>
-                          )}
+                           <div className="text-[8px] mt-1">
+                             {log.status === 'success' ? (
+                               <span className="text-green-600">
+                                 Geração ({log.record_count} reg) {'→'} ZIP {'→'} Envio (OK)
+                               </span>
+                             ) : (
+                               <span className="text-destructive">
+                                 Falha: {log.error_message || 'Erro inesperado'}
+                               </span>
+                             )}
+                           </div>
                         </td>
                       </tr>
                     ))}

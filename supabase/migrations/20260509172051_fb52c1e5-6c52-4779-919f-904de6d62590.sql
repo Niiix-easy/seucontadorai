@@ -1,0 +1,1 @@
+ALTER TABLE public.fiscal_export_logs ADD COLUMN file_url TEXT;
