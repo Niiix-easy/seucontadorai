@@ -14,7 +14,7 @@
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
       );
 
-      const { action, schedule_id, log_id } = await req.json().catch(() => ({}));
+       const { action, schedule_id, log_id, technical_info } = await req.json().catch(() => ({}));
 
       if (action === "run_now") {
         // Implementation for report generation
@@ -35,8 +35,9 @@
             report_type: schedule.report_type,
             format: schedule.format,
             status: "processing",
-            recipients: schedule.email_recipients,
-            filters: schedule.filters
+             recipients: schedule.email_recipients,
+             filters: schedule.filters,
+             technical_log: technical_info || {}
           })
           .select()
           .single();
@@ -46,9 +47,13 @@
         // In a real world scenario, this would be an async task or another edge function call
         // For now, we simulate success and update the log
         // We'll set record_count based on filters
-        let count = 0;
+         let csvCount = 0;
+         let pdfCount = 0;
         const filters = schedule.filters || {};
+         const stageCounts = { validation: 0, processing: 0, generation: 0 };
+
         if (schedule.report_type === 'backlog') {
+           stageCounts.validation = 1;
           let query = supabaseClient
             .from("processed_documents")
             .select("*", { count: 'exact', head: true })
@@ -58,9 +63,13 @@
           if (filters.env && filters.env !== 'all') query = query.eq('environment', filters.env);
           if (filters.date) query = query.gte('next_retry_at', `${filters.date}T00:00:00`);
           
-          const { count: c } = await query;
-          count = c || 0;
+           const { count: c } = await query;
+           csvCount = c || 0;
+           pdfCount = c || 0;
+           stageCounts.processing = csvCount;
+           stageCounts.generation = csvCount;
         } else {
+           stageCounts.validation = 1;
           let query = supabaseClient
             .from("fiscal_action_logs")
             .select("*", { count: 'exact', head: true });
@@ -70,13 +79,19 @@
           if (filters.dateStart) query = query.gte('created_at', `${filters.dateStart}T00:00:00`);
           if (filters.dateEnd) query = query.lte('created_at', `${filters.dateEnd}T23:59:59`);
           
-          const { count: c } = await query;
-          count = c || 0;
+           const { count: c } = await query;
+           csvCount = c || 0;
+           pdfCount = c || 0;
+           stageCounts.processing = csvCount;
+           stageCounts.generation = csvCount;
         }
 
         await supabaseClient.from("fiscal_export_logs").update({
           status: "success",
-          record_count: count,
+           record_count: csvCount,
+           csv_count: csvCount,
+           pdf_count: pdfCount,
+           stage_counts: stageCounts,
           file_url: "https://ghvfzwehyysldzxuvhez.supabase.co/storage/v1/object/public/reports/sample_report.zip" // Simulated
         }).eq("id", log.id);
 
@@ -94,7 +109,17 @@
         
         if (logErr || !log) throw new Error("Log not found");
 
-        // Logic to resend email with existing file_url
+        await supabaseClient.from("fiscal_export_logs").update({
+          resend_status: "sending"
+        }).eq("id", log_id);
+
+        // Simulate email sending
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        await supabaseClient.from("fiscal_export_logs").update({
+          resend_status: "sent"
+        }).eq("id", log_id);
+
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
