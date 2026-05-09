@@ -47,16 +47,30 @@
         // For now, we simulate success and update the log
         // We'll set record_count based on filters
         let count = 0;
+        const filters = schedule.filters || {};
         if (schedule.report_type === 'backlog') {
-          const { count: c } = await supabaseClient
+          let query = supabaseClient
             .from("processed_documents")
             .select("*", { count: 'exact', head: true })
             .or('status.in.("pending","error")');
+          
+          if (filters.uf && filters.uf !== 'all') query = query.eq('uf', filters.uf);
+          if (filters.env && filters.env !== 'all') query = query.eq('environment', filters.env);
+          if (filters.date) query = query.gte('next_retry_at', `${filters.date}T00:00:00`);
+          
+          const { count: c } = await query;
           count = c || 0;
         } else {
-          const { count: c } = await supabaseClient
+          let query = supabaseClient
             .from("fiscal_action_logs")
             .select("*", { count: 'exact', head: true });
+          
+          if (filters.uf && filters.uf !== 'all') query = query.eq('uf', filters.uf);
+          if (filters.env && filters.env !== 'all') query = query.eq('environment', filters.env);
+          if (filters.dateStart) query = query.gte('created_at', `${filters.dateStart}T00:00:00`);
+          if (filters.dateEnd) query = query.lte('created_at', `${filters.dateEnd}T23:59:59`);
+          
+          const { count: c } = await query;
           count = c || 0;
         }
 
