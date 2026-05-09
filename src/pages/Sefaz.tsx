@@ -11,8 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { 
     Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
-    Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
-    FileDown, Play, CheckSquare, Square, FileArchive
+     Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
+     FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X
  } from "lucide-react";
 import JSZip from "jszip";
 import { toast } from "sonner";
@@ -140,6 +140,13 @@ export default function Sefaz() {
     });
     const [suspensionStates, setSuspensionStates] = useState<any[]>([]);
     const [backlogData, setBacklogData] = useState<any[]>([]);
+    const [backlogFilters, setBacklogFilters] = useState({ uf: "all", env: "all", date: "" });
+    const [backlogSearch, setBacklogSearch] = useState("");
+    const [showPauseDialog, setShowPauseDialog] = useState<{ uf: string, env: string, paused: boolean } | null>(null);
+    const [pauseReason, setPauseReason] = useState("");
+    const [auditLogs, setAuditLogs] = useState<any[]>([]);
+    const [showAuditLogs, setShowAuditLogs] = useState(false);
+
     const [deadLetterNotifs, setDeadLetterNotifs] = useState<any[]>([]);
     const [dlSearch, setDlSearch] = useState("");
     const [dlPeriodo, setDlPeriodo] = useState({ de: "", ate: "" });
@@ -283,10 +290,16 @@ export default function Sefaz() {
   }]);
 
     const loadBacklogData = async () => {
-      const { data: backlog } = await supabase
+      let query = supabase
         .from("processed_documents")
         .select("uf, environment, status, next_retry_at")
         .or('status.in.("pending","error")');
+      
+      if (backlogFilters.uf !== "all") query = query.eq("uf", backlogFilters.uf);
+      if (backlogFilters.env !== "all") query = query.eq("environment", backlogFilters.env);
+      if (backlogFilters.date) query = query.gte("next_retry_at", `${backlogFilters.date}T00:00:00`);
+
+      const { data: backlog } = await query;
       
       if (backlog) {
         const grouped = backlog.reduce((acc: any, curr: any) => {
@@ -305,35 +318,107 @@ export default function Sefaz() {
       if (states) setSuspensionStates(states);
     };
 
-    const togglePause = async (uf: string, env: string, currentPaused: boolean) => {
+    const loadAuditLogs = async () => {
+      const { data } = await supabase
+        .from("fiscal_action_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (data) setAuditLogs(data);
+    };
+
+    const handleManualRetryBatch = async (uf: string, env: string) => {
+      try {
+        const { data, error } = await supabase.functions.invoke("fiscal-engine", {
+          body: { action: "manual_retry_batch", uf, environment: env, userId: user?.id }
+        });
+        if (error) throw error;
+        toast.success(`${data.count || 0} documentos colocados na fila para reprocessamento imediato.`);
+        loadBacklogData();
+      } catch (err: any) {
+        toast.error("Erro ao disparar reprocessamento: " + err.message);
+      }
+    };
+
+    const togglePause = async (uf: string, env: string, currentPaused: boolean, reason?: string) => {
       const { error } = await supabase
         .from("fiscal_suspension_states")
         .upsert({ 
           user_id: user?.id, 
           uf, 
           environment: env, 
-          is_paused: !currentPaused 
+          is_paused: !currentPaused,
+          reason: reason || null
         }, { onConflict: "user_id, uf, environment" });
       
       if (!error) {
+        await supabase.from("fiscal_action_logs").insert({
+          user_id: user?.id,
+          action: !currentPaused ? "pause" : "resume",
+          uf,
+          environment: env,
+          reason: reason || ( !currentPaused ? "Pausado pelo usuário" : "Retomado pelo usuário" )
+        });
         toast.success(`Reprocessamento ${!currentPaused ? "pausado" : "retomado"} para ${uf}/${env}`);
         loadBacklogData();
+        setShowPauseDialog(null);
+        setPauseReason("");
       }
     };
 
     useEffect(() => {
       if (user) {
         loadNfes();
-        loadFiscalConfig();
-        loadProcessedDocs();
-        loadBacklogData();
       }
     }, [user]);
 
-   const loadFiscalConfig = async () => {
-     const { data, error } = await supabase.from("fiscal_configurations").select("*").single();
-     if (!error && data) setFiscalConfig(data);
-   };
+    useEffect(() => {
+      if (user) {
+        loadFiscalConfig();
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, fiscalConfig.uf, fiscalConfig.environment]);
+
+    useEffect(() => {
+      if (user) {
+        loadProcessedDocs();
+        loadBacklogData();
+        loadAuditLogs();
+
+        const channel = supabase
+          .channel('fiscal_monitoring')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'processed_documents' }, () => {
+            loadBacklogData();
+            loadProcessedDocs();
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'fiscal_suspension_states' }, () => {
+            loadBacklogData();
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'dead_letter_notifications' }, () => {
+            loadProcessedDocs();
+          })
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'fiscal_action_logs' }, () => {
+            loadAuditLogs();
+          })
+          .subscribe();
+
+        return () => {
+          supabase.removeChannel(channel);
+        };
+      }
+    }, [user, backlogFilters]);
+
+    const loadFiscalConfig = async () => {
+      const { data, error } = await supabase
+        .from("fiscal_configurations")
+        .select("*")
+        .match({ uf: fiscalConfig.uf, environment: fiscalConfig.environment })
+        .maybeSingle();
+      
+      if (!error && data) {
+        setFiscalConfig(data);
+      }
+    };
 
     const loadProcessedDocs = async () => {
       let query = supabase.from("processed_documents").select("*").order("created_at", { ascending: false });
@@ -364,7 +449,7 @@ export default function Sefaz() {
 
     const handleExportDeadLetterCSV = () => {
       if (deadLetterNotifs.length === 0) return;
-      const headers = ["ID", "Documento ID", "UF", "Ambiente", "Data", "Status Alerta", "Canais", "cStat", "xMotivo", "Retentativas", "Próximo Retry", "XML/Recibo"];
+      const headers = ["ID", "Documento ID", "UF", "Ambiente", "Data", "Status Alerta", "Canais", "cStat", "xMotivo", "Retentativas", "Próximo Retry", "ID XML", "ID Comprovante", "Link XML"];
       const rows = deadLetterNotifs.map(n => [
         n.id,
         n.document_id,
@@ -375,8 +460,11 @@ export default function Sefaz() {
         (n.channels || []).join(", "),
         n.cstat || "",
         n.xmotivo || "",
-        n.retry_count_at_failure || "", n.processed_documents?.next_retry_at || "",
-        `${n.last_xml_url || ""}; ${n.last_receipt_number || ""}`
+        n.retry_count_at_failure || "", 
+        n.processed_documents?.next_retry_at || "",
+        n.document_id,
+        n.last_receipt_number || "",
+        n.last_xml_url || ""
       ]);
       const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -451,7 +539,7 @@ export default function Sefaz() {
           retry_delay_minutes: fiscalConfig.retry_delay_minutes,
           auto_retry_on_reactivation: fiscalConfig.auto_retry_on_reactivation,
           reactivation_throughput: fiscalConfig.reactivation_throughput
-        }, { onConflict: "user_id" });
+        }, { onConflict: "user_id, uf, environment" });
         
         if (error) throw error;
 
@@ -1257,9 +1345,44 @@ export default function Sefaz() {
                 </div>
               </div>
               <div className="space-y-6 pt-4 border-t">
-                <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Package className="w-4 h-4" /> Backlog & Controle Granular (UF/Ambiente)
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Package className="w-4 h-4" /> Backlog & Controle Granular (UF/Ambiente)
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setShowAuditLogs(true)} className="gap-2 h-8 text-[10px]">
+                      <History className="w-3 h-3" /> Ver Auditoria
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/20 rounded-lg border">
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-3 h-3 text-muted-foreground" />
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground">Filtros:</Label>
+                  </div>
+                  <Select value={backlogFilters.uf} onValueChange={v => setBacklogFilters(p => ({ ...p, uf: v }))}>
+                    <SelectTrigger className="w-24 h-8 text-[10px]"><SelectValue placeholder="UF" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas UFs</SelectItem>
+                      {ufs.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={backlogFilters.env} onValueChange={v => setBacklogFilters(p => ({ ...p, env: v }))}>
+                    <SelectTrigger className="w-28 h-8 text-[10px]"><SelectValue placeholder="Ambiente" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos Amb.</SelectItem>
+                      <SelectItem value="homologacao">Homologação</SelectItem>
+                      <SelectItem value="producao">Produção</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-[10px] uppercase text-muted-foreground">A partir de:</Label>
+                    <Input type="date" value={backlogFilters.date} onChange={e => setBacklogFilters(p => ({ ...p, date: e.target.value }))} className="w-32 h-8 text-[10px]" />
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setBacklogFilters({ uf: "all", env: "all", date: "" })} title="Limpar Filtros"><X className="w-3 h-3" /></Button>
+                </div>
+
                 <div className="overflow-x-auto border rounded-lg">
                   <table className="w-full text-xs">
                     <thead className="bg-muted/50 uppercase">
@@ -1297,15 +1420,26 @@ export default function Sefaz() {
                               )}
                             </td>
                             <td className="py-2 px-4 text-right">
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className={cn("h-7 text-[10px]", isPaused ? "text-green-600" : "text-amber-600")}
-                                onClick={() => togglePause(b.uf, b.env, !!isPaused)}
-                              >
-                                {isPaused ? <Play className="w-3 h-3 mr-1" /> : <Square className="w-3 h-3 mr-1" />}
-                                {isPaused ? "Retomar" : "Pausar"}
-                              </Button>
+                              <div className="flex justify-end gap-1">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-7 text-[10px] text-primary"
+                                  onClick={() => handleManualRetryBatch(b.uf, b.env)}
+                                  title="Reprocessar Imediatamente"
+                                >
+                                  <RefreshCw className="w-3 h-3 mr-1" /> Agora
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className={cn("h-7 text-[10px]", isPaused ? "text-green-600" : "text-amber-600")}
+                                  onClick={() => setShowPauseDialog({ uf: b.uf, env: b.env, paused: !!isPaused })}
+                                >
+                                  {isPaused ? <Play className="w-3 h-3 mr-1" /> : <Square className="w-3 h-3 mr-1" />}
+                                  {isPaused ? "Retomar" : "Pausar"}
+                                </Button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -1360,8 +1494,88 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
   </infNFe>
 </NFe>`}
           </pre>
-        </DialogContent>
-      </Dialog>
+         </DialogContent>
+       </Dialog>
+ 
+       {/* Pause/Resume Dialog */}
+       <Dialog open={!!showPauseDialog} onOpenChange={() => setShowPauseDialog(null)}>
+         <DialogContent>
+           <DialogHeader>
+             <DialogTitle className="font-display">
+               {showPauseDialog?.paused ? "Retomar Reprocessamento" : "Pausar Reprocessamento"}
+             </DialogTitle>
+             <DialogDescription>
+               UF: {showPauseDialog?.uf} | Ambiente: {showPauseDialog?.env}
+             </DialogDescription>
+           </DialogHeader>
+           <div className="space-y-4">
+             <div className="space-y-2">
+               <Label>Motivo da ação (Auditoria)</Label>
+               <Textarea 
+                 placeholder="Descreva o motivo..." 
+                 value={pauseReason} 
+                 onChange={e => setPauseReason(e.target.value)}
+                 rows={3}
+               />
+             </div>
+             <div className="flex justify-end gap-2">
+               <Button variant="outline" onClick={() => setShowPauseDialog(null)}>Cancelar</Button>
+               <Button 
+                 variant={showPauseDialog?.paused ? "default" : "destructive"}
+                 onClick={() => showPauseDialog && togglePause(showPauseDialog.uf, showPauseDialog.env, showPauseDialog.paused, pauseReason)}
+               >
+                 Confirmar
+               </Button>
+             </div>
+           </div>
+         </DialogContent>
+       </Dialog>
+ 
+       {/* Audit Logs Dialog */}
+       <Dialog open={showAuditLogs} onOpenChange={setShowAuditLogs}>
+         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+           <DialogHeader>
+             <DialogTitle className="font-display flex items-center gap-2">
+               <History className="w-5 h-5" /> Auditoria de Ações Fiscais
+             </DialogTitle>
+           </DialogHeader>
+           <div className="space-y-4">
+             <div className="overflow-x-auto border rounded-lg">
+               <table className="w-full text-xs">
+                 <thead className="bg-muted uppercase">
+                   <tr>
+                     <th className="text-left py-2 px-4">Data/Hora</th>
+                     <th className="text-left py-2 px-4">Ação</th>
+                     <th className="text-left py-2 px-4">UF/Amb</th>
+                     <th className="text-left py-2 px-4">Motivo</th>
+                   </tr>
+                 </thead>
+                 <tbody>
+                   {auditLogs.map(log => (
+                     <tr key={log.id} className="border-t hover:bg-muted/30">
+                       <td className="py-2 px-4 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
+                       <td className="py-2 px-4">
+                         <Badge variant="outline" className={cn("text-[9px]", 
+                           log.action === 'pause' ? 'border-amber-500 text-amber-500' : 
+                           log.action === 'resume' ? 'border-green-500 text-green-500' : 
+                           'border-blue-500 text-blue-500'
+                         )}>
+                           {log.action.toUpperCase()}
+                         </Badge>
+                       </td>
+                       <td className="py-2 px-4">{log.uf}/{log.environment}</td>
+                       <td className="py-2 px-4 text-muted-foreground">{log.reason || '—'}</td>
+                     </tr>
+                   ))}
+                   {auditLogs.length === 0 && (
+                     <tr><td colSpan={4} className="py-8 text-center text-muted-foreground">Nenhum log encontrado.</td></tr>
+                   )}
+                 </tbody>
+               </table>
+             </div>
+           </div>
+         </DialogContent>
+       </Dialog>
 
       {/* NF-e Detail */}
       <Dialog open={!!nfeDetalhe} onOpenChange={() => setNfeDetalhe(null)}>

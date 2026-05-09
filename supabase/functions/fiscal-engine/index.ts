@@ -158,7 +158,51 @@ serve(async (req) => {
     const supabaseClient = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
     const { action, documentId, userId: forcedUserId, uf: forcedUf, environment: forcedEnv } = await req.json();
 
-    if (action === "sign_and_send") {
+     if (action === "sign_and_send" || action === "manual_retry_batch") {
+       if (action === "manual_retry_batch") {
+         const { uf, environment, userId } = await req.json();
+         const { data: config } = await supabaseClient
+           .from("fiscal_configurations")
+           .select("reactivation_throughput")
+           .eq("user_id", userId)
+           .single();
+         
+         const limit = config?.reactivation_throughput || 10;
+ 
+         const { data: docsToRetry } = await supabaseClient
+           .from("processed_documents")
+           .select("id")
+           .match({ user_id: userId, uf, environment })
+           .in("status", ["error", "dead-letter"])
+           .eq("is_processing", false)
+           .limit(limit);
+ 
+         if (!docsToRetry || docsToRetry.length === 0) {
+           return new Response(JSON.stringify({ success: true, count: 0, message: "Nenhum documento para reprocessar." }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+         }
+ 
+         const ids = docsToRetry.map(d => d.id);
+         await supabaseClient
+           .from("processed_documents")
+           .update({ 
+             status: "pending", 
+             next_retry_at: new Date().toISOString(),
+             last_error: "Disparado via reprocessamento manual"
+           })
+           .in("id", ids);
+ 
+         // Trigger logging
+         await supabaseClient.from("fiscal_action_logs").insert({
+           user_id: userId,
+           action: "manual_retry",
+           uf,
+           environment,
+           reason: "Reprocessamento manual disparado pelo usuário"
+         });
+ 
+         return new Response(JSON.stringify({ success: true, count: ids.length }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+       }
+ 
       const { data: doc, error: docError } = await supabaseClient
         .from("processed_documents")
         .select("*, fiscal_configurations(*)")

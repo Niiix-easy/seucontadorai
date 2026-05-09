@@ -453,6 +453,36 @@ export type Database = {
           },
         ]
       }
+      fiscal_action_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          environment: string
+          id: string
+          reason: string | null
+          uf: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          environment: string
+          id?: string
+          reason?: string | null
+          uf: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          environment?: string
+          id?: string
+          reason?: string | null
+          uf?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       fiscal_configurations: {
         Row: {
           auto_retry_on_reactivation: boolean | null
@@ -521,6 +551,7 @@ export type Database = {
           is_paused: boolean | null
           is_suspended: boolean | null
           last_failure_at: string | null
+          reason: string | null
           throughput_per_minute: number | null
           uf: string
           updated_at: string | null
@@ -533,6 +564,7 @@ export type Database = {
           is_paused?: boolean | null
           is_suspended?: boolean | null
           last_failure_at?: string | null
+          reason?: string | null
           throughput_per_minute?: number | null
           uf: string
           updated_at?: string | null
@@ -545,6 +577,7 @@ export type Database = {
           is_paused?: boolean | null
           is_suspended?: boolean | null
           last_failure_at?: string | null
+          reason?: string | null
           throughput_per_minute?: number | null
           uf?: string
           updated_at?: string | null
