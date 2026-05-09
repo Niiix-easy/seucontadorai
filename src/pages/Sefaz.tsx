@@ -155,7 +155,7 @@ export default function Sefaz() {
     const [newPrefName, setNewPrefName] = useState("");
     const [scheduledReports, setScheduledReports] = useState<any[]>([]);
     const [showScheduleDialog, setShowScheduleDialog] = useState<{ type: 'backlog' | 'audit' } | null>(null);
-    const [newSchedule, setNewSchedule] = useState({ format: 'pdf', frequency: 'daily', email: "" });
+     const [newSchedule, setNewSchedule] = useState({ format: 'pdf', frequency: 'daily', emails: [] as string[] as string[], currentEmail: "" });
     const [showExportPreview, setShowExportPreview] = useState(false);
     const [exportHistory, setExportHistory] = useState<any[]>([]);
     const [showExportHistory, setShowExportHistory] = useState(false);
@@ -181,7 +181,9 @@ export default function Sefaz() {
      const [selectedIds, setSelectedIds] = useState<string[]>([]);
      const [isBatchProcessing, setIsBatchProcessing] = useState(false);
      const [batchProgress, setBatchProgress] = useState(0);
-    const handleExportCSV = () => {
+ 
+ 
+      const handleExportCSV = () => {
       const filtered = statusFilter === "all" ? processedDocs : processedDocs.filter(d => d.status === statusFilter);
       if (filtered.length === 0) return;
       const headers = ["ID", "Data", "Tipo", "Status", "Total", "Recibo", "Protocolo", "Sefaz Status", "Sefaz Mensagem", "Erros", "Retentativas"];
@@ -553,14 +555,6 @@ export default function Sefaz() {
       if (data) setExportHistory(data);
     };
 
-    const handleResendEmail = async (logId: string) => {
-      toast.info("Reenviando e-mail...");
-      // Simulate resend
-      setTimeout(() => {
-        toast.success("E-mail reenviado com sucesso!");
-      }, 1500);
-    };
-
     const loadUserPreferences = async () => {
       if (!user) return;
       const { data } = await supabase
@@ -598,10 +592,18 @@ export default function Sefaz() {
       if (data) setScheduledReports(data);
     };
 
-    const handleCreateSchedule = async () => {
-      if (!user || !showScheduleDialog || !newSchedule.email) return;
-      
-      const currentFilters = showScheduleDialog.type === 'backlog' ? backlogFilters : auditFilters;
+     const handleCreateSchedule = async () => {
+       let recipients = [...newSchedule.emails];
+       if (newSchedule.currentEmail && !recipients.includes(newSchedule.currentEmail)) {
+         recipients.push(newSchedule.currentEmail);
+       }
+ 
+       if (!user || !showScheduleDialog || recipients.length === 0) {
+         toast.error("Adicione pelo menos um destinatário.");
+         return;
+       }
+       
+       const currentFilters = showScheduleDialog.type === 'backlog' ? backlogFilters : auditFilters;
       const hasUF = currentFilters.uf && currentFilters.uf !== 'all';
       const hasEnv = (currentFilters as any).env && (currentFilters as any).env !== 'all';
       const hasDate = showScheduleDialog.type === 'backlog' ? !!(currentFilters as any).date : (!!(currentFilters as any).dateStart || !!(currentFilters as any).dateEnd);
@@ -611,25 +613,106 @@ export default function Sefaz() {
         return;
       }
 
-      const { error } = await supabase.from("fiscal_scheduled_reports").insert({
-        user_id: user.id,
-        report_type: showScheduleDialog.type,
-        format: newSchedule.format,
-        frequency: newSchedule.frequency,
-        filters: currentFilters,
-        email_recipients: [newSchedule.email],
-        is_active: true
-      });
-
-      if (!error) {
-        toast.success("Agendamento criado com sucesso!");
-        loadScheduledReports();
-        setShowScheduleDialog(null);
-      } else {
-        toast.error("Erro ao criar agendamento: " + error.message);
-      }
-    };
-
+       const { error } = await supabase.from("fiscal_scheduled_reports").insert({
+         user_id: user.id,
+         report_type: showScheduleDialog.type,
+         format: newSchedule.format,
+         frequency: newSchedule.frequency,
+         filters: currentFilters,
+         email_recipients: recipients,
+         is_active: true
+       });
+ 
+       if (!error) {
+         toast.success("Agendamento criado com sucesso!");
+         loadScheduledReports();
+         setShowScheduleDialog(null);
+       } else {
+         toast.error("Erro ao criar agendamento: " + error.message);
+       }
+     };
+ 
+     const handleRunScheduleNow = async (schedule: any) => {
+       if (!user) return;
+       toast.info("Iniciando processamento manual da exportação...");
+       
+       try {
+         const { error } = await supabase.functions.invoke("fiscal-scheduler", {
+           body: { action: "run_now", schedule_id: schedule.id }
+         });
+ 
+         if (error) throw error;
+         toast.success("Exportação enfileirada com sucesso!");
+         const { data: logs } = await supabase.from("fiscal_export_logs").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+         if (logs) setExportHistory(logs);
+       } catch (err: any) {
+         toast.error("Erro ao disparar exportação: " + err.message);
+       }
+     };
+ 
+     const handleResendEmail = async (logId: string) => {
+       toast.info("Reenviando e-mail...");
+       const { error } = await supabase.functions.invoke("fiscal-scheduler", {
+         body: { action: "resend_email", log_id: logId }
+       });
+       if (!error) {
+         toast.success("E-mail reenviado com sucesso!");
+       } else {
+         toast.error("Erro ao reenviar e-mail: " + error.message);
+       }
+     };
+ 
+     const handleExportZip = async (type: 'backlog' | 'audit') => {
+       toast.info("Gerando pacote ZIP...");
+       const zip = new JSZip();
+       const dateStr = new Date().toISOString().split('T')[0];
+       
+       if (type === 'backlog') {
+         const headers = ["UF", "Ambiente", "Quantidade", "Próximo Envio", "Status"];
+         const rows = backlogData.map(b => {
+           const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
+           const status = state?.is_suspended ? "Suspenso" : (state?.is_paused ? "Pausado" : "Ativo");
+           return [b.uf, b.env.toUpperCase(), b.count, b.next ? new Date(b.next).toLocaleString() : "—", status];
+         });
+         const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
+         zip.file(`backlog_fiscal_${dateStr}.csv`, csvContent);
+ 
+         const doc = new jsPDF();
+         doc.text("Backlog Fiscal", 14, 15);
+         autoTable(doc, { head: [headers], body: rows, startY: 25 });
+         const pdfContent = doc.output('blob');
+         zip.file(`backlog_fiscal_${dateStr}.pdf`, pdfContent);
+       } else {
+         const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "cStat", "xMotivo"];
+         const rows = auditLogs.map(log => [
+           new Date(log.created_at).toLocaleString(),
+           log.action.toUpperCase(),
+           log.uf,
+           log.environment,
+           log.reason || "",
+           log.cstat || "",
+           log.xmotivo || ""
+         ]);
+         const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
+         zip.file(`auditoria_fiscal_${dateStr}.csv`, csvContent);
+ 
+         const doc = new jsPDF();
+         doc.text("Auditoria Fiscal", 14, 15);
+         autoTable(doc, { head: [headers], body: rows, startY: 25 });
+         const pdfContent = doc.output('blob');
+         zip.file(`auditoria_fiscal_${dateStr}.pdf`, pdfContent);
+       }
+ 
+       const content = await zip.generateAsync({ type: "blob" });
+       const url = URL.createObjectURL(content);
+       const link = document.createElement("a");
+       link.href = url;
+       link.download = `${type}_fiscal_${dateStr}.zip`;
+       document.body.appendChild(link);
+       link.click();
+       document.body.removeChild(link);
+       toast.success("Pacote ZIP exportado!");
+     };
     const handleExportAuditXLSX = () => {
       if (auditLogs.length === 0) return;
       const data = auditLogs.map(log => ({
@@ -1699,12 +1782,18 @@ export default function Sefaz() {
                     <Button variant="outline" size="sm" onClick={handleExportAuditCSV} className="gap-2 h-8 text-[10px]">
                       <Download className="w-3 h-3" /> Exportar Auditoria
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleExportAuditPDF} title="PDF Auditoria" className="h-8 w-8 p-0 border-red-200 hover:bg-red-50">
-                      <FileDown className="w-3 h-3 text-red-500" />
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleExportBacklogPDF} title="PDF Backlog" className="h-8 w-8 p-0 border-blue-200 hover:bg-blue-50">
-                      <FileDown className="w-3 h-3 text-blue-500" />
-                    </Button>
+                     <Button variant="outline" size="sm" onClick={handleExportAuditPDF} title="PDF Auditoria" className="h-8 w-8 p-0 border-red-200 hover:bg-red-50">
+                       <FileDown className="w-3 h-3 text-red-500" />
+                     </Button>
+                     <Button variant="outline" size="sm" onClick={handleExportBacklogPDF} title="PDF Backlog" className="h-8 w-8 p-0 border-blue-200 hover:bg-blue-50">
+                       <FileDown className="w-3 h-3 text-blue-500" />
+                     </Button>
+                     <Button variant="outline" size="sm" onClick={() => handleExportZip('backlog')} title="Exportar ZIP Backlog" className="h-8 w-8 p-0 border-purple-200 hover:bg-purple-50">
+                       <FileArchive className="w-3 h-3 text-purple-500" />
+                     </Button>
+                     <Button variant="outline" size="sm" onClick={() => handleExportZip('audit')} title="Exportar ZIP Auditoria" className="h-8 w-8 p-0 border-purple-200 hover:bg-purple-50">
+                       <FileArchive className="w-3 h-3 text-purple-600" />
+                     </Button>
                     <Button variant="outline" size="sm" onClick={() => setShowAuditLogs(true)} className="gap-2 h-8 text-[10px]">
                       <History className="w-3 h-3" /> Auditoria
                     </Button>
@@ -2319,15 +2408,39 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   </Select>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label>E-mail do Destinatário</Label>
-                <Input 
-                  type="email" 
-                  placeholder="email@exemplo.com"
-                  value={newSchedule.email}
-                  onChange={e => setNewSchedule(p => ({ ...p, email: e.target.value }))}
-                />
-              </div>
+               <div className="space-y-3">
+                 <Label>Destinatários ({newSchedule.emails.length})</Label>
+                 <div className="flex gap-2">
+                   <Input 
+                     type="email" 
+                     placeholder="email@exemplo.com"
+                     value={newSchedule.currentEmail}
+                     onChange={e => setNewSchedule(p => ({ ...p, currentEmail: e.target.value }))}
+                     onKeyDown={e => {
+                       if (e.key === 'Enter') {
+                         e.preventDefault();
+                         if (newSchedule.currentEmail && !newSchedule.emails.includes(newSchedule.currentEmail)) {
+                           setNewSchedule(p => ({ ...p, emails: [...p.emails, p.currentEmail], currentEmail: "" }));
+                         }
+                       }
+                     }}
+                   />
+                   <Button onClick={() => {
+                     if (newSchedule.currentEmail && !newSchedule.emails.includes(newSchedule.currentEmail)) {
+                       setNewSchedule(p => ({ ...p, emails: [...p.emails, p.currentEmail], currentEmail: "" }));
+                     }
+                   }}>Add</Button>
+                 </div>
+                 <div className="flex flex-wrap gap-2 max-h-[100px] overflow-y-auto p-1 border rounded bg-muted/30">
+                   {newSchedule.emails.length === 0 && <span className="text-[10px] text-muted-foreground italic px-2">Nenhum e-mail adicionado.</span>}
+                   {newSchedule.emails.map((email, i) => (
+                     <div key={i} className="flex items-center gap-1 bg-primary/10 text-primary text-[10px] px-2 py-1 rounded-full border border-primary/20">
+                       {email}
+                       <X className="w-3 h-3 cursor-pointer hover:text-destructive" onClick={() => setNewSchedule(p => ({ ...p, emails: p.emails.filter(e => e !== email) }))} />
+                     </div>
+                   ))}
+                 </div>
+               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setShowScheduleDialog(null)}>Cancelar</Button>
                 <Button onClick={() => setShowExportPreview(true)}>Visualizar & Confirmar</Button>
@@ -2363,10 +2476,15 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                       : (auditFilters.dateStart || 'Início') + ' até ' + (auditFilters.dateEnd || 'Hoje')}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Destinatário:</span>
-                  <span className="font-bold">{newSchedule.email}</span>
-                </div>
+                 <div className="flex flex-col text-sm gap-1">
+                   <span className="text-muted-foreground">Destinatários:</span>
+                   <div className="flex flex-wrap gap-1">
+                     {newSchedule.emails.length > 0 ? newSchedule.emails.map(e => (
+                       <span key={e} className="bg-primary/5 px-1.5 py-0.5 rounded text-[10px] border">{e}</span>
+                     )) : <span className="text-destructive text-[10px] font-bold">Nenhum! (Adicione acima)</span>}
+                     {newSchedule.currentEmail && <span className="bg-amber-50 px-1.5 py-0.5 rounded text-[10px] border italic opacity-70">{newSchedule.currentEmail} (pendente)</span>}
+                   </div>
+                 </div>
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setShowExportPreview(false)}>Voltar</Button>
@@ -2384,8 +2502,15 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                 <FileArchive className="w-5 h-5 text-purple-500" /> Histórico de Exportações Agendadas
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="overflow-x-auto border rounded-lg">
+             <div className="space-y-4">
+               <Tabs defaultValue="history">
+                 <TabsList className="grid w-full grid-cols-2">
+                   <TabsTrigger value="history">Execuções Recentes</TabsTrigger>
+                   <TabsTrigger value="schedules">Agendamentos Ativos</TabsTrigger>
+                 </TabsList>
+                 
+                 <TabsContent value="history" className="mt-4">
+                   <div className="overflow-x-auto border rounded-lg">
                 <table className="w-full text-xs">
                   <thead className="bg-muted uppercase">
                     <tr>
@@ -2428,22 +2553,65 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                         </td>
                       </tr>
                     ))}
-                    {exportHistory.length === 0 && (
-                      <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhuma exportação registrada.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-                <div className="flex items-center justify-between p-2 border-t bg-muted/10">
-                  <span className="text-[10px] text-muted-foreground">Página {auditPage}</span>
-                  <div className="flex gap-1">
-                    <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setAuditPage(p => Math.max(1, p - 1))} disabled={auditPage === 1}><ArrowLeft className="w-3 h-3" /></Button>
-                    <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setAuditPage(p => p + 1)} disabled={auditLogs.length < 10}><ArrowLeft className="w-3 h-3 rotate-180" /></Button>
-                  </div>
-                </div>
-              </div>
-            </div>
+                     {exportHistory.length === 0 && (
+                       <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhuma exportação registrada.</td></tr>
+                     )}
+                   </tbody>
+                 </table>
+                 <div className="flex items-center justify-between p-2 border-t bg-muted/10">
+                   <span className="text-[10px] text-muted-foreground">Página {auditPage}</span>
+                   <div className="flex gap-1">
+                     <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setAuditPage(p => Math.max(1, p - 1))} disabled={auditPage === 1}><ArrowLeft className="w-3 h-3" /></Button>
+                     <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setAuditPage(p => p + 1)} disabled={auditLogs.length < 10}><ArrowLeft className="w-3 h-3 rotate-180" /></Button>
+                   </div>
+                 </div>
+               </div>
+             </TabsContent>
+ 
+             <TabsContent value="schedules" className="mt-4">
+               <div className="overflow-x-auto border rounded-lg">
+                 <table className="w-full text-xs">
+                   <thead className="bg-muted uppercase">
+                     <tr>
+                       <th className="text-left py-2 px-4">Relatório</th>
+                       <th className="text-left py-2 px-4">Frequência</th>
+                       <th className="text-left py-2 px-4">Formato</th>
+                       <th className="text-left py-2 px-4">Destinatários</th>
+                       <th className="text-right py-2 px-4">Ação</th>
+                     </tr>
+                   </thead>
+                   <tbody>
+                     {scheduledReports.map(schedule => (
+                       <tr key={schedule.id} className="border-t hover:bg-muted/30">
+                         <td className="py-2 px-4 capitalize font-medium">{schedule.report_type}</td>
+                         <td className="py-2 px-4 capitalize">{schedule.frequency}</td>
+                         <td className="py-2 px-4 uppercase">{schedule.format}</td>
+                         <td className="py-2 px-4">
+                           <div className="flex flex-wrap gap-1">
+                             {(schedule.email_recipients || []).slice(0, 2).map((e: string) => (
+                               <span key={e} className="bg-muted px-1.5 py-0.5 rounded text-[10px] border">{e}</span>
+                             ))}
+                             {(schedule.email_recipients || []).length > 2 && <span className="text-[9px] text-muted-foreground">+{schedule.email_recipients.length - 2}</span>}
+                           </div>
+                         </td>
+                         <td className="py-2 px-4 text-right">
+                           <Button variant="outline" size="sm" onClick={() => handleRunScheduleNow(schedule)} className="h-7 text-[10px] gap-1 px-2 border-primary/20 hover:bg-primary/10">
+                             <Play className="w-2.5 h-2.5" /> Executar Agora
+                           </Button>
+                         </td>
+                       </tr>
+                     ))}
+                     {scheduledReports.length === 0 && (
+                       <tr><td colSpan={5} className="py-8 text-center text-muted-foreground italic">Nenhum agendamento ativo.</td></tr>
+                     )}
+                   </tbody>
+                 </table>
+               </div>
+             </TabsContent>
+           </Tabs>
+         </div>
           </DialogContent>
         </Dialog>
       </div>
-   );
- }
+    );
+  }
