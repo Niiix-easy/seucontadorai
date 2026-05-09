@@ -2287,7 +2287,97 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setShowScheduleDialog(null)}>Cancelar</Button>
-                <Button onClick={handleCreateSchedule}>Criar Agendamento</Button>
+                <Button onClick={() => setShowExportPreview(true)}>Visualizar & Confirmar</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Export Preview Dialog */}
+        <Dialog open={showExportPreview} onOpenChange={setShowExportPreview}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirmar Recorte de Exportação</DialogTitle>
+              <DialogDescription>Verifique o volume de dados antes de agendar.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="p-4 bg-muted/50 rounded-lg space-y-2 border">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Tipo de Relatório:</span>
+                  <span className="font-bold capitalize">{showScheduleDialog?.type}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Volume de Registros:</span>
+                  <span className="font-bold text-primary">
+                    {showScheduleDialog?.type === 'backlog' ? backlogData.length : auditLogs.length} registros
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Período Detectado:</span>
+                  <span className="font-bold">
+                    {showScheduleDialog?.type === 'backlog' 
+                      ? (backlogFilters.date || 'Todo histórico') 
+                      : (auditFilters.dateStart || 'Início') + ' até ' + (auditFilters.dateEnd || 'Hoje')}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Destinatário:</span>
+                  <span className="font-bold">{newSchedule.email}</span>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowExportPreview(false)}>Voltar</Button>
+                <Button onClick={() => { handleCreateSchedule(); setShowExportPreview(false); }}>Confirmar Agendamento</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Export History Dialog */}
+        <Dialog open={showExportHistory} onOpenChange={setShowExportHistory}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileArchive className="w-5 h-5 text-purple-500" /> Histórico de Exportações Agendadas
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted uppercase">
+                    <tr>
+                      <th className="text-left py-2 px-4">Data/Hora</th>
+                      <th className="text-left py-2 px-4">Relatório</th>
+                      <th className="text-left py-2 px-4">Formato</th>
+                      <th className="text-center py-2 px-4">Registros</th>
+                      <th className="text-left py-2 px-4">Status</th>
+                      <th className="text-right py-2 px-4">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {exportHistory.map(log => (
+                      <tr key={log.id} className="border-t hover:bg-muted/30">
+                        <td className="py-2 px-4 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
+                        <td className="py-2 px-4 capitalize">{log.report_type}</td>
+                        <td className="py-2 px-4 uppercase font-bold">{log.format}</td>
+                        <td className="py-2 px-4 text-center">{log.record_count}</td>
+                        <td className="py-2 px-4">
+                          <Badge variant={log.status === 'success' ? 'default' : 'destructive'} className="text-[9px]">
+                            {log.status === 'success' ? 'Enviado' : 'Erro'}
+                          </Badge>
+                        </td>
+                        <td className="py-2 px-4 text-right">
+                          <Button variant="ghost" size="sm" onClick={() => handleResendEmail(log.id)} className="h-7 text-[10px] text-purple-600">
+                            <Send className="w-3 h-3 mr-1" /> Reenviar
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                    {exportHistory.length === 0 && (
+                      <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhuma exportação registrada.</td></tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </DialogContent>
