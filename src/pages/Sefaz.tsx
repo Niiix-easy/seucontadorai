@@ -167,6 +167,7 @@ export default function Sefaz() {
       isCalculating?: boolean
     } | null>(null);
     const [manualScheduleStatus, setManualScheduleStatus] = useState<{ id: string, status: string, progress: number, zipUrl?: string } | null>(null);
+    const [showAuditDetailDialog, setShowAuditDetailDialog] = useState<any | null>(null);
     const [exportHistory, setExportHistory] = useState<any[]>([]);
     const [showExportHistory, setShowExportHistory] = useState(false);
     const [backlogPage, setBacklogPage] = useState(1);
@@ -3042,9 +3043,23 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                                        <span className="text-[7px] text-muted-foreground font-mono">
                                          Hash CSV: {log.csv_hash?.substring(0, 16)}...
                                        </span>
-                                       {log.validation_divergence && (
-                                         <Badge variant="destructive" className="text-[7px] h-3 px-1 mt-0.5">Divergência Detectada</Badge>
-                                       )}
+                                        {log.validation_divergence ? (
+                                          <Button 
+                                            variant="ghost" 
+                                            className="h-3 p-0 text-[7px] text-destructive hover:text-destructive/80 mt-0.5 flex items-center"
+                                            onClick={() => setShowAuditDetailDialog(log)}
+                                          >
+                                            <AlertCircle className="w-2 h-2 mr-0.5" /> Divergência Detectada (Ver detalhes)
+                                          </Button>
+                                        ) : (
+                                          <Button 
+                                            variant="ghost" 
+                                            className="h-3 p-0 text-[7px] text-green-600 hover:text-green-500 mt-0.5 flex items-center"
+                                            onClick={() => setShowAuditDetailDialog(log)}
+                                          >
+                                            <CheckCircle2 className="w-2 h-2 mr-0.5" /> Integridade OK (Ver log)
+                                          </Button>
+                                        )}
                                      </div>
                                    )}
                                  </div>
