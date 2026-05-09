@@ -469,7 +469,9 @@ export default function Sefaz() {
           <TabsTrigger value="consultas">Consultas</TabsTrigger>
            <TabsTrigger value="integradores">Integradores</TabsTrigger>
            <TabsTrigger value="processamento">Relatórios de Processamento</TabsTrigger>
-           <TabsTrigger value="config_avancada">Config. Certificado</TabsTrigger>
+            <TabsTrigger value="config_avancada">Config. Certificado</TabsTrigger>
+        </TabsList>
+
          <TabsContent value="processamento">
            <Card>
              <CardHeader>
@@ -566,8 +568,7 @@ export default function Sefaz() {
                </div>
              </CardContent>
            </Card>
-         </TabsContent>
-        </TabsList>
+          </TabsContent>
 
         {/* EMISSÃO */}
         <TabsContent value="nfe">
