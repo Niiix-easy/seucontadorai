@@ -113,6 +113,7 @@ function generateChave() {
    retry_count?: number;
    next_retry_at?: string | null;
    processing_log?: any[];
+   is_processing?: boolean;
  };
 
 export default function Sefaz() {
@@ -141,19 +142,19 @@ export default function Sefaz() {
       const filtered = statusFilter === "all" ? processedDocs : processedDocs.filter(d => d.status === statusFilter);
       if (filtered.length === 0) return;
       const headers = ["ID", "Data", "Tipo", "Status", "Total", "Recibo", "Protocolo", "Sefaz Status", "Sefaz Mensagem", "Erros", "Retentativas"];
-      const rows = filtered.map(doc => [
-        doc.id, 
-        new Date(doc.created_at).toLocaleString(), 
-        doc.document_type, 
-        doc.status,
-        doc.valor_total || 0, 
-        doc.receipt_number || "", 
-        doc.protocol_number || "",
-        doc.last_error || "", 
-        doc.retry_count || 0,
-        doc.sefaz_response_code || "",
-        doc.sefaz_response_message || ""
-      ]);
+       const rows = filtered.map(doc => [
+         doc.id, 
+         new Date(doc.created_at).toLocaleString(), 
+         doc.document_type, 
+         doc.status,
+         doc.valor_total || 0, 
+         doc.receipt_number || "", 
+         doc.protocol_number || "",
+         doc.sefaz_response_code || "",
+         doc.sefaz_response_message || "",
+         doc.last_error || "", 
+         doc.retry_count || 0,
+       ]);
       const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
@@ -166,24 +167,46 @@ export default function Sefaz() {
       toast.success("Relatório CSV exportado!");
     };
  
-    const handleBatchRetry = async () => {
-      if (selectedIds.length === 0) return;
-      setIsBatchProcessing(true);
-      setBatchProgress(0);
-      let completed = 0;
-      for (const id of selectedIds) {
-        try {
-          await supabase.from("processed_documents").update({ status: "pending", last_error: null }).eq("id", id);
-          await supabase.functions.invoke("fiscal-engine", { body: { action: "sign_and_send", documentId: id } });
-        } catch (e) { console.error(e); }
-        completed++;
-        setBatchProgress(Math.round((completed / selectedIds.length) * 100));
-      }
-      toast.success(`${completed} documentos em reprocessamento.`);
-      setIsBatchProcessing(false);
-      setSelectedIds([]);
-      loadProcessedDocs();
-    };
+     const handleBatchRetry = async () => {
+       if (selectedIds.length === 0) return;
+       
+       setIsBatchProcessing(true);
+       setBatchProgress(0);
+ 
+       try {
+         toast.info("Validando certificado e ambiente...");
+         const { data: valData, error: valError } = await supabase.functions.invoke("fiscal-engine", { 
+           body: { action: "validate" } 
+         });
+ 
+         if (valError || !valData.valid) {
+           toast.error(`Falha na validação: ${valData?.error || "Certificado ou ambiente inválido"}`);
+           setIsBatchProcessing(false);
+           return;
+         }
+ 
+         toast.success(`Certificado válido: ${valData.subject}. Iniciando lote...`);
+ 
+         let completed = 0;
+         for (const id of selectedIds) {
+           try {
+             await supabase.from("processed_documents").update({ status: "pending", last_error: null, is_processing: true }).eq("id", id);
+             await supabase.functions.invoke("fiscal-engine", { body: { action: "sign_and_send", documentId: id } });
+           } catch (e) { 
+             console.error(`Erro no documento ${id}:`, e); 
+           }
+           completed++;
+           setBatchProgress(Math.round((completed / selectedIds.length) * 100));
+         }
+         toast.success(`${completed} documentos processados.`);
+       } catch (err: any) {
+         toast.error("Erro no processamento em lote: " + err.message);
+       } finally {
+         setIsBatchProcessing(false);
+         setSelectedIds([]);
+         loadProcessedDocs();
+       }
+     };
  
     const toggleSelectAll = () => {
       if (selectedIds.length === processedDocs.length) setSelectedIds([]);
@@ -557,12 +580,13 @@ export default function Sefaz() {
                          </td>
                          <td className="py-3 px-4 font-mono">{doc.protocol_number || '—'}</td>
                          <td className="py-3 px-4 text-center">{doc.retry_count || 0}</td>
-                         <td className="py-3 px-4 text-right">
-                           <div className="flex justify-end gap-1">
-                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDocInDetail(doc)} title="Ver Detalhes"><Eye className="w-3 h-3" /></Button>
-                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDownloadXml(doc)} title="Download XML"><Download className="w-3 h-3" /></Button>
-                           </div>
-                         </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex justify-center gap-1">
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDocInDetail(doc)} title="Ver Detalhes"><Eye className="w-3 h-3" /></Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDownloadXml(doc)} title="Download XML"><Download className="w-3 h-3" /></Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRetry(doc.id)} disabled={doc.status === 'authorized' || doc.is_processing} title="Reprocessar"><RefreshCw className={`w-3 h-3 ${doc.is_processing ? 'animate-spin' : ''}`} /></Button>
+                            </div>
+                          </td>
                        </tr>
                      ))}
                    </tbody>
@@ -978,16 +1002,28 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                      {docInDetail.xml_content}
                    </pre>
                  </TabsContent>
-                 <TabsContent value="logs" className="mt-2">
-                   <div className="space-y-2">
-                     {docInDetail.processing_log?.map((log: any, idx: number) => (
-                       <div key={idx} className="text-xs p-2 border-b last:border-0 flex justify-between">
-                         <span>{log.event}</span>
-                         <span className="text-muted-foreground">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                       </div>
-                     ))}
-                   </div>
-                 </TabsContent>
+                  <TabsContent value="logs" className="mt-2">
+                    <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                      {docInDetail.processing_log?.length ? (
+                        docInDetail.processing_log.map((log: any, idx: number) => (
+                          <div key={idx} className="p-3 border rounded-lg bg-muted/20 space-y-1">
+                            <div className="flex justify-between items-center">
+                              <span className="font-semibold text-[11px] text-primary">{log.event}</span>
+                              <span className="text-[10px] text-muted-foreground">{new Date(log.timestamp).toLocaleString()}</span>
+                            </div>
+                            {(log.cStat || log.xMotivo) && (
+                              <div className="text-[10px] bg-muted/50 p-1.5 rounded flex gap-2">
+                                <span className="font-bold">cStat: {log.cStat || '—'}</span>
+                                <span className="text-muted-foreground">{log.xMotivo || '—'}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-center text-muted-foreground py-8 text-sm">Sem registros de processamento.</p>
+                      )}
+                    </div>
+                  </TabsContent>
                </Tabs>
                
                <div className="flex justify-end gap-2">

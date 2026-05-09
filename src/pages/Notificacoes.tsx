@@ -338,6 +338,7 @@ export default function Notificacoes() {
       case "nfe": return <FileSignature className="w-4 h-4 text-blue-500" />;
       case "nfse": return <Receipt className="w-4 h-4 text-green-500" />;
       case "audit": return <ShieldAlert className="w-4 h-4 text-amber-500" />;
+      case "error": return <ShieldAlert className="w-4 h-4 text-destructive" />;
       default: return <Bell className="w-4 h-4 text-muted-foreground" />;
     }
   };

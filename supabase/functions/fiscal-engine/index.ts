@@ -113,8 +113,56 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { action, documentId, password } = await req.json();
+     const { action, documentId, password, uf, environment } = await req.json();
 
+     if (action === "validate") {
+       const authHeader = req.headers.get("Authorization");
+       const { data: { user } } = await supabaseClient.auth.getUser(authHeader?.split(" ")[1] ?? "");
+       if (!user) throw new Error("Não autorizado");
+ 
+       const { data: config } = await supabaseClient
+         .from("fiscal_configurations")
+         .select("*")
+         .eq("user_id", user.id)
+         .single();
+ 
+       if (!config || !config.certificate_path) {
+         return new Response(JSON.stringify({ valid: false, error: "Certificado não configurado" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+       }
+ 
+       const { data: pfxData, error: downloadError } = await supabaseClient.storage
+         .from("certificates")
+         .download(config.certificate_path);
+ 
+       if (downloadError) return new Response(JSON.stringify({ valid: false, error: "Erro ao acessar arquivo do certificado" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+ 
+       try {
+         const decryptedPass = await decryptPassword(config.certificate_password_encrypted);
+         const pfxArrayBuffer = await pfxData.arrayBuffer();
+         const pfxBytes = new Uint8Array(pfxArrayBuffer);
+         const p12Asn1 = forge.asn1.fromDer(forge.util.createBuffer(pfxBytes as any).getBytes());
+         const p12 = forge.pkcs12.fromP12(p12Asn1, decryptedPass);
+         
+         const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
+         const cert = certBags[forge.pki.oids.certBag]?.[0]?.cert;
+ 
+         if (!cert) throw new Error("Certificado não encontrado no arquivo");
+ 
+         const now = new Date();
+         if (new Date(cert.validity.notAfter) < now) {
+           return new Response(JSON.stringify({ valid: false, error: "Certificado expirado em " + cert.validity.notAfter }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+         }
+ 
+         return new Response(JSON.stringify({ 
+           valid: true, 
+           expiry: cert.validity.notAfter,
+           subject: cert.subject.getField('CN')?.value
+         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+       } catch (e) {
+         return new Response(JSON.stringify({ valid: false, error: "Senha incorreta ou certificado corrompido" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+       }
+     }
+ 
     if (action === "update_password") {
       const encrypted = await encryptPassword(password);
       const authHeader = req.headers.get("Authorization");
@@ -175,13 +223,19 @@ serve(async (req) => {
 
       try {
         const response = await sendToSefaz(signedXml, config.uf, config.environment);
-        const responseText = await response.text();
-        
-        const cStat = responseText.match(/<cStat>(.*?)<\/cStat>/)?.[1];
-        const xMotivo = responseText.match(/<xMotivo>(.*?)<\/xMotivo>/)?.[1];
-        const nProt = responseText.match(/<nProt>(.*?)<\/nProt>/)?.[1];
-
-        if (cStat === "100") {
+         const responseText = await response.text();
+         console.log("SEFAZ Response:", responseText);
+ 
+         const getTag = (tag: string) => {
+           const match = responseText.match(new RegExp(`<${tag}[^>]*>(.*?)<\/${tag}>`, 'i'));
+           return match ? match[1] : null;
+         };
+ 
+         const cStat = getTag("cStat");
+         const xMotivo = getTag("xMotivo");
+         const nProt = getTag("nProt");
+ 
+         if (cStat === "100" || cStat === "101" || cStat === "102") {
           await supabaseClient.from("processed_documents").update({
             status: "authorized",
             signed_xml_content: signedXml,
@@ -189,29 +243,38 @@ serve(async (req) => {
             sefaz_response_code: cStat,
             sefaz_response_message: xMotivo,
             is_processing: false,
-            processing_log: [...(doc.processing_log || []), { timestamp: new Date().toISOString(), event: "Autorizado pela SEFAZ" }]
+             processing_log: [...(doc.processing_log || []), { timestamp: new Date().toISOString(), event: "Autorizado pela SEFAZ", cStat, xMotivo }]
           }).eq("id", documentId);
         } else {
-          throw new Error(`SEFAZ [${cStat}]: ${xMotivo}`);
+           throw new Error(`SEFAZ [${cStat || 'ERRO'}]: ${xMotivo || 'Erro desconhecido'}`);
         }
       } catch (error) {
         const newRetryCount = (doc.retry_count || 0) + 1;
         const maxRetries = config.max_retries || 5;
         const delay = config.retry_delay_minutes || 15;
         
-        const status = newRetryCount >= maxRetries ? "failed_permanently" : "error";
+         const status = newRetryCount >= maxRetries ? "dead-letter" : "error";
         const nextRetry = status === "error" 
           ? new Date(Date.now() + 1000 * 60 * delay).toISOString() 
           : null;
 
-        await supabaseClient.from("processed_documents").update({
-          status,
-          last_error: error.message,
-          retry_count: newRetryCount,
-          next_retry_at: nextRetry,
-          is_processing: false,
-            processing_log: [...(doc.processing_log || []), { timestamp: new Date().toISOString(), event: `Erro: ${error.message}` }]
-        }).eq("id", documentId);
+         await supabaseClient.from("processed_documents").update({
+           status,
+           last_error: error.message,
+           retry_count: newRetryCount,
+           next_retry_at: nextRetry,
+           is_processing: false,
+           processing_log: [...(doc.processing_log || []), { timestamp: new Date().toISOString(), event: `Tentativa ${newRetryCount}: ${error.message}` }]
+         }).eq("id", documentId);
+ 
+         if (status === "dead-letter") {
+           await supabaseClient.from("notifications").insert({
+             user_id: doc.user_id,
+             title: "Documento em Dead-Letter",
+             message: `O documento ${documentId} excedeu o limite de ${maxRetries} tentativas e foi movido para dead-letter.`,
+             type: "error"
+           });
+         }
       }
 
       return new Response(JSON.stringify({ success: true }), {
