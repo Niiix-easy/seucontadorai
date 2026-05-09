@@ -9,10 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { 
-   Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
+    Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
     Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
-    FileDown, Play, CheckSquare, Square
+    FileDown, Play, CheckSquare, Square, FileArchive
  } from "lucide-react";
+import JSZip from "jszip";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -261,13 +262,46 @@ export default function Sefaz() {
      if (!error && data) setFiscalConfig(data);
    };
 
-   const loadProcessedDocs = async () => {
-     let query = supabase.from("processed_documents").select("*").order("created_at", { ascending: false });
-     if (periodo.de) query = query.gte("created_at", periodo.de);
-     if (periodo.ate) query = query.lte("created_at", periodo.ate);
-     const { data } = await query;
-     if (data) setProcessedDocs(data as ProcessedDocument[]);
-   };
+    const loadProcessedDocs = async () => {
+      let query = supabase.from("processed_documents").select("*").order("created_at", { ascending: false });
+      if (periodo.de) query = query.gte("created_at", `${periodo.de}T00:00:00`);
+      if (periodo.ate) query = query.lte("created_at", `${periodo.ate}T23:59:59`);
+      if (cStatFilter) query = query.ilike("sefaz_response_code", `%${cStatFilter}%`);
+      if (xMotivoFilter) query = query.ilike("sefaz_response_message", `%${xMotivoFilter}%`);
+      
+      const { data } = await query;
+      if (data) setProcessedDocs(data as ProcessedDocument[]);
+    };
+
+    const handleBatchDownloadZip = async () => {
+      if (selectedIds.length === 0) return;
+      
+      toast.info("Gerando arquivo ZIP...");
+      const zip = new JSZip();
+      const selectedDocs = processedDocs.filter(d => selectedIds.includes(d.id));
+      
+      selectedDocs.forEach(doc => {
+        if (doc.signed_xml_content) {
+          zip.file(`${doc.id}_assinado.xml`, doc.signed_xml_content);
+        } else {
+          zip.file(`${doc.id}_original.xml`, doc.xml_content);
+        }
+        // If there are other receipts or logs, they could be added here
+        if (doc.processing_log) {
+          zip.file(`${doc.id}_log.json`, JSON.stringify(doc.processing_log, null, 2));
+        }
+      });
+
+      const content = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(content);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `lote_fiscal_${new Date().getTime()}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Download ZIP iniciado!");
+    };
 
     const handleSaveConfig = async () => {
       if (!user) return;
