@@ -590,7 +590,7 @@ export default function Sefaz() {
       });
 
       doc.save(`backlog_fiscal_${new Date().toISOString().split('T')[0]}.pdf`);
-      toast.success("Backlog PDF exportada!");
+      toast.success("Backlog PDF exportado!");
     };
 
     const handleExportDeadLetterCSV = () => {
