@@ -145,7 +145,7 @@ export default function Sefaz() {
     const [suspensionStates, setSuspensionStates] = useState<any[]>([]);
     const [backlogData, setBacklogData] = useState<any[]>([]);
      const [backlogFilters, setBacklogFilters] = useState({ uf: "all", env: "all", date: "", cStat: "", xMotivo: "" });
-    const [auditFilters, setAuditFilters] = useState({ dateStart: "", dateEnd: "", uf: "all", env: "all", action: "all" });
+    const [auditFilters, setAuditFilters] = useState({ dateStart: "", dateEnd: "", uf: "all", env: "all", action: "all", cStat: "", xMotivo: "" });
      const [showPauseDialog, setShowPauseDialog] = useState<{ uf: string, env: string, paused: boolean, manual?: boolean } | null>(null);
      const [manualRetryProgress, setManualRetryProgress] = useState<{ [key: string]: { status: 'queued' | 'processing' | 'done' | 'error', count: number, total: number } }>({});
     const [pauseReason, setPauseReason] = useState("");
@@ -361,6 +361,8 @@ export default function Sefaz() {
       if (auditFilters.action !== "all") query = query.eq("action", auditFilters.action);
       if (auditFilters.dateStart) query = query.gte("created_at", `${auditFilters.dateStart}T00:00:00`);
       if (auditFilters.dateEnd) query = query.lte("created_at", `${auditFilters.dateEnd}T23:59:59`);
+      if (auditFilters.cStat) query = query.ilike("sefaz_response_code", `%${auditFilters.cStat}%`);
+      if (auditFilters.xMotivo) query = query.ilike("reason", `%${auditFilters.xMotivo}%`);
 
       const from = (auditPage - 1) * 10;
       const to = from + 9;
