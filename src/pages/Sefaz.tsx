@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Textarea } from "@/components/ui/textarea";
 import { 
   Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
-  Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator
+   Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -88,14 +88,37 @@ function generateChave() {
   return Array.from({ length: 44 }, () => Math.floor(Math.random() * 10)).join("");
 }
 
+ type FiscalConfig = {
+   uf: string;
+   environment: "homologacao" | "producao";
+   certificate_filename: string | null;
+ };
+
+ type ProcessedDocument = {
+   id: string;
+   document_type: string;
+   status: string;
+   valor_total?: number;
+   sefaz_response_message: string | null;
+   created_at: string;
+   xml_content: string;
+   signed_xml_content: string | null;
+   receipt_number: string | null;
+   protocol_number: string | null;
+ };
+
 export default function Sefaz() {
   const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [emitindo, setEmitindo] = useState(false);
   const [loading, setLoading] = useState(true);
   const [nfes, setNfes] = useState<NFeEmitida[]>([]);
+   const [processedDocs, setProcessedDocs] = useState<ProcessedDocument[]>([]);
+   const [fiscalConfig, setFiscalConfig] = useState<FiscalConfig>({ uf: "SP", environment: "homologacao", certificate_filename: null });
+   const [configLoading, setConfigLoading] = useState(false);
   const [nfeDetalhe, setNfeDetalhe] = useState<NFeEmitida | null>(null);
   const [showXmlPreview, setShowXmlPreview] = useState(false);
+   const [periodo, setPeriodo] = useState({ de: "", ate: "" });
 
   // Form fields
   const [integrador, setIntegrador] = useState("oobj");
@@ -118,7 +141,39 @@ export default function Sefaz() {
     icmsAliquota: 18, ipiAliquota: 0, pisAliquota: 1.65, cofinsAliquota: 7.6
   }]);
 
-  useEffect(() => { if (user) loadNfes(); }, [user]);
+   useEffect(() => {
+     if (user) {
+       loadNfes();
+       loadFiscalConfig();
+       loadProcessedDocs();
+     }
+   }, [user]);
+
+   const loadFiscalConfig = async () => {
+     const { data, error } = await supabase.from("fiscal_configurations").select("*").single();
+     if (!error && data) setFiscalConfig(data);
+   };
+
+   const loadProcessedDocs = async () => {
+     let query = supabase.from("processed_documents").select("*").order("created_at", { ascending: false });
+     if (periodo.de) query = query.gte("created_at", periodo.de);
+     if (periodo.ate) query = query.lte("created_at", periodo.ate);
+     const { data } = await query;
+     if (data) setProcessedDocs(data as ProcessedDocument[]);
+   };
+
+   const handleSaveConfig = async () => {
+     if (!user) return;
+     setConfigLoading(true);
+     const { error } = await supabase.from("fiscal_configurations").upsert({
+       user_id: user.id,
+       uf: fiscalConfig.uf,
+       environment: fiscalConfig.environment,
+     }, { onConflict: "user_id" });
+     if (!error) toast.success("Configurações salvas!");
+     else toast.error("Erro ao salvar: " + error.message);
+     setConfigLoading(false);
+   };
 
   const loadNfes = async () => {
     setLoading(true);
