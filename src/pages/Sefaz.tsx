@@ -469,6 +469,7 @@ export default function Sefaz() {
           <TabsTrigger value="consultas">Consultas</TabsTrigger>
            <TabsTrigger value="integradores">Integradores</TabsTrigger>
            <TabsTrigger value="processamento">Relatórios de Processamento</TabsTrigger>
+           <TabsTrigger value="config_avancada">Config. Certificado</TabsTrigger>
          <TabsContent value="processamento">
            <Card>
              <CardHeader>
@@ -493,7 +494,30 @@ export default function Sefaz() {
                    <div className="bg-primary h-full transition-all duration-300" style={{ width: `${batchProgress}%` }} />
                  </div>
                )}
-               <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs">De:</Label>
+                    <Input type="date" value={periodo.de} onChange={e => setPeriodo(prev => ({ ...prev, de: e.target.value }))} className="w-32 h-9" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs">Até:</Label>
+                    <Input type="date" value={periodo.ate} onChange={e => setPeriodo(prev => ({ ...prev, ate: e.target.value }))} className="w-32 h-9" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs">Status:</Label>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-32 h-9 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="authorized">Autorizado</SelectItem>
+                        <SelectItem value="error">Erro</SelectItem>
+                        <SelectItem value="pending">Pendente</SelectItem>
+                        <SelectItem value="failed_permanently">Dead-letter</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={loadProcessedDocs}><Search className="w-4 h-4" /></Button>
+                </div>
                  <Input type="date" value={periodo.de} onChange={e => setPeriodo(prev => ({ ...prev, de: e.target.value }))} className="w-32 h-9" />
                  <span className="text-muted-foreground text-xs">até</span>
                  <Input type="date" value={periodo.ate} onChange={e => setPeriodo(prev => ({ ...prev, ate: e.target.value }))} className="w-32 h-9" />
