@@ -15,6 +15,8 @@ import {
      FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X
  } from "lucide-react";
 import JSZip from "jszip";
+ import jsPDF from "jspdf";
+ import autoTable from "jspdf-autotable";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
