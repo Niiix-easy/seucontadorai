@@ -1258,6 +1258,66 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
           )}
         </DialogContent>
       </Dialog>
+       {/* Dead-Letter Detail Dialog */}
+       <Dialog open={!!dlSelectedNotif} onOpenChange={() => setDlSelectedNotif(null)}>
+         <DialogContent className="max-w-2xl">
+           <DialogHeader>
+             <DialogTitle className="font-display">Detalhes do Alerta Dead-Letter</DialogTitle>
+           </DialogHeader>
+           {dlSelectedNotif && (
+             <div className="space-y-4">
+               <div className="grid grid-cols-2 gap-4">
+                 <div className="p-3 bg-muted/30 rounded-lg">
+                   <p className="text-xs text-muted-foreground uppercase">ID Alerta</p>
+                   <p className="font-mono text-sm">{dlSelectedNotif.id}</p>
+                 </div>
+                 <div className="p-3 bg-muted/30 rounded-lg">
+                   <p className="text-xs text-muted-foreground uppercase">ID Documento</p>
+                   <p className="font-mono text-sm">{dlSelectedNotif.document_id}</p>
+                 </div>
+                 <div className="p-3 bg-muted/30 rounded-lg">
+                   <p className="text-xs text-muted-foreground uppercase">Retentativas</p>
+                   <p className="font-mono text-sm">{dlSelectedNotif.retry_count_at_failure || 'N/A'}</p>
+                 </div>
+                 <div className="p-3 bg-muted/30 rounded-lg">
+                   <p className="text-xs text-muted-foreground uppercase">Canais</p>
+                   <div className="flex gap-1 mt-1">
+                    {dlSelectedNotif.channels?.map((c: string) => <Badge key={c} variant="outline" className="text-[10px]">{c}</Badge>)}
+                   </div>
+                 </div>
+               </div>
+
+               <div className="p-4 bg-destructive/5 border border-destructive/20 rounded-lg">
+                 <p className="text-xs font-bold text-destructive uppercase">Erro Retornado (SEFAZ)</p>
+                 <div className="mt-2 flex gap-2">
+                   <Badge variant="destructive" className="h-5">cStat: {dlSelectedNotif.cstat}</Badge>
+                   <p className="text-xs text-muted-foreground font-medium">{dlSelectedNotif.xmotivo}</p>
+                 </div>
+                 {dlSelectedNotif.error_message && (
+                   <div className="mt-3 p-2 bg-background/50 rounded border text-[10px] font-mono whitespace-pre-wrap">
+                     {dlSelectedNotif.error_message}
+                   </div>
+                 )}
+               </div>
+
+               <div className="flex justify-end gap-2">
+                 <Button variant="outline" size="sm" onClick={() => {
+                   const doc = dlSelectedNotif.processed_documents;
+                   if (doc) setDocInDetail(doc);
+                   else toast.error("Documento não encontrado");
+                 }}>Ver Documento</Button>
+                 {dlSelectedNotif.last_xml_url && (
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={dlSelectedNotif.last_xml_url} target="_blank" rel="noopener noreferrer">Baixar XML Transmitido</a>
+                    </Button>
+                 )}
+                 <Button size="sm" onClick={() => handleRetry(dlSelectedNotif.document_id)}>Reprocessar Manual</Button>
+               </div>
+             </div>
+           )}
+         </DialogContent>
+       </Dialog>
+
        {/* Document Detail Dialog */}
        <Dialog open={!!docInDetail} onOpenChange={() => setDocInDetail(null)}>
          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
