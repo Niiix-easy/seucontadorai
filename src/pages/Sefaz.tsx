@@ -1719,11 +1719,54 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
        <Dialog open={showAuditLogs} onOpenChange={setShowAuditLogs}>
          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
            <DialogHeader>
-             <DialogTitle className="font-display flex items-center gap-2">
-               <History className="w-5 h-5" /> Auditoria de Ações Fiscais
-             </DialogTitle>
+              <div className="flex items-center justify-between w-full pr-6">
+                <DialogTitle className="font-display flex items-center gap-2">
+                  <History className="w-5 h-5" /> Auditoria de Ações Fiscais
+                </DialogTitle>
+              </div>
            </DialogHeader>
            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2 items-center p-3 bg-muted/20 rounded-lg border text-[10px]">
+                <div className="flex items-center gap-1">
+                  <Label className="text-[9px] uppercase font-bold text-muted-foreground">UF:</Label>
+                  <Select value={auditFilters.uf} onValueChange={v => setAuditFilters(p => ({ ...p, uf: v }))}>
+                    <SelectTrigger className="w-16 h-7 text-[9px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      {ufs.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Label className="text-[9px] uppercase font-bold text-muted-foreground">Ação:</Label>
+                  <Select value={auditFilters.action} onValueChange={v => setAuditFilters(p => ({ ...p, action: v }))}>
+                    <SelectTrigger className="w-24 h-7 text-[9px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      <SelectItem value="pause">Pausa</SelectItem>
+                      <SelectItem value="resume">Retomada</SelectItem>
+                      <SelectItem value="manual_retry">Reprocessamento</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Label className="text-[9px] uppercase font-bold text-muted-foreground">Período:</Label>
+                  <Input type="date" value={auditFilters.dateStart} onChange={e => setAuditFilters(p => ({ ...p, dateStart: e.target.value }))} className="w-28 h-7 text-[9px]" />
+                  <span className="text-muted-foreground text-[8px]">até</span>
+                  <Input type="date" value={auditFilters.dateEnd} onChange={e => setAuditFilters(p => ({ ...p, dateEnd: e.target.value }))} className="w-28 h-7 text-[9px]" />
+                </div>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setAuditFilters({ dateStart: "", dateEnd: "", uf: "all", env: "all", action: "all" })} title="Limpar Filtros">
+                  <X className="w-3 h-3" />
+                </Button>
+                <div className="ml-auto flex gap-1">
+                  <Button variant="outline" size="sm" onClick={handleExportAuditCSV} className="h-7 text-[9px] gap-1 px-2">
+                    <Download className="w-2.5 h-2.5" /> CSV
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleExportAuditPDF} className="h-7 text-[9px] gap-1 px-2 border-red-100">
+                    <FileDown className="w-2.5 h-2.5 text-red-500" /> PDF
+                  </Button>
+                </div>
+              </div>
              <div className="overflow-x-auto border rounded-lg">
                <table className="w-full text-xs">
                  <thead className="bg-muted uppercase">
