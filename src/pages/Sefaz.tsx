@@ -2401,6 +2401,13 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                     )}
                   </tbody>
                 </table>
+                <div className="flex items-center justify-between p-2 border-t bg-muted/10">
+                  <span className="text-[10px] text-muted-foreground">Página {auditPage}</span>
+                  <div className="flex gap-1">
+                    <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setAuditPage(p => Math.max(1, p - 1))} disabled={auditPage === 1}><ArrowLeft className="w-3 h-3" /></Button>
+                    <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setAuditPage(p => p + 1)} disabled={auditLogs.length < 10}><ArrowLeft className="w-3 h-3 rotate-180" /></Button>
+                  </div>
+                </div>
               </div>
             </div>
           </DialogContent>
