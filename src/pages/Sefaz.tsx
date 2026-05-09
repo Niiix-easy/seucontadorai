@@ -376,6 +376,7 @@ export default function Sefaz() {
       if (user) {
         loadFiscalConfig();
       }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user, fiscalConfig.uf, fiscalConfig.environment]);
 
     useEffect(() => {
