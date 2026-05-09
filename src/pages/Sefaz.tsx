@@ -93,6 +93,8 @@ function generateChave() {
    uf: string;
    environment: "homologacao" | "producao";
    certificate_filename: string | null;
+   max_retries?: number;
+   retry_delay_minutes?: number;
  };
 
  type ProcessedDocument = {
@@ -117,9 +119,16 @@ export default function Sefaz() {
   const [search, setSearch] = useState("");
   const [emitindo, setEmitindo] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [nfes, setNfes] = useState<NFeEmitida[]>([]);
+   const [nfes, setNfes] = useState<NFeEmitida[]>([]);
    const [processedDocs, setProcessedDocs] = useState<ProcessedDocument[]>([]);
-   const [fiscalConfig, setFiscalConfig] = useState<FiscalConfig>({ uf: "SP", environment: "homologacao", certificate_filename: null });
+   const [fiscalConfig, setFiscalConfig] = useState<FiscalConfig>({ 
+     uf: "SP", 
+     environment: "homologacao", 
+     certificate_filename: null,
+     max_retries: 5,
+     retry_delay_minutes: 15
+   });
+   const [statusFilter, setStatusFilter] = useState<string>("all");
     const [configLoading, setConfigLoading] = useState(false);
     const [certPassword, setCertPassword] = useState("");
     const [showCertPassword, setShowCertPassword] = useState(false);
@@ -128,12 +137,20 @@ export default function Sefaz() {
      const [isBatchProcessing, setIsBatchProcessing] = useState(false);
      const [batchProgress, setBatchProgress] = useState(0);
     const handleExportCSV = () => {
-      if (processedDocs.length === 0) return;
-      const headers = ["ID", "Data", "Tipo", "Status", "Total", "Recibo", "Protocolo", "Erros", "Retentativas"];
-      const rows = processedDocs.map(doc => [
-        doc.id, new Date(doc.created_at).toLocaleString(), doc.document_type, doc.status,
-        doc.valor_total || 0, doc.receipt_number || "", doc.protocol_number || "",
-        doc.last_error || "", doc.retry_count || 0
+      const filtered = statusFilter === "all" ? processedDocs : processedDocs.filter(d => d.status === statusFilter);
+      if (filtered.length === 0) return;
+      const headers = ["ID", "Data", "Tipo", "Status", "Total", "Recibo", "Protocolo", "Erros", "Retentativas", "Download XML"];
+      const rows = filtered.map(doc => [
+        doc.id, 
+        new Date(doc.created_at).toLocaleString(), 
+        doc.document_type, 
+        doc.status,
+        doc.valor_total || 0, 
+        doc.receipt_number || "", 
+        doc.protocol_number || "",
+        doc.last_error || "", 
+        doc.retry_count || 0,
+        doc.signed_xml_content ? "Sim (signed)" : "Não"
       ]);
       const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -221,18 +238,35 @@ export default function Sefaz() {
      if (data) setProcessedDocs(data as ProcessedDocument[]);
    };
 
-   const handleSaveConfig = async () => {
-     if (!user) return;
-     setConfigLoading(true);
-     const { error } = await supabase.from("fiscal_configurations").upsert({
-       user_id: user.id,
-       uf: fiscalConfig.uf,
-       environment: fiscalConfig.environment,
-     }, { onConflict: "user_id" });
-     if (!error) toast.success("Configurações salvas!");
-     else toast.error("Erro ao salvar: " + error.message);
-     setConfigLoading(false);
-   };
+    const handleSaveConfig = async () => {
+      if (!user) return;
+      setConfigLoading(true);
+      try {
+        const { error } = await supabase.from("fiscal_configurations").upsert({
+          user_id: user.id,
+          uf: fiscalConfig.uf,
+          environment: fiscalConfig.environment,
+          max_retries: fiscalConfig.max_retries,
+          retry_delay_minutes: fiscalConfig.retry_delay_minutes
+        }, { onConflict: "user_id" });
+        
+        if (error) throw error;
+
+        if (certPassword) {
+          const { data, error: funcError } = await supabase.functions.invoke("fiscal-engine", {
+            body: { action: "update_password", password: certPassword }
+          });
+          if (funcError) throw funcError;
+          setCertPassword("");
+        }
+        
+        toast.success("Configurações salvas!");
+      } catch (err: any) {
+        toast.error("Erro ao salvar: " + err.message);
+      } finally {
+        setConfigLoading(false);
+      }
+    };
 
   const loadNfes = async () => {
     setLoading(true);
