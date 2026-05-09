@@ -173,6 +173,28 @@ export default function Sefaz() {
       document.body.removeChild(link);
       toast.success("Relatório CSV exportado!");
     };
+
+    const handleExportLog = (doc: ProcessedDocument) => {
+      if (!doc.processing_log) return;
+      const headers = ["Tentativa", "Horário", "Evento", "cStat", "xMotivo"];
+      const rows = doc.processing_log.map((log, index) => [
+        index + 1,
+        new Date(log.timestamp).toLocaleString(),
+        log.event,
+        log.cStat || "",
+        log.xMotivo || ""
+      ]);
+      const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `log_processamento_${doc.id}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Log de processamento exportado!");
+    };
  
      const handleBatchRetry = async () => {
        if (selectedIds.length === 0) return;
