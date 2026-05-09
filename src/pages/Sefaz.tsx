@@ -282,15 +282,6 @@ export default function Sefaz() {
     icmsAliquota: 18, ipiAliquota: 0, pisAliquota: 1.65, cofinsAliquota: 7.6
   }]);
 
-   useEffect(() => {
-     if (user) {
-       loadNfes();
-        loadFiscalConfig();
-        loadProcessedDocs();
-        loadBacklogData();
-      }
-    }, [user]);
-
     const loadBacklogData = async () => {
       const { data: backlog } = await supabase
         .from("processed_documents")
@@ -329,7 +320,15 @@ export default function Sefaz() {
         loadBacklogData();
       }
     };
-   }, [user]);
+
+    useEffect(() => {
+      if (user) {
+        loadNfes();
+        loadFiscalConfig();
+        loadProcessedDocs();
+        loadBacklogData();
+      }
+    }, [user]);
 
    const loadFiscalConfig = async () => {
      const { data, error } = await supabase.from("fiscal_configurations").select("*").single();
