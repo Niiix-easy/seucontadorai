@@ -1165,6 +1165,15 @@ export default function Sefaz() {
                           onChange={e => setFiscalConfig(p => ({ ...p, retry_delay_minutes: Number(e.target.value) }))} 
                         />
                       </div>
+                      <div className="space-y-2 col-span-2">
+                        <Label>Throughput (Docs/Min)</Label>
+                        <Input 
+                          type="number" 
+                          value={fiscalConfig.reactivation_throughput} 
+                          onChange={e => setFiscalConfig(p => ({ ...p, reactivation_throughput: Number(e.target.value) }))} 
+                          placeholder="Vazão para esta UF/Ambiente"
+                        />
+                      </div>
                     </div>
                   </div>
 
