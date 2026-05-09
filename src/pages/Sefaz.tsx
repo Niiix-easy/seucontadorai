@@ -2565,9 +2565,18 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
             {showZipPreviewDialog && (
               <div className="space-y-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="border rounded p-3 bg-muted/30">
-                    <span className="text-[10px] text-muted-foreground uppercase block mb-1">Volume Previsto</span>
-                    <span className="text-xl font-bold">{showZipPreviewDialog.count} registros</span>
+                  <div className="border rounded p-3 bg-muted/30 col-span-2">
+                    <span className="text-[10px] text-muted-foreground uppercase block mb-1">Volume de Dados</span>
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <span className="text-xl font-bold">{showZipPreviewDialog.count}</span>
+                        <span className="text-[10px] text-muted-foreground ml-1">total de registros</span>
+                      </div>
+                      <div className="text-[10px] text-right space-y-0.5">
+                        <p className="text-blue-600 font-medium">CSV: {showZipPreviewDialog.count} registros</p>
+                        <p className="text-red-600 font-medium">PDF: {showZipPreviewDialog.count} registros</p>
+                      </div>
+                    </div>
                   </div>
                   <div className="border rounded p-3 bg-muted/30">
                     <span className="text-[10px] text-muted-foreground uppercase block mb-1">Relatório</span>
