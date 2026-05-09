@@ -322,7 +322,7 @@ export default function Sefaz() {
       const { data: backlog } = await query;
       
       if (backlog) {
-        const grouped = backlog.reduce((acc: any, curr: any) => {
+        const groupedMap = backlog.reduce((acc: any, curr: any) => {
           const key = `${curr.uf}-${curr.environment}`;
           if (!acc[key]) acc[key] = { uf: curr.uf, env: curr.environment, count: 0, next: curr.next_retry_at };
           acc[key].count++;
@@ -331,7 +331,19 @@ export default function Sefaz() {
           }
           return acc;
         }, {});
-        setBacklogData(Object.values(grouped));
+        
+        let result = Object.values(groupedMap);
+        
+        // Apply Sorting
+        result.sort((a: any, b: any) => {
+          const field = backlogSort.field;
+          const modifier = backlogSort.order === 'asc' ? 1 : -1;
+          if (a[field] < b[field]) return -1 * modifier;
+          if (a[field] > b[field]) return 1 * modifier;
+          return 0;
+        });
+
+        setBacklogData(result);
       }
 
       const { data: states } = await supabase.from("fiscal_suspension_states").select("*");
