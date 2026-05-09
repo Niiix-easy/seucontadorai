@@ -1789,12 +1789,18 @@ export default function Sefaz() {
                     <Button variant="outline" size="sm" onClick={handleExportAuditCSV} className="gap-2 h-8 text-[10px]">
                       <Download className="w-3 h-3" /> Exportar Auditoria
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleExportAuditPDF} title="PDF Auditoria" className="h-8 w-8 p-0 border-red-200 hover:bg-red-50">
-                      <FileDown className="w-3 h-3 text-red-500" />
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleExportBacklogPDF} title="PDF Backlog" className="h-8 w-8 p-0 border-blue-200 hover:bg-blue-50">
-                      <FileDown className="w-3 h-3 text-blue-500" />
-                    </Button>
+                     <Button variant="outline" size="sm" onClick={handleExportAuditPDF} title="PDF Auditoria" className="h-8 w-8 p-0 border-red-200 hover:bg-red-50">
+                       <FileDown className="w-3 h-3 text-red-500" />
+                     </Button>
+                     <Button variant="outline" size="sm" onClick={handleExportBacklogPDF} title="PDF Backlog" className="h-8 w-8 p-0 border-blue-200 hover:bg-blue-50">
+                       <FileDown className="w-3 h-3 text-blue-500" />
+                     </Button>
+                     <Button variant="outline" size="sm" onClick={() => handleExportZip('backlog')} title="Exportar ZIP Backlog" className="h-8 w-8 p-0 border-purple-200 hover:bg-purple-50">
+                       <FileArchive className="w-3 h-3 text-purple-500" />
+                     </Button>
+                     <Button variant="outline" size="sm" onClick={() => handleExportZip('audit')} title="Exportar ZIP Auditoria" className="h-8 w-8 p-0 border-purple-200 hover:bg-purple-50">
+                       <FileArchive className="w-3 h-3 text-purple-600" />
+                     </Button>
                     <Button variant="outline" size="sm" onClick={() => setShowAuditLogs(true)} className="gap-2 h-8 text-[10px]">
                       <History className="w-3 h-3" /> Auditoria
                     </Button>
@@ -2409,15 +2415,39 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   </Select>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label>E-mail do Destinatário</Label>
-                <Input 
-                  type="email" 
-                  placeholder="email@exemplo.com"
-                  value={newSchedule.email}
-                  onChange={e => setNewSchedule(p => ({ ...p, email: e.target.value }))}
-                />
-              </div>
+               <div className="space-y-3">
+                 <Label>Destinatários ({newSchedule.emails.length})</Label>
+                 <div className="flex gap-2">
+                   <Input 
+                     type="email" 
+                     placeholder="email@exemplo.com"
+                     value={newSchedule.currentEmail}
+                     onChange={e => setNewSchedule(p => ({ ...p, currentEmail: e.target.value }))}
+                     onKeyDown={e => {
+                       if (e.key === 'Enter') {
+                         e.preventDefault();
+                         if (newSchedule.currentEmail && !newSchedule.emails.includes(newSchedule.currentEmail)) {
+                           setNewSchedule(p => ({ ...p, emails: [...p.emails, p.currentEmail], currentEmail: "" }));
+                         }
+                       }
+                     }}
+                   />
+                   <Button onClick={() => {
+                     if (newSchedule.currentEmail && !newSchedule.emails.includes(newSchedule.currentEmail)) {
+                       setNewSchedule(p => ({ ...p, emails: [...p.emails, p.currentEmail], currentEmail: "" }));
+                     }
+                   }}>Add</Button>
+                 </div>
+                 <div className="flex flex-wrap gap-2 max-h-[100px] overflow-y-auto p-1 border rounded bg-muted/30">
+                   {newSchedule.emails.length === 0 && <span className="text-[10px] text-muted-foreground italic px-2">Nenhum e-mail adicionado.</span>}
+                   {newSchedule.emails.map((email, i) => (
+                     <div key={i} className="flex items-center gap-1 bg-primary/10 text-primary text-[10px] px-2 py-1 rounded-full border border-primary/20">
+                       {email}
+                       <X className="w-3 h-3 cursor-pointer hover:text-destructive" onClick={() => setNewSchedule(p => ({ ...p, emails: p.emails.filter(e => e !== email) }))} />
+                     </div>
+                   ))}
+                 </div>
+               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setShowScheduleDialog(null)}>Cancelar</Button>
                 <Button onClick={() => setShowExportPreview(true)}>Visualizar & Confirmar</Button>
@@ -2453,10 +2483,15 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                       : (auditFilters.dateStart || 'Início') + ' até ' + (auditFilters.dateEnd || 'Hoje')}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Destinatário:</span>
-                  <span className="font-bold">{newSchedule.email}</span>
-                </div>
+                 <div className="flex flex-col text-sm gap-1">
+                   <span className="text-muted-foreground">Destinatários:</span>
+                   <div className="flex flex-wrap gap-1">
+                     {newSchedule.emails.length > 0 ? newSchedule.emails.map(e => (
+                       <span key={e} className="bg-primary/5 px-1.5 py-0.5 rounded text-[10px] border">{e}</span>
+                     )) : <span className="text-destructive text-[10px] font-bold">Nenhum! (Adicione acima)</span>}
+                     {newSchedule.currentEmail && <span className="bg-amber-50 px-1.5 py-0.5 rounded text-[10px] border italic opacity-70">{newSchedule.currentEmail} (pendente)</span>}
+                   </div>
+                 </div>
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setShowExportPreview(false)}>Voltar</Button>
