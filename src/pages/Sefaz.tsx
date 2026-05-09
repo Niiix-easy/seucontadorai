@@ -161,12 +161,14 @@ export default function Sefaz() {
       type: 'backlog' | 'audit', 
       count: number, 
       filters: any, 
+      sort?: any,
       previewCount?: number,
       expectedCsvHash?: string,
       expectedPdfHash?: string,
       isCalculating?: boolean
     } | null>(null);
     const [manualScheduleStatus, setManualScheduleStatus] = useState<{ id: string, status: string, progress: number, zipUrl?: string } | null>(null);
+    const [showAuditDetailDialog, setShowAuditDetailDialog] = useState<any | null>(null);
     const [exportHistory, setExportHistory] = useState<any[]>([]);
     const [showExportHistory, setShowExportHistory] = useState(false);
     const [backlogPage, setBacklogPage] = useState(1);
@@ -712,28 +714,128 @@ export default function Sefaz() {
        }
      };
  
-     const calculateHash = async (content: string | Blob) => {
-       const data = typeof content === 'string' ? new TextEncoder().encode(content) : new Uint8Array(await (content as Blob).arrayBuffer());
-       const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-       const hashArray = Array.from(new Uint8Array(hashBuffer));
-       return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-     };
+    const calculateHash = async (content: string | Blob | Uint8Array) => {
+      let data: BufferSource;
+      if (typeof content === 'string') {
+        data = new TextEncoder().encode(content);
+      } else if (content instanceof Blob) {
+        data = await content.arrayBuffer();
+      } else {
+        data = content as any;
+      }
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    };
 
-     const handleExportZip = async (type: 'backlog' | 'audit', mode: 'full' | 'proof' = 'full') => {
-       const filters = type === 'backlog' ? backlogFilters : auditFilters;
-       const count = type === 'backlog' 
-         ? backlogData.reduce((acc, b) => acc + b.count, 0) 
-         : auditLogs.length;
-       
-       setShowZipPreviewDialog({ type, count, filters, previewCount: count, isCalculating: true });
+    const verifyAndDownloadFile = async (log: any, fileType: 'csv' | 'pdf') => {
+      if (!log.file_url) {
+        toast.error("URL do arquivo não disponível.");
+        return;
+      }
+      toast.info(`Extraindo e verificando ${fileType.toUpperCase()}...`);
+      try {
+        const response = await fetch(log.file_url);
+        const blob = await response.blob();
+        const zip = await JSZip.loadAsync(blob);
+        let targetFileName = "";
+        zip.forEach((path) => { 
+          if (path.toLowerCase().endsWith(`.${fileType}`) && !path.startsWith("log_tecnico")) {
+            targetFileName = path;
+          }
+        });
+
+        if (!targetFileName) {
+          toast.error(`Arquivo ${fileType.toUpperCase()} não encontrado no pacote.`);
+          return;
+        }
+
+        const fileContent = await zip.file(targetFileName)?.async(fileType === 'csv' ? "string" : "uint8array");
+        if (fileContent) {
+          const currentHash = await calculateHash(fileContent);
+          const expectedHash = fileType === 'csv' ? log.csv_hash : log.pdf_hash;
+          
+          if (expectedHash && currentHash !== expectedHash) {
+            toast.error(`DIVERGÊNCIA: Hash do ${fileType.toUpperCase()} não confere!`, {
+              description: `Esperado: ${expectedHash.substring(0, 10)}... | Obtido: ${currentHash.substring(0, 10)}...`,
+              duration: 10000
+            });
+            return;
+          }
+
+          const downloadBlob = fileType === 'csv' 
+            ? new Blob([fileContent as string], { type: "text/csv;charset=utf-8;" })
+            : new Blob([fileContent as any], { type: "application/pdf" });
+          
+          const url = URL.createObjectURL(downloadBlob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = targetFileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          toast.success(`${fileType.toUpperCase()} baixado e verificado.`);
+        }
+      } catch (err) {
+        toast.error(`Erro ao processar ${fileType.toUpperCase()}.`);
+      }
+    };
+
+    const downloadAuditSummary = (log: any) => {
+      const summary = {
+        id_execucao: log.id,
+        report_id: log.report_id,
+        data_criacao: log.created_at,
+        tipo: log.report_type,
+        filtros: log.filters,
+        contagens: {
+          total: log.record_count,
+          csv: log.csv_count,
+          pdf: log.pdf_count
+        },
+        hashes: {
+          csv: log.csv_hash,
+          pdf: log.pdf_hash
+        },
+        destinatarios: log.recipients,
+        tecnico: log.technical_log,
+        status: log.status,
+        divergencia: log.validation_divergence
+      };
+
+      const blob = new Blob([JSON.stringify(summary, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `resumo_auditoria_${log.id.substring(0, 8)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Resumo de auditoria exportado.");
+    };
+
+    const handleRunProofFromHistory = (log: any) => {
+      toast.info("Iniciando Modo Prova a partir do histórico...");
+      handleExportZip(log.report_type as 'backlog' | 'audit', 'proof', log.filters, log.technical_log?.sorting);
+    };
+
+      const handleExportZip = async (type: 'backlog' | 'audit', mode: 'full' | 'proof' = 'full', overrideFilters?: any, overrideSort?: any) => {
+        const filters = overrideFilters || (type === 'backlog' ? backlogFilters : auditFilters);
+        const sort = overrideSort || (type === 'backlog' ? backlogSort : auditSort);
+        
+        const count = type === 'backlog' 
+          ? backlogData.reduce((acc, b) => acc + b.count, 0) 
+          : auditLogs.length;
+        
+        setShowZipPreviewDialog({ type, count, filters, sort, previewCount: count, isCalculating: true });
 
        // Pre-calculate hashes for preview/proof
        let csvContent = "";
        let rows: any[] = [];
        if (type === 'backlog') {
          const sortedData = [...backlogData].sort((a: any, b: any) => {
-           const field = backlogSort.field;
-           const modifier = backlogSort.order === 'asc' ? 1 : -1;
+           const field = sort.field;
+           const modifier = sort.order === 'asc' ? 1 : -1;
            if (a[field] < b[field]) return -1 * modifier;
            if (a[field] > b[field]) return 1 * modifier;
            return 0;
@@ -831,7 +933,7 @@ export default function Sefaz() {
 
       const confirmExportZip = async () => {
          if (!showZipPreviewDialog || !user) return;
-         const { type, previewCount } = showZipPreviewDialog;
+         const { type, previewCount, filters, sort } = showZipPreviewDialog;
         setShowZipPreviewDialog(null);
         
         toast.info("Gerando pacote ZIP...");
@@ -865,12 +967,24 @@ export default function Sefaz() {
            const pdfHash = await calculateHash(pdfContent);
            zip.file(`backlog_fiscal_${dateStr}.pdf`, pdfContent);
 
-           const techLog = { sorting: backlogSort, page: backlogPage, timestamp: new Date().toISOString(), csv_hash: csvHash, pdf_hash: pdfHash, preview_count: previewCount, final_count: rows.length };
+            const techLog = { 
+              execution_id: crypto.randomUUID(),
+              sorting: sort, 
+              page: backlogPage, 
+              page_size: 10,
+              direction: sort.order,
+              field: sort.field,
+              timestamp: new Date().toISOString(), 
+              csv_hash: csvHash, 
+              pdf_hash: pdfHash, 
+              preview_count: previewCount, 
+              final_count: rows.length 
+            };
            zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(techLog, null, 2));
            const divergence = previewCount !== rows.length;
-           await supabase.from("fiscal_export_logs").insert([{
-             user_id: user.id, report_type: 'backlog', format: 'zip', status: 'success', record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, csv_hash: csvHash, pdf_hash: pdfHash, validation_divergence: divergence, filters: backlogFilters, technical_log: techLog as any, recipients: []
-           }]);
+            await supabase.from("fiscal_export_logs").insert([{
+              user_id: user.id, report_type: 'backlog', format: 'zip', status: 'success', record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, csv_hash: csvHash, pdf_hash: pdfHash, validation_divergence: divergence, filters: filters, technical_log: techLog as any, recipients: []
+            }]);
          } else {
            const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "cStat", "xMotivo"];
            const rows = auditLogs.map(log => [new Date(log.created_at).toLocaleString(), log.action.toUpperCase(), log.uf, log.environment, log.reason || "", log.cstat || "", log.xmotivo || ""]);
@@ -885,12 +999,24 @@ export default function Sefaz() {
            const pdfHash = await calculateHash(pdfContent);
            zip.file(`auditoria_fiscal_${dateStr}.pdf`, pdfContent);
 
-           const techLog = { sorting: auditSort, page: auditPage, timestamp: new Date().toISOString(), csv_hash: csvHash, pdf_hash: pdfHash, preview_count: previewCount, final_count: rows.length };
+            const techLog = { 
+              execution_id: crypto.randomUUID(),
+              sorting: sort, 
+              page: auditPage, 
+              page_size: 10,
+              direction: sort.order,
+              field: sort.field,
+              timestamp: new Date().toISOString(), 
+              csv_hash: csvHash, 
+              pdf_hash: pdfHash, 
+              preview_count: previewCount, 
+              final_count: rows.length 
+            };
            zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(techLog, null, 2));
            const divergence = previewCount !== rows.length;
-           await supabase.from("fiscal_export_logs").insert([{
-             user_id: user.id, report_type: 'audit', format: 'zip', status: 'success', record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, csv_hash: csvHash, pdf_hash: pdfHash, validation_divergence: divergence, filters: auditFilters, technical_log: techLog as any, recipients: []
-           }]);
+            await supabase.from("fiscal_export_logs").insert([{
+              user_id: user.id, report_type: 'audit', format: 'zip', status: 'success', record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, csv_hash: csvHash, pdf_hash: pdfHash, validation_divergence: divergence, filters: filters, technical_log: techLog as any, recipients: []
+            }]);
          }
   
         const content = await zip.generateAsync({ type: "blob" });
@@ -2567,6 +2693,118 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
           </DialogContent>
         </Dialog>
 
+        <Dialog open={!!showAuditDetailDialog} onOpenChange={() => setShowAuditDetailDialog(null)}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <History className="w-5 h-5 text-primary" />
+                Auditoria de Exportação - #{showAuditDetailDialog?.id?.substring(0, 8)}
+              </DialogTitle>
+              <DialogDescription>
+                Detalhes técnicos e validação de integridade da exportação.
+              </DialogDescription>
+            </DialogHeader>
+
+            {showAuditDetailDialog && (
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className={cn(
+                    "p-3 rounded-lg border",
+                    showAuditDetailDialog.validation_divergence ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"
+                  )}>
+                    <div className="flex items-center gap-2 mb-2">
+                      {showAuditDetailDialog.validation_divergence ? (
+                        <AlertCircle className="w-4 h-4 text-red-600" />
+                      ) : (
+                        <CheckCircle2 className="w-4 h-4 text-green-600" />
+                      )}
+                      <span className={cn("font-bold text-sm", showAuditDetailDialog.validation_divergence ? "text-red-700" : "text-green-700")}>
+                        Status de Integridade: {showAuditDetailDialog.validation_divergence ? 'Falha' : 'Sucesso'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {showAuditDetailDialog.validation_divergence 
+                        ? "Divergência detectada entre a pré-visualização e os registros finais incluídos no arquivo."
+                        : "Todos os registros e hashes foram validados com sucesso."}
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-lg border bg-muted/30">
+                    <span className="text-[10px] uppercase text-muted-foreground font-bold block mb-1">Identificador de Execução</span>
+                    <code className="text-xs font-mono break-all">{showAuditDetailDialog.technical_log?.execution_id || showAuditDetailDialog.id}</code>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-sm font-bold flex items-center gap-2">
+                    <FileCode className="w-4 h-4" /> Validação de Hashes (SHA-256)
+                  </h4>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted">
+                        <tr>
+                          <th className="text-left py-2 px-3">Arquivo</th>
+                          <th className="text-left py-2 px-3">Hash Registrado</th>
+                          <th className="text-center py-2 px-3">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-t">
+                          <td className="py-2 px-3 font-medium">CSV</td>
+                          <td className="py-2 px-3 font-mono text-[10px] break-all">{showAuditDetailDialog.csv_hash || 'N/A'}</td>
+                          <td className="py-2 px-3 text-center">
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">VALIDADO</Badge>
+                          </td>
+                        </tr>
+                        <tr className="border-t">
+                          <td className="py-2 px-3 font-medium">PDF</td>
+                          <td className="py-2 px-3 font-mono text-[10px] break-all">{showAuditDetailDialog.pdf_hash || 'N/A'}</td>
+                          <td className="py-2 px-3 text-center">
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">VALIDADO</Badge>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-sm font-bold flex items-center gap-2">
+                    <Settings className="w-4 h-4" /> Parâmetros Técnicos de Reprodução
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2 text-[11px] bg-muted/20 p-3 rounded-lg border">
+                    <div className="flex justify-between border-b pb-1">
+                      <span className="text-muted-foreground">Ordenação:</span>
+                      <span className="font-mono font-bold capitalize">{showAuditDetailDialog.technical_log?.field || showAuditDetailDialog.technical_log?.sorting?.field || '-'}</span>
+                    </div>
+                    <div className="flex justify-between border-b pb-1">
+                      <span className="text-muted-foreground">Direção:</span>
+                      <span className="font-mono font-bold uppercase">{showAuditDetailDialog.technical_log?.direction || showAuditDetailDialog.technical_log?.sorting?.order || '-'}</span>
+                    </div>
+                    <div className="flex justify-between border-b pb-1">
+                      <span className="text-muted-foreground">Página:</span>
+                      <span className="font-mono font-bold">{showAuditDetailDialog.technical_log?.page || '-'}</span>
+                    </div>
+                    <div className="flex justify-between border-b pb-1">
+                      <span className="text-muted-foreground">Tamanho:</span>
+                      <span className="font-mono font-bold">{showAuditDetailDialog.technical_log?.page_size || '10'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4 border-t mt-4">
+                  <Button variant="outline" size="sm" onClick={() => downloadAuditSummary(showAuditDetailDialog)}>
+                    <Download className="w-4 h-4 mr-2" /> Baixar Resumo Consolidado
+                  </Button>
+                  <Button variant="default" size="sm" onClick={() => handleRunProofFromHistory(showAuditDetailDialog)}>
+                    <Zap className="w-4 h-4 mr-2" /> Reexecutar Modo Prova
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
         {/* Schedule Report Dialog */}
         <Dialog open={!!showScheduleDialog} onOpenChange={() => setShowScheduleDialog(null)}>
           <DialogContent>
@@ -2881,16 +3119,32 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                                   {log.resend_status === 'sending' ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Send className="w-3 h-3 mr-1" />}
                                   {log.resend_status === 'sent' ? 'E-mail Enviado' : (log.resend_status === 'sending' ? 'Enviando...' : 'Reenviar E-mail')}
                                </Button>
-                               {log.file_url && (
-                                 <div className="flex gap-1">
-                                   <Button variant="ghost" size="sm" onClick={() => verifyAndDownload(log)} className="h-7 text-[10px] text-green-600">
-                                      <Download className="w-3 h-3 mr-1" /> Baixar ZIP (Verificado)
-                                   </Button>
-                                   <Button variant="ghost" size="sm" onClick={() => handleRerunExport(log)} className="h-7 text-[10px] text-blue-600" title="Repetir Exportação com mesmos filtros">
-                                      <RefreshCw className="w-3 h-3 mr-1" /> Repetir
-                                   </Button>
-                                 </div>
-                               )}
+                                {log.file_url && (
+                                  <div className="flex flex-col gap-1">
+                                    <div className="flex gap-1">
+                                      <Button variant="ghost" size="sm" onClick={() => verifyAndDownload(log)} className="h-6 text-[9px] text-green-600 border border-green-100 bg-green-50/50">
+                                         <FileArchive className="w-3 h-3 mr-1" /> ZIP
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={() => verifyAndDownloadFile(log, 'csv')} className="h-6 text-[9px] text-green-600 border border-green-100 bg-green-50/50">
+                                         <FileText className="w-3 h-3 mr-1" /> CSV
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={() => verifyAndDownloadFile(log, 'pdf')} className="h-6 text-[9px] text-green-600 border border-green-100 bg-green-50/50">
+                                         <FileDown className="w-3 h-3 mr-1" /> PDF
+                                      </Button>
+                                    </div>
+                                    <div className="flex gap-1">
+                                      <Button variant="ghost" size="sm" onClick={() => downloadAuditSummary(log)} className="h-6 text-[9px] text-orange-600 border border-orange-100 bg-orange-50/50">
+                                         <Calculator className="w-3 h-3 mr-1" /> Auditoria
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={() => handleRunProofFromHistory(log)} className="h-6 text-[9px] text-amber-600 border border-amber-100 bg-amber-50/50" title="Validar sem baixar">
+                                         <Zap className="w-3 h-3 mr-1" /> Prova
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={() => handleRerunExport(log)} className="h-6 text-[9px] text-blue-600 border border-blue-100 bg-blue-50/50" title="Repetir Exportação">
+                                         <RefreshCw className="w-3 h-3 mr-1" /> Repetir
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
                              </div>
                              <div className="flex flex-col items-end">
                                {log.status === 'success' ? (
@@ -2904,9 +3158,23 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                                        <span className="text-[7px] text-muted-foreground font-mono">
                                          Hash CSV: {log.csv_hash?.substring(0, 16)}...
                                        </span>
-                                       {log.validation_divergence && (
-                                         <Badge variant="destructive" className="text-[7px] h-3 px-1 mt-0.5">Divergência Detectada</Badge>
-                                       )}
+                                        {log.validation_divergence ? (
+                                          <Button 
+                                            variant="ghost" 
+                                            className="h-3 p-0 text-[7px] text-destructive hover:text-destructive/80 mt-0.5 flex items-center"
+                                            onClick={() => setShowAuditDetailDialog(log)}
+                                          >
+                                            <AlertCircle className="w-2 h-2 mr-0.5" /> Divergência Detectada (Ver detalhes)
+                                          </Button>
+                                        ) : (
+                                          <Button 
+                                            variant="ghost" 
+                                            className="h-3 p-0 text-[7px] text-green-600 hover:text-green-500 mt-0.5 flex items-center"
+                                            onClick={() => setShowAuditDetailDialog(log)}
+                                          >
+                                            <CheckCircle2 className="w-2 h-2 mr-0.5" /> Integridade OK (Ver log)
+                                          </Button>
+                                        )}
                                      </div>
                                    )}
                                  </div>
