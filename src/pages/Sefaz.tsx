@@ -748,16 +748,31 @@ export default function Sefaz() {
       return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     };
 
-    const verifyAndDownloadFile = async (log: any, fileType: 'csv' | 'pdf') => {
+    const verifyAndDownloadFile = async (log: any, fileType: 'csv' | 'pdf' | 'zip') => {
       if (!log.file_url) {
         toast.error("URL do arquivo não disponível.");
         return;
       }
-      toast.info(`Extraindo e verificando ${fileType.toUpperCase()}...`);
+      toast.info(`Processando download de ${fileType.toUpperCase()}...`);
+      const newEvent = { timestamp: new Date().toISOString(), type: 'download', file: fileType, verified: false };
       try {
         const response = await fetch(log.file_url);
         const blob = await response.blob();
-        const zip = await JSZip.loadAsync(blob);
+        if (fileType === 'zip') {
+          const zipHash = await calculateHash(blob);
+          if (log.zip_hash && zipHash !== log.zip_hash) {
+            toast.error("DIVERGÊNCIA: Hash do ZIP não confere!");
+            return;
+          }
+          newEvent.verified = true;
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(blob);
+          link.download = `${log.report_type}_fiscal.zip`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        } else {
+          const zip = await JSZip.loadAsync(blob);
         let targetFileName = "";
         zip.forEach((path) => { 
           if (path.toLowerCase().endsWith(`.${fileType}`) && !path.startsWith("log_tecnico")) {
@@ -794,8 +809,12 @@ export default function Sefaz() {
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
+          newEvent.verified = true;
           toast.success(`${fileType.toUpperCase()} baixado e verificado.`);
         }
+        const updatedEvents = [...(log.audit_events || []), newEvent];
+        await supabase.from("fiscal_export_logs").update({ audit_events: updatedEvents }).eq("id", log.id);
+        loadExportHistory();
       } catch (err) {
         toast.error(`Erro ao processar ${fileType.toUpperCase()}.`);
       }
