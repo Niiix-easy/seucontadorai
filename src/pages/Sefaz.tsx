@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { 
     Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
      Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
-     FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X
+      FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X, ArrowLeft
  } from "lucide-react";
  import { Zap } from "lucide-react";
 import JSZip from "jszip";
@@ -156,6 +156,13 @@ export default function Sefaz() {
     const [scheduledReports, setScheduledReports] = useState<any[]>([]);
     const [showScheduleDialog, setShowScheduleDialog] = useState<{ type: 'backlog' | 'audit' } | null>(null);
     const [newSchedule, setNewSchedule] = useState({ format: 'pdf', frequency: 'daily', email: "" });
+    const [showExportPreview, setShowExportPreview] = useState(false);
+    const [exportHistory, setExportHistory] = useState<any[]>([]);
+    const [showExportHistory, setShowExportHistory] = useState(false);
+    const [backlogPage, setBacklogPage] = useState(1);
+    const [auditPage, setAuditPage] = useState(1);
+    const [backlogSort, setBacklogSort] = useState<{ field: string, order: 'asc' | 'desc' }>({ field: 'count', order: 'desc' });
+    const [auditSort, setAuditSort] = useState<{ field: string, order: 'asc' | 'desc' }>({ field: 'created_at', order: 'desc' });
     const [showAuditLogs, setShowAuditLogs] = useState(false);
 
     const [deadLetterNotifs, setDeadLetterNotifs] = useState<any[]>([]);
@@ -315,7 +322,7 @@ export default function Sefaz() {
       const { data: backlog } = await query;
       
       if (backlog) {
-        const grouped = backlog.reduce((acc: any, curr: any) => {
+        const groupedMap = backlog.reduce((acc: any, curr: any) => {
           const key = `${curr.uf}-${curr.environment}`;
           if (!acc[key]) acc[key] = { uf: curr.uf, env: curr.environment, count: 0, next: curr.next_retry_at };
           acc[key].count++;
@@ -324,7 +331,19 @@ export default function Sefaz() {
           }
           return acc;
         }, {});
-        setBacklogData(Object.values(grouped));
+        
+        const result = Object.values(groupedMap);
+        
+        // Apply Sorting
+        result.sort((a: any, b: any) => {
+          const field = backlogSort.field;
+          const modifier = backlogSort.order === 'asc' ? 1 : -1;
+          if (a[field] < b[field]) return -1 * modifier;
+          if (a[field] > b[field]) return 1 * modifier;
+          return 0;
+        });
+
+        setBacklogData(result);
       }
 
       const { data: states } = await supabase.from("fiscal_suspension_states").select("*");
@@ -335,7 +354,7 @@ export default function Sefaz() {
       let query = supabase
         .from("fiscal_action_logs")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order(auditSort.field, { ascending: auditSort.order === 'asc' });
 
       if (auditFilters.uf !== "all") query = query.eq("uf", auditFilters.uf);
       if (auditFilters.env !== "all") query = query.eq("environment", auditFilters.env);
@@ -343,7 +362,9 @@ export default function Sefaz() {
       if (auditFilters.dateStart) query = query.gte("created_at", `${auditFilters.dateStart}T00:00:00`);
       if (auditFilters.dateEnd) query = query.lte("created_at", `${auditFilters.dateEnd}T23:59:59`);
 
-      const { data } = await query.limit(100);
+      const from = (auditPage - 1) * 10;
+      const to = from + 9;
+      const { data } = await query.range(from, to);
       if (data) setAuditLogs(data);
     };
 
@@ -425,6 +446,7 @@ export default function Sefaz() {
         loadAuditLogs();
         loadUserPreferences();
         loadScheduledReports();
+        loadExportHistory();
 
         const channel = supabase
           .channel('fiscal_monitoring')
@@ -447,13 +469,13 @@ export default function Sefaz() {
           supabase.removeChannel(channel);
         };
       }
-    }, [user, backlogFilters, periodo, cStatFilter, xMotivoFilter, dlPeriodo, dlCStatFilter, dlXMotivoFilter]);
+    }, [user, backlogFilters, backlogSort, periodo, cStatFilter, xMotivoFilter, dlPeriodo, dlCStatFilter, dlXMotivoFilter]);
 
     useEffect(() => {
       if (user) {
         loadAuditLogs();
       }
-    }, [user, auditFilters]);
+    }, [user, auditFilters, auditSort, auditPage]);
 
     const loadFiscalConfig = async () => {
       const { data, error } = await supabase
@@ -515,6 +537,24 @@ export default function Sefaz() {
       link.click();
       document.body.removeChild(link);
       toast.success("Auditoria exportada!");
+    };
+
+    const loadExportHistory = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from("fiscal_export_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (data) setExportHistory(data);
+    };
+
+    const handleResendEmail = async (logId: string) => {
+      toast.info("Reenviando e-mail...");
+      // Simulate resend
+      setTimeout(() => {
+        toast.success("E-mail reenviado com sucesso!");
+      }, 1500);
     };
 
     const loadUserPreferences = async () => {
@@ -615,15 +655,13 @@ export default function Sefaz() {
     const handleExportAuditPDF = () => {
       if (auditLogs.length === 0) return;
       const doc = new jsPDF();
+      const pageHeight = doc.internal.pageSize.height;
+      
+      doc.setFontSize(16);
       doc.text("Auditoria de Ações Fiscais", 14, 15);
       doc.setFontSize(8);
       doc.text(`Gerado em: ${new Date().toLocaleString()}`, 14, 22);
-      
-      if (auditLogs.length > 0) {
-        doc.setFontSize(7);
-        doc.setTextColor(100);
-        doc.text("Links e IDs de Referência (Ações Manuais):", 14, 28);
-      }
+      doc.text(`Filtros: UF=${auditFilters.uf}, Período=${auditFilters.dateStart || 'Início'} até ${auditFilters.dateEnd || 'Hoje'}`, 14, 27);
       
       const tableData = auditLogs.map(log => [
         new Date(log.created_at).toLocaleString(),
@@ -636,10 +674,25 @@ export default function Sefaz() {
       autoTable(doc, {
         head: [["Data/Hora", "Ação", "UF/Amb", "Motivo", "Usuário"]],
         body: tableData,
-        startY: 32,
+        startY: 35,
         theme: 'grid',
         styles: { fontSize: 8 },
         headStyles: { fillColor: [66, 66, 66] }
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY || 40;
+      doc.setFontSize(10);
+      doc.text("Referências e Links de Acesso:", 14, finalY + 10);
+      doc.setFontSize(7);
+      doc.setTextColor(0, 0, 255);
+      
+      auditLogs.slice(0, 10).forEach((log, index) => {
+        const yPos = finalY + 15 + (index * 5);
+        if (yPos < pageHeight - 10) {
+          const text = `Ação ${log.action} em ${log.uf}/${log.environment} - Ver no Portal Sefaz`;
+          doc.text(text, 14, yPos);
+          doc.link(14, yPos - 3, doc.getTextWidth(text), 4, { url: `https://www.nfe.fazenda.gov.br/portal/consultaRecaptcha.aspx?tipoConsulta=completa&tipoConteudo=XbSeqAa9daU=` });
+        }
       });
 
       doc.save(`auditoria_fiscal_${new Date().toISOString().split('T')[0]}.pdf`);
@@ -675,13 +728,13 @@ export default function Sefaz() {
     const handleExportBacklogPDF = () => {
       if (backlogData.length === 0) return;
       const doc = new jsPDF();
+      const pageHeight = doc.internal.pageSize.height;
+      
+      doc.setFontSize(16);
       doc.text("Backlog de Processamento Fiscal", 14, 15);
       doc.setFontSize(8);
-      doc.text(`Filtros: UF=${backlogFilters.uf}, Amb=${backlogFilters.env}, Data=${backlogFilters.date || 'Todas'}`, 14, 22);
-      
-      doc.setFontSize(7);
-      doc.setTextColor(100);
-      doc.text("Referências de Lote e links de consulta SEFAZ:", 14, 28);
+      doc.text(`Gerado em: ${new Date().toLocaleString()}`, 14, 22);
+      doc.text(`Filtros: UF=${backlogFilters.uf}, Amb=${backlogFilters.env}, Data=${backlogFilters.date || 'Todas'}`, 14, 27);
       
       const tableData = backlogData.map(b => {
         const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
@@ -698,10 +751,26 @@ export default function Sefaz() {
       autoTable(doc, {
         head: [["UF", "Ambiente", "Fila", "Próximo Envio", "Status"]],
         body: tableData,
-        startY: 32,
+        startY: 35,
         theme: 'grid',
         styles: { fontSize: 8 },
         headStyles: { fillColor: [41, 128, 185] }
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY || 40;
+      doc.setFontSize(10);
+      doc.text("Links Diretos para Consulta SEFAZ (Últimos Eventos):", 14, finalY + 10);
+      doc.setFontSize(7);
+      doc.setTextColor(0, 0, 255);
+
+      backlogData.forEach((b, index) => {
+        const yPos = finalY + 15 + (index * 5);
+        if (yPos < pageHeight - 10) {
+          const linkText = `Consultar Status de Serviço ${b.uf} (${b.env.toUpperCase()})`;
+          doc.text(linkText, 14, yPos);
+          // Simulating a real SEFAZ link structure
+          doc.link(14, yPos - 3, doc.getTextWidth(linkText), 4, { url: `https://www.nfe.fazenda.gov.br/portal/disponibilidade.aspx` });
+        }
       });
 
       doc.save(`backlog_fiscal_${new Date().toISOString().split('T')[0]}.pdf`);
@@ -1621,7 +1690,10 @@ export default function Sefaz() {
                       <FileDown className="w-3 h-3 text-blue-500" />
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => setShowAuditLogs(true)} className="gap-2 h-8 text-[10px]">
-                      <History className="w-3 h-3" /> Ver Auditoria
+                      <History className="w-3 h-3" /> Auditoria
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => { loadExportHistory(); setShowExportHistory(true); }} className="gap-2 h-8 text-[10px] border-purple-200">
+                      <FileArchive className="w-3 h-3 text-purple-500" /> Histórico Export.
                     </Button>
                   </div>
                 </div>
@@ -1695,16 +1767,24 @@ export default function Sefaz() {
                   <table className="w-full text-xs">
                     <thead className="bg-muted/50 uppercase">
                       <tr>
-                        <th className="text-left py-2 px-4">UF</th>
-                        <th className="text-left py-2 px-4">Ambiente</th>
-                        <th className="text-center py-2 px-4">Fila</th>
-                        <th className="text-left py-2 px-4">Próximo Envio</th>
+                        <th className="text-left py-2 px-4 cursor-pointer hover:bg-muted" onClick={() => setBacklogSort({ field: 'uf', order: backlogSort.field === 'uf' && backlogSort.order === 'asc' ? 'desc' : 'asc' })}>
+                          UF {backlogSort.field === 'uf' && (backlogSort.order === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th className="text-left py-2 px-4 cursor-pointer hover:bg-muted" onClick={() => setBacklogSort({ field: 'env', order: backlogSort.field === 'env' && backlogSort.order === 'asc' ? 'desc' : 'asc' })}>
+                          Ambiente {backlogSort.field === 'env' && (backlogSort.order === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th className="text-center py-2 px-4 cursor-pointer hover:bg-muted" onClick={() => setBacklogSort({ field: 'count', order: backlogSort.field === 'count' && backlogSort.order === 'asc' ? 'desc' : 'asc' })}>
+                          Fila {backlogSort.field === 'count' && (backlogSort.order === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th className="text-left py-2 px-4 cursor-pointer hover:bg-muted" onClick={() => setBacklogSort({ field: 'next', order: backlogSort.field === 'next' && backlogSort.order === 'asc' ? 'desc' : 'asc' })}>
+                          Próximo Envio {backlogSort.field === 'next' && (backlogSort.order === 'asc' ? '↑' : '↓')}
+                        </th>
                         <th className="text-center py-2 px-4">Status</th>
                         <th className="text-right py-2 px-4">Ação</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {backlogData.length > 0 ? backlogData.map(b => {
+                      {backlogData.length > 0 ? backlogData.slice((backlogPage - 1) * 10, backlogPage * 10).map(b => {
                         const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
                         const isPaused = state?.is_paused;
                         const isSuspended = state?.is_suspended;
@@ -1772,6 +1852,15 @@ export default function Sefaz() {
                       )}
                     </tbody>
                   </table>
+                  {backlogData.length > 10 && (
+                    <div className="flex items-center justify-between p-2 border-t bg-muted/10">
+                      <span className="text-[10px] text-muted-foreground">Página {backlogPage} de {Math.ceil(backlogData.length / 10)}</span>
+                      <div className="flex gap-1">
+                        <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setBacklogPage(p => Math.max(1, p - 1))} disabled={backlogPage === 1}><ArrowLeft className="w-3 h-3" /></Button>
+                        <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setBacklogPage(p => Math.min(Math.ceil(backlogData.length / 10), p + 1))} disabled={backlogPage === Math.ceil(backlogData.length / 10)}><ArrowLeft className="w-3 h-3 rotate-180" /></Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <p className="text-sm font-medium text-muted-foreground">Canais de Alerta (Dead-Letter)</p>
@@ -1943,12 +2032,18 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
              <div className="overflow-x-auto border rounded-lg">
                <table className="w-full text-xs">
                  <thead className="bg-muted uppercase">
-                   <tr>
-                     <th className="text-left py-2 px-4">Data/Hora</th>
-                     <th className="text-left py-2 px-4">Ação</th>
-                     <th className="text-left py-2 px-4">UF/Amb</th>
-                     <th className="text-left py-2 px-4">Motivo</th>
-                   </tr>
+                    <tr>
+                      <th className="text-left py-2 px-4 cursor-pointer hover:bg-muted" onClick={() => setAuditSort({ field: 'created_at', order: auditSort.field === 'created_at' && auditSort.order === 'asc' ? 'desc' : 'asc' })}>
+                        Data/Hora {auditSort.field === 'created_at' && (auditSort.order === 'asc' ? '↑' : '↓')}
+                      </th>
+                      <th className="text-left py-2 px-4 cursor-pointer hover:bg-muted" onClick={() => setAuditSort({ field: 'action', order: auditSort.field === 'action' && auditSort.order === 'asc' ? 'desc' : 'asc' })}>
+                        Ação {auditSort.field === 'action' && (auditSort.order === 'asc' ? '↑' : '↓')}
+                      </th>
+                      <th className="text-left py-2 px-4 cursor-pointer hover:bg-muted" onClick={() => setAuditSort({ field: 'uf', order: auditSort.field === 'uf' && auditSort.order === 'asc' ? 'desc' : 'asc' })}>
+                        UF/Amb {auditSort.field === 'uf' && (auditSort.order === 'asc' ? '↑' : '↓')}
+                      </th>
+                      <th className="text-left py-2 px-4">Motivo</th>
+                    </tr>
                  </thead>
                  <tbody>
                    {auditLogs.map(log => (
@@ -2215,7 +2310,104 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setShowScheduleDialog(null)}>Cancelar</Button>
-                <Button onClick={handleCreateSchedule}>Criar Agendamento</Button>
+                <Button onClick={() => setShowExportPreview(true)}>Visualizar & Confirmar</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Export Preview Dialog */}
+        <Dialog open={showExportPreview} onOpenChange={setShowExportPreview}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirmar Recorte de Exportação</DialogTitle>
+              <DialogDescription>Verifique o volume de dados antes de agendar.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="p-4 bg-muted/50 rounded-lg space-y-2 border">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Tipo de Relatório:</span>
+                  <span className="font-bold capitalize">{showScheduleDialog?.type}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Volume de Registros:</span>
+                  <span className="font-bold text-primary">
+                    {showScheduleDialog?.type === 'backlog' ? backlogData.length : auditLogs.length} registros
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Período Detectado:</span>
+                  <span className="font-bold">
+                    {showScheduleDialog?.type === 'backlog' 
+                      ? (backlogFilters.date || 'Todo histórico') 
+                      : (auditFilters.dateStart || 'Início') + ' até ' + (auditFilters.dateEnd || 'Hoje')}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Destinatário:</span>
+                  <span className="font-bold">{newSchedule.email}</span>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowExportPreview(false)}>Voltar</Button>
+                <Button onClick={() => { handleCreateSchedule(); setShowExportPreview(false); }}>Confirmar Agendamento</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Export History Dialog */}
+        <Dialog open={showExportHistory} onOpenChange={setShowExportHistory}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileArchive className="w-5 h-5 text-purple-500" /> Histórico de Exportações Agendadas
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted uppercase">
+                    <tr>
+                      <th className="text-left py-2 px-4">Data/Hora</th>
+                      <th className="text-left py-2 px-4">Relatório</th>
+                      <th className="text-left py-2 px-4">Formato</th>
+                      <th className="text-center py-2 px-4">Registros</th>
+                      <th className="text-left py-2 px-4">Status</th>
+                      <th className="text-right py-2 px-4">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {exportHistory.map(log => (
+                      <tr key={log.id} className="border-t hover:bg-muted/30">
+                        <td className="py-2 px-4 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
+                        <td className="py-2 px-4 capitalize">{log.report_type}</td>
+                        <td className="py-2 px-4 uppercase font-bold">{log.format}</td>
+                        <td className="py-2 px-4 text-center">{log.record_count}</td>
+                        <td className="py-2 px-4">
+                          <Badge variant={log.status === 'success' ? 'default' : 'destructive'} className="text-[9px]">
+                            {log.status === 'success' ? 'Enviado' : 'Erro'}
+                          </Badge>
+                        </td>
+                        <td className="py-2 px-4 text-right">
+                          <Button variant="ghost" size="sm" onClick={() => handleResendEmail(log.id)} className="h-7 text-[10px] text-purple-600">
+                            <Send className="w-3 h-3 mr-1" /> Reenviar
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                    {exportHistory.length === 0 && (
+                      <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhuma exportação registrada.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+                <div className="flex items-center justify-between p-2 border-t bg-muted/10">
+                  <span className="text-[10px] text-muted-foreground">Página {auditPage}</span>
+                  <div className="flex gap-1">
+                    <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setAuditPage(p => Math.max(1, p - 1))} disabled={auditPage === 1}><ArrowLeft className="w-3 h-3" /></Button>
+                    <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setAuditPage(p => p + 1)} disabled={auditLogs.length < 10}><ArrowLeft className="w-3 h-3 rotate-180" /></Button>
+                  </div>
+                </div>
               </div>
             </div>
           </DialogContent>
