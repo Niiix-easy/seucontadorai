@@ -432,6 +432,7 @@ export default function Sefaz() {
         loadAuditLogs();
         loadUserPreferences();
         loadScheduledReports();
+        loadExportHistory();
 
         const channel = supabase
           .channel('fiscal_monitoring')
