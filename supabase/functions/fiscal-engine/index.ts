@@ -87,13 +87,13 @@ async function signXml(xml: string, privateKeyPem: string, certPem: string) {
 
 async function sendToSefaz(signedXml: string, uf: string, env: string) {
   const endpoint = env === 'producao' 
-    ? \`https://nfe.sefaz.\${uf.toLowerCase()}.gov.br/ws/NFeAutorizacao4\`
-    : \`https://homologacao.nfe.sefaz.\${uf.toLowerCase()}.gov.br/ws/NFeAutorizacao4\`;
+    ? `https://nfe.sefaz.${uf.toLowerCase()}.gov.br/ws/NFeAutorizacao4`
+    : `https://homologacao.nfe.sefaz.${uf.toLowerCase()}.gov.br/ws/NFeAutorizacao4`;
 
-  const soapEnvelope = \`<?xml version="1.0" encoding="utf-8"?>
+  const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
-    <nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">\${signedXml}</nfeDadosMsg>
+    <nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">${signedXml}</nfeDadosMsg>
   </soap12:Body>
 </soap12:Envelope>\`;
 
@@ -192,7 +192,7 @@ serve(async (req) => {
             processing_log: [...(doc.processing_log || []), { timestamp: new Date().toISOString(), event: "Autorizado pela SEFAZ" }]
           }).eq("id", documentId);
         } else {
-          throw new Error(\`SEFAZ [\${cStat}]: \${xMotivo}\`);
+          throw new Error(`SEFAZ [${cStat}]: ${xMotivo}`);
         }
       } catch (error) {
         const newRetryCount = (doc.retry_count || 0) + 1;
@@ -210,7 +210,7 @@ serve(async (req) => {
           retry_count: newRetryCount,
           next_retry_at: nextRetry,
           is_processing: false,
-          processing_log: [...(doc.processing_log || []), { timestamp: new Date().toISOString(), event: \`Erro: \${error.message}\` }]
+            processing_log: [...(doc.processing_log || []), { timestamp: new Date().toISOString(), event: `Erro: ${error.message}` }]
         }).eq("id", documentId);
       }
 
