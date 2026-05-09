@@ -151,10 +151,21 @@
       return new Response(JSON.stringify({ success: true, processed: results }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-    } catch (error) {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+      } catch (error) {
+        // If we have a log entry, update it with the error
+        const { log_id: errorLogId } = await req.json().catch(() => ({}));
+        if (errorLogId) {
+          await supabaseClient.from("fiscal_export_logs").update({
+            status: "error",
+            error_message: error.message,
+            full_error_details: error.stack || error.message,
+            technical_log: { stage: "processing", timestamp: new Date().toISOString() }
+          }).eq("id", errorLogId);
+        }
+
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
   });
