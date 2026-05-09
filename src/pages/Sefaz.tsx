@@ -300,6 +300,16 @@ export default function Sefaz() {
       
       const { data } = await query;
       if (data) setProcessedDocs(data as ProcessedDocument[]);
+      
+      // Load dead-letter notifications
+      if (user) {
+        const { data: dlNotifs } = await supabase
+          .from("dead_letter_notifications")
+          .select("*, processed_documents(id, document_type)")
+          .order("created_at", { ascending: false })
+          .limit(50);
+        if (dlNotifs) setDeadLetterNotifs(dlNotifs);
+      }
     };
 
     const handleBatchDownloadZip = async () => {
@@ -360,7 +370,9 @@ export default function Sefaz() {
           uf: fiscalConfig.uf,
           environment: fiscalConfig.environment,
           max_retries: fiscalConfig.max_retries,
-          retry_delay_minutes: fiscalConfig.retry_delay_minutes
+          retry_delay_minutes: fiscalConfig.retry_delay_minutes,
+          auto_retry_on_reactivation: fiscalConfig.auto_retry_on_reactivation,
+          reactivation_throughput: fiscalConfig.reactivation_throughput
         }, { onConflict: "user_id" });
         
         if (error) throw error;
