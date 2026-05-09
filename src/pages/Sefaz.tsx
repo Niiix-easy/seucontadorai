@@ -161,6 +161,7 @@ export default function Sefaz() {
       type: 'backlog' | 'audit', 
       count: number, 
       filters: any, 
+      sort?: any,
       previewCount?: number,
       expectedCsvHash?: string,
       expectedPdfHash?: string,
@@ -823,10 +824,10 @@ export default function Sefaz() {
         const sort = overrideSort || (type === 'backlog' ? backlogSort : auditSort);
         
         const count = type === 'backlog' 
-         ? backlogData.reduce((acc, b) => acc + b.count, 0) 
-         : auditLogs.length;
-       
-       setShowZipPreviewDialog({ type, count, filters, previewCount: count, isCalculating: true });
+          ? backlogData.reduce((acc, b) => acc + b.count, 0) 
+          : auditLogs.length;
+        
+        setShowZipPreviewDialog({ type, count, filters, sort, previewCount: count, isCalculating: true });
 
        // Pre-calculate hashes for preview/proof
        let csvContent = "";
@@ -932,7 +933,7 @@ export default function Sefaz() {
 
       const confirmExportZip = async () => {
          if (!showZipPreviewDialog || !user) return;
-         const { type, previewCount } = showZipPreviewDialog;
+         const { type, previewCount, filters, sort } = showZipPreviewDialog;
         setShowZipPreviewDialog(null);
         
         toast.info("Gerando pacote ZIP...");
