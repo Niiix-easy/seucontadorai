@@ -1472,15 +1472,31 @@ export default function Sefaz() {
                             </td>
                             <td className="py-2 px-4 text-right">
                               <div className="flex justify-end gap-1">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-7 text-[10px] text-primary"
-                                  onClick={() => handleManualRetryBatch(b.uf, b.env)}
-                                  title="Reprocessar Imediatamente"
-                                >
-                                  <RefreshCw className="w-3 h-3 mr-1" /> Agora
-                                </Button>
+                                {manualRetryProgress[`${b.uf}-${b.env}`] ? (
+                                  <div className="flex flex-col items-end gap-1 px-2">
+                                    <div className="flex items-center gap-2">
+                                      {manualRetryProgress[`${b.uf}-${b.env}`].status === 'processing' && <Loader2 className="w-3 h-3 animate-spin text-primary" />}
+                                      <span className="text-[9px] font-medium capitalize">
+                                        {manualRetryProgress[`${b.uf}-${b.env}`].status === 'queued' ? 'Enfileirado' : 
+                                         manualRetryProgress[`${b.uf}-${b.env}`].status === 'processing' ? 'Processando' : 
+                                         manualRetryProgress[`${b.uf}-${b.env}`].status === 'done' ? 'Concluído' : 'Erro'}
+                                      </span>
+                                    </div>
+                                    {manualRetryProgress[`${b.uf}-${b.env}`].status === 'done' && (
+                                      <span className="text-[8px] text-green-600">{manualRetryProgress[`${b.uf}-${b.env}`].count} docs ok</span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-7 text-[10px] text-primary"
+                                    onClick={() => setShowPauseDialog({ uf: b.uf, env: b.env, paused: !!isPaused, manual: true })}
+                                    title="Reprocessar Imediatamente"
+                                  >
+                                    <RefreshCw className="w-3 h-3 mr-1" /> Agora
+                                  </Button>
+                                )}
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
