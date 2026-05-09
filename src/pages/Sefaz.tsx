@@ -326,6 +326,25 @@ export default function Sefaz() {
       toast.success("Download ZIP iniciado!");
     };
 
+    const [notifPrefs, setNotifPrefs] = useState({ email: true, push: true });
+
+    useEffect(() => {
+      if (user) {
+        supabase.from("notification_preferences").select("dead_letter_alerts_email, dead_letter_alerts_push").eq("user_id", user.id).maybeSingle().then(({ data }) => {
+          if (data) setNotifPrefs({ email: data.dead_letter_alerts_email ?? true, push: data.dead_letter_alerts_push ?? true });
+        });
+      }
+    }, [user]);
+
+    const handleSaveNotifPrefs = async () => {
+      if (!user) return;
+      const { error } = await supabase.from("notification_preferences").update({
+        dead_letter_alerts_email: notifPrefs.email,
+        dead_letter_alerts_push: notifPrefs.push
+      }).eq("user_id", user.id);
+      if (!error) toast.success("Canais de alerta atualizados!");
+    };
+
     const handleSaveConfig = async () => {
       if (!user) return;
       setConfigLoading(true);
