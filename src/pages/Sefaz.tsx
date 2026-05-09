@@ -538,7 +538,7 @@ export default function Sefaz() {
           retry_delay_minutes: fiscalConfig.retry_delay_minutes,
           auto_retry_on_reactivation: fiscalConfig.auto_retry_on_reactivation,
           reactivation_throughput: fiscalConfig.reactivation_throughput
-        }, { onConflict: "user_id" });
+        }, { onConflict: "user_id, uf, environment" });
         
         if (error) throw error;
 
