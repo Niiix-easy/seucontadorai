@@ -2010,6 +2010,10 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   <span className="text-muted-foreground text-[8px]">até</span>
                   <Input type="date" value={auditFilters.dateEnd} onChange={e => setAuditFilters(p => ({ ...p, dateEnd: e.target.value }))} className="w-28 h-7 text-[9px]" />
                 </div>
+                <div className="flex items-center gap-1">
+                  <Input placeholder="cStat" value={auditFilters.cStat} onChange={e => setAuditFilters(p => ({ ...p, cStat: e.target.value }))} className="w-16 h-7 text-[9px]" />
+                  <Input placeholder="Motivo" value={auditFilters.xMotivo} onChange={e => setAuditFilters(p => ({ ...p, xMotivo: e.target.value }))} className="w-24 h-7 text-[9px]" />
+                </div>
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setAuditFilters({ dateStart: "", dateEnd: "", uf: "all", env: "all", action: "all", cStat: "", xMotivo: "" })} title="Limpar Filtros">
                   <X className="w-3 h-3" />
                 </Button>
