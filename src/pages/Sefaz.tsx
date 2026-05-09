@@ -2851,9 +2851,9 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
               </DialogDescription>
             </DialogHeader>
 
-            {showAuditDetailDialog && (
-              <div className="space-y-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
+             {showAuditDetailDialog && (
+               <div className="space-y-4 py-4">
+                 <div className="grid grid-cols-2 gap-4">
                   <div className={cn(
                     "p-3 rounded-lg border",
                     showAuditDetailDialog.validation_divergence ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"
@@ -2875,11 +2875,19 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                     </p>
                   </div>
 
-                  <div className="p-3 rounded-lg border bg-muted/30">
-                    <span className="text-[10px] uppercase text-muted-foreground font-bold block mb-1">Identificador de Execução</span>
-                    <code className="text-xs font-mono break-all">{showAuditDetailDialog.technical_log?.execution_id || showAuditDetailDialog.id}</code>
-                  </div>
-                </div>
+                   <div className="p-3 rounded-lg border bg-muted/30 relative group">
+                     <span className="text-[10px] uppercase text-muted-foreground font-bold block mb-1">Identificador de Execução</span>
+                     <code className="text-xs font-mono break-all">{showAuditDetailDialog.technical_log?.execution_id || showAuditDetailDialog.id}</code>
+                     <Button 
+                       variant="ghost" 
+                       size="icon" 
+                       className="absolute top-2 right-2 w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity" 
+                       onClick={() => copyToClipboard(showAuditDetailDialog.technical_log?.execution_id || showAuditDetailDialog.id, "ID de Execução")}
+                     >
+                       <CheckSquare className="w-3 h-3" />
+                     </Button>
+                   </div>
+                 </div>
 
                 <div className="space-y-2">
                   <h4 className="text-sm font-bold flex items-center gap-2">
@@ -2937,11 +2945,152 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <h4 className="text-sm font-bold flex items-center gap-2">
-                    <Settings className="w-4 h-4" /> Parâmetros Técnicos de Reprodução
-                  </h4>
-                  <div className="grid grid-cols-2 gap-2 text-[11px] bg-muted/20 p-3 rounded-lg border">
+                 <div className="space-y-2">
+                   <div className="flex items-center justify-between">
+                     <h4 className="text-sm font-bold flex items-center gap-2">
+                       <Settings className="w-4 h-4" /> Parâmetros Técnicos de Reprodução
+                     </h4>
+                     <Button 
+                       variant="outline" 
+                       size="sm" 
+                       className="h-6 text-[9px]"
+                       onClick={() => {
+                         const block = `ID: ${showAuditDetailDialog.technical_log?.execution_id || showAuditDetailDialog.id}\nOrdenação: ${showAuditDetailDialog.technical_log?.field || showAuditDetailDialog.technical_log?.sorting?.field || '-'}\nDireção: ${showAuditDetailDialog.technical_log?.direction || showAuditDetailDialog.technical_log?.sorting?.order || '-'}\nPágina: ${showAuditDetailDialog.technical_log?.page || '-'}\nTamanho: ${showAuditDetailDialog.technical_log?.page_size || '10'}`;
+                         copyToClipboard(block, "Bloco Técnico");
+                       }}
+                     >
+                       Copiar Bloco Técnico
+                     </Button>
+                   </div>
+                   <div className="grid grid-cols-2 gap-2 text-[11px] bg-muted/20 p-3 rounded-lg border relative">
+                 <div className="space-y-2">
+                   <h4 className="text-sm font-bold flex items-center gap-2">
+                     <FileText className="w-4 h-4" /> Logs de Auditoria do Sistema
+                   </h4>
+                   <div className="bg-slate-900 text-slate-100 p-3 rounded-lg font-mono text-[10px] max-h-[150px] overflow-y-auto space-y-1">
+                     {(showAuditDetailDialog.audit_events || [
+                       { timestamp: showAuditDetailDialog.created_at, stage: 'initializing', message: 'Iniciando processo de auditoria...' },
+                       { timestamp: showAuditDetailDialog.created_at, stage: 'csv_gen', message: 'Geração de dados CSV concluída.' },
+                       { timestamp: showAuditDetailDialog.created_at, stage: 'pdf_gen', message: 'Geração de PDF concluída.' },
+                       { timestamp: showAuditDetailDialog.created_at, stage: 'hash_calc', message: 'Cálculo de hashes SHA-256 concluído.' },
+                       { timestamp: showAuditDetailDialog.created_at, stage: 'finalizing', message: 'Pacote finalizado com sucesso.' }
+                     ]).map((evt: any, idx: number) => (
+                       <div key={idx} className="flex gap-2">
+                         <span className="text-slate-500">[{new Date(evt.timestamp).toLocaleTimeString()}]</span>
+                         <span className="text-blue-400 uppercase">[{evt.stage}]</span>
+                         <span className={cn(evt.status === 'error' ? 'text-red-400' : 'text-slate-100')}>
+                           {evt.message}
+                           {evt.reason && <span className="block text-red-300 ml-4 italic mt-1">Motivo: {evt.reason}</span>}
+                         </span>
+                       </div>
+                     ))}
+                   </div>
+                 </div>
+
+         {/* Comparison Dialog */}
+         <Dialog open={!!showComparisonDialog} onOpenChange={() => setShowComparisonDialog(null)}>
+           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+             <DialogHeader>
+               <DialogTitle className="flex items-center gap-2 text-purple-600">
+                 <RefreshCw className="w-5 h-5" /> Comparação de Execuções Lado a Lado
+               </DialogTitle>
+               <DialogDescription>
+                 Análise detalhada de diferenças entre duas exportações selecionadas.
+               </DialogDescription>
+             </DialogHeader>
+             
+             {showComparisonDialog && showComparisonDialog.length === 2 && (
+               <div className="grid grid-cols-2 gap-4 py-4">
+                 {showComparisonDialog.map((item, idx) => (
+                   <div key={item.id} className={cn(
+                     "space-y-4 p-4 rounded-xl border-2",
+                     idx === 0 ? "border-blue-100 bg-blue-50/20" : "border-amber-100 bg-amber-50/20"
+                   )}>
+                     <div className="flex justify-between items-center border-b pb-2">
+                       <Badge variant="outline" className={cn("text-[10px]", idx === 0 ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700")}>
+                         Execução {idx + 1}
+                       </Badge>
+                       <span className="text-[10px] text-muted-foreground">{new Date(item.created_at).toLocaleString()}</span>
+                     </div>
+                     
+                     <div className="space-y-3">
+                       <div>
+                         <span className="text-[9px] uppercase font-bold text-muted-foreground block">Filtros Aplicados</span>
+                         <div className="bg-white/80 p-2 rounded border text-[10px] mt-1">
+                           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                             <div className="flex justify-between border-b border-dashed py-1">
+                               <span className="text-muted-foreground">UF:</span>
+                               <span className={cn("font-bold", item.filters?.uf !== showComparisonDialog[1-idx].filters?.uf && "text-red-600")}>
+                                 {item.filters?.uf || 'Todas'}
+                               </span>
+                             </div>
+                             <div className="flex justify-between border-b border-dashed py-1">
+                               <span className="text-muted-foreground">Ambiente:</span>
+                               <span className={cn("font-bold", item.filters?.env !== showComparisonDialog[1-idx].filters?.env && "text-red-600")}>
+                                 {item.filters?.env || 'Ambos'}
+                               </span>
+                             </div>
+                           </div>
+                         </div>
+                       </div>
+
+                       <div>
+                         <span className="text-[9px] uppercase font-bold text-muted-foreground block">Integridade</span>
+                         <div className="bg-white/80 p-2 rounded border text-[10px] mt-1 space-y-2">
+                           <div className="flex justify-between items-center">
+                             <span className="text-muted-foreground">Registros:</span>
+                             <span className={cn("font-mono font-bold", item.record_count !== showComparisonDialog[1-idx].record_count && "text-red-600 underline")}>
+                               {item.record_count}
+                             </span>
+                           </div>
+                           <div className="space-y-1">
+                             <span className="text-muted-foreground">Hash CSV:</span>
+                             <code className={cn(
+                               "block p-1 bg-muted rounded font-mono text-[8px] break-all",
+                               item.csv_hash !== showComparisonDialog[1-idx].csv_hash && "text-red-600 border border-red-200"
+                             )}>
+                               {item.csv_hash}
+                             </code>
+                           </div>
+                           <div className="space-y-1">
+                             <span className="text-muted-foreground">Hash PDF:</span>
+                             <code className={cn(
+                               "block p-1 bg-muted rounded font-mono text-[8px] break-all",
+                               item.pdf_hash !== showComparisonDialog[1-idx].pdf_hash && "text-red-600 border border-red-200"
+                             )}>
+                               {item.pdf_hash}
+                             </code>
+                           </div>
+                         </div>
+                       </div>
+
+                       <div>
+                         <span className="text-[9px] uppercase font-bold text-muted-foreground block">Destinatários</span>
+                         <div className="bg-white/80 p-2 rounded border text-[10px] mt-1 h-[60px] overflow-y-auto">
+                           {(item.recipients || []).length > 0 ? (
+                             <ul className="list-disc pl-4 space-y-0.5">
+                               {item.recipients.map((r: string, rIdx: number) => (
+                                 <li key={rIdx} className={cn(!showComparisonDialog[1-idx].recipients?.includes(r) && "text-red-600 font-bold")}>{r}</li>
+                               ))}
+                             </ul>
+                           ) : (
+                             <span className="text-muted-foreground italic">Nenhum destinatário</span>
+                           )}
+                         </div>
+                       </div>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             )}
+             
+             <div className="flex justify-end gap-2 pt-4 border-t">
+               <Button variant="outline" onClick={() => setShowComparisonDialog(null)}>Fechar Comparação</Button>
+               <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => setSelectedHistoryItems([])}>Limpar Seleção</Button>
+             </div>
+           </DialogContent>
+         </Dialog>
+
                     <div className="flex justify-between border-b pb-1">
                       <span className="text-muted-foreground">Ordenação:</span>
                       <span className="font-mono font-bold capitalize">{showAuditDetailDialog.technical_log?.field || showAuditDetailDialog.technical_log?.sorting?.field || '-'}</span>
