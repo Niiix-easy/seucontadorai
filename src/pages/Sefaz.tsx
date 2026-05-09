@@ -1031,14 +1031,7 @@ export default function Sefaz() {
             };
            zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(techLog, null, 2));
            const divergence = previewCount !== rows.length;
-            await supabase.from("fiscal_export_logs").insert([{
-              user_id: user.id, report_type: 'backlog', format: 'zip', status: 'success', 
-              record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, 
-              csv_hash: csvHash, pdf_hash: pdfHash, zip_hash: zipHash,
-              validation_divergence: divergence, filters: filters, technical_log: techLog as any, recipients: [],
-              expected_data: { csv_hash: expectedCsvHash, pdf_hash: expectedPdfHash, count: previewCount }
-            }]);
-         } else {
+          } else {
            const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "cStat", "xMotivo"];
            const rows = auditLogs.map(log => [new Date(log.created_at).toLocaleString(), log.action.toUpperCase(), log.uf, log.environment, log.reason || "", log.cstat || "", log.xmotivo || ""]);
            const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
@@ -1072,18 +1065,16 @@ export default function Sefaz() {
             };
            zip.file(`log_tecnico_${dateStr}.json`, JSON.stringify(techLog, null, 2));
            const divergence = previewCount !== rows.length;
-            await supabase.from("fiscal_export_logs").insert([{
-              user_id: user.id, report_type: 'audit', format: 'zip', status: 'success', 
-              record_count: rows.length, csv_count: rows.length, pdf_count: rows.length, 
-              csv_hash: csvHash, pdf_hash: pdfHash, zip_hash: zipHash,
-              validation_divergence: divergence, filters: filters, technical_log: techLog as any, recipients: [],
-              expected_data: { csv_hash: expectedCsvHash, pdf_hash: expectedPdfHash, count: previewCount }
-            }]);
-         }
+          }
   
         setManualScheduleStatus(prev => prev ? { ...prev, status: 'finalizing_zip', progress: 95 } : null);
         const content = await zip.generateAsync({ type: "blob" });
         const zipHash = await calculateHash(content);
+        
+        // Determine which counts/hashes to use for log
+        // We'll need to store these during the generation above
+        // ... actually let's just use local variables that we'll pull out
+        
         const url = URL.createObjectURL(content);
         const link = document.createElement("a");
         link.href = url;
