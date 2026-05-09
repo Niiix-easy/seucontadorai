@@ -698,7 +698,9 @@ export default function Sefaz() {
  
       const handleExportZip = async (type: 'backlog' | 'audit') => {
         const filters = type === 'backlog' ? backlogFilters : auditFilters;
-        const count = type === 'backlog' ? backlogData.reduce((acc, b) => acc + b.count, 0) : auditLogs.length;
+        const count = type === 'backlog' 
+          ? backlogData.reduce((acc, b) => acc + b.count, 0) 
+          : auditLogs.length;
         
         setShowZipPreviewDialog({ type, count, filters });
       };
@@ -2707,8 +2709,15 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                         <td className="py-2 px-4 text-right flex flex-col items-end gap-1">
                           <div className="flex gap-1">
                             <Button variant="ghost" size="sm" onClick={() => handleResendEmail(log.id)} className="h-7 text-[10px] text-purple-600">
-                              <Send className="w-3 h-3 mr-1" /> Reenviar
+                               <Send className="w-3 h-3 mr-1" /> Reenviar E-mail
                             </Button>
+                            {log.file_url && (
+                              <Button variant="ghost" size="sm" asChild className="h-7 text-[10px] text-green-600">
+                                <a href={log.file_url} target="_blank" rel="noopener noreferrer">
+                                  <Download className="w-3 h-3 mr-1" /> Baixar ZIP
+                                </a>
+                              </Button>
+                            )}
                           </div>
                           {log.status === 'error' && (
                             <div className="text-[8px] text-destructive max-w-[150px] text-right truncate" title={log.error_message}>
