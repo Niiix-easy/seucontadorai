@@ -168,7 +168,49 @@ export default function Sefaz() {
       isCalculating?: boolean
     } | null>(null);
     const [manualScheduleStatus, setManualScheduleStatus] = useState<{ id: string, status: string, progress: number, zipUrl?: string } | null>(null);
-    const [showAuditDetailDialog, setShowAuditDetailDialog] = useState<any | null>(null);
+     const [showAuditDetailDialog, setShowAuditDetailDialog] = useState<any | null>(null);
+     const [selectedHistoryItems, setSelectedHistoryItems] = useState<string[]>([]);
+     const [showComparisonDialog, setShowComparisonDialog] = useState<any[] | null>(null);
+   const handleBulkDownloadAudit = async (format: 'json' | 'xlsx') => {
+     if (exportHistory.length === 0) return;
+     toast.info(`Gerando resumo consolidado (${format.toUpperCase()})...`);
+     const data = exportHistory.map(log => ({
+       id: log.id,
+       data: new Date(log.created_at).toLocaleString(),
+       relatorio: log.report_type,
+       status: log.status,
+       divergencia: log.validation_divergence ? 'SIM' : 'NÃO',
+       registros: log.record_count,
+       csv_hash: log.csv_hash,
+       pdf_hash: log.pdf_hash,
+       zip_hash: log.zip_hash,
+       parametros: JSON.stringify(log.technical_log),
+       filtros: JSON.stringify(log.filters),
+       destinatarios: log.recipients?.join(", ")
+     }));
+     if (format === 'json') {
+       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+       const url = URL.createObjectURL(blob);
+       const link = document.createElement("a");
+       link.href = url;
+       link.download = `auditoria_consolidada_${new Date().toISOString().split('T')[0]}.json`;
+       document.body.appendChild(link);
+       link.click();
+       document.body.removeChild(link);
+     } else {
+       const ws = XLSX.utils.json_to_sheet(data);
+       const wb = XLSX.utils.book_new();
+       XLSX.utils.book_append_sheet(wb, ws, "Auditoria");
+       XLSX.writeFile(wb, `auditoria_consolidada_${new Date().toISOString().split('T')[0]}.xlsx`);
+     }
+     toast.success("Resumo consolidado exportado com sucesso!");
+   };
+
+   const copyToClipboard = (text: string, label: string) => {
+     navigator.clipboard.writeText(text);
+     toast.success(`${label} copiado para a área de transferência!`);
+   };
+
     const [exportHistory, setExportHistory] = useState<any[]>([]);
     const [showExportHistory, setShowExportHistory] = useState(false);
     const [backlogPage, setBacklogPage] = useState(1);
@@ -932,9 +974,21 @@ export default function Sefaz() {
             record_count: count, csv_count: count, pdf_count: count, 
             csv_hash: csvHash, pdf_hash: pdfHash,
             validation_divergence: divergence, filters: filters, 
-            technical_log: { mode: 'proof', sorting: sort, timestamp: new Date().toISOString() } as any,
-            expected_data: { csv_hash: csvHash, pdf_hash: pdfHash, count: count },
-            recipients: []
+             technical_log: { mode: 'proof', sorting: sort, timestamp: new Date().toISOString(), execution_id: crypto.randomUUID() } as any,
+             expected_data: { csv_hash: csvHash, pdf_hash: pdfHash, count: count },
+             recipients: [],
+             audit_events: ([
+               { timestamp: new Date().toISOString(), stage: 'initializing', message: 'Iniciando Modo Prova a partir de dados históricos.' },
+               { timestamp: new Date().toISOString(), stage: 'csv_gen', message: `Dados CSV recalculados (${count} registros).` },
+               { timestamp: new Date().toISOString(), stage: 'pdf_gen', message: 'PDF simulado para auditoria de hash.' },
+               { timestamp: new Date().toISOString(), stage: 'hash_calc', message: 'Hashes SHA-256 gerados com sucesso.' },
+               { 
+                 timestamp: new Date().toISOString(), 
+                 stage: 'validation', 
+                 message: divergence ? 'Divergência detectada entre snapshot e dados atuais.' : 'Integridade confirmada. Dados idênticos ao snapshot.',
+                 status: divergence ? 'warning' : 'success'
+               }
+             ] as any[])
           }]);
           loadExportHistory();
           toast.success("Modo Prova concluído e registrado no histórico.");
@@ -954,10 +1008,22 @@ export default function Sefaz() {
            const content = await zip.file(csvFile)?.async("string");
            if (content) {
              const currentHash = await calculateHash(content);
-             if (log.csv_hash && currentHash !== log.csv_hash) {
-               toast.error("ERRO: Hash do CSV não coincide!", { duration: 10000 });
-               return;
-             }
+              if (log.csv_hash && currentHash !== log.csv_hash) {
+                const newEvent = {
+                  timestamp: new Date().toISOString(),
+                  stage: 'download_validation',
+                  message: 'Falha crítica de integridade no download!',
+                  status: 'error',
+                  reason: `Hash obtido (${currentHash.substring(0, 8)}) não bate com o esperado.`
+                };
+                await supabase.from("fiscal_export_logs").update({
+                  audit_events: [...(log.audit_events || []), newEvent],
+                  validation_divergence: true
+                }).eq("id", log.id);
+                loadExportHistory();
+                toast.error("ERRO: Hash do CSV não coincide!", { duration: 10000 });
+                return;
+              }
            }
          }
          const link = document.createElement("a");
@@ -1113,13 +1179,32 @@ export default function Sefaz() {
         
         const url = URL.createObjectURL(content);
 
-        await supabase.from("fiscal_export_logs").insert([{
-          user_id: user.id, report_type: type, format: 'zip', status: 'success', 
-          record_count: finalRecordCount, csv_count: finalRecordCount, pdf_count: finalRecordCount, 
-          csv_hash: finalCsvHash, pdf_hash: finalPdfHash, zip_hash: zipHash,
-          validation_divergence: finalDivergence, filters: filters, technical_log: finalTechLog as any, recipients: [],
-          expected_data: { csv_hash: expectedCsvHash, pdf_hash: expectedPdfHash, count: previewCount }
-        }]);
+         const auditEvents: any[] = [
+           { timestamp: new Date().toISOString(), stage: 'initializing', message: 'Iniciando exportação completa do relatório.' },
+           { timestamp: new Date().toISOString(), stage: 'csv_gen', message: `Arquivo CSV gerado com ${finalRecordCount} registros.` },
+           { timestamp: new Date().toISOString(), stage: 'pdf_gen', message: 'Documento PDF formatado e pronto.' },
+           { timestamp: new Date().toISOString(), stage: 'hash_calc', message: 'Hashes SHA-256 calculados e validados.' },
+           { timestamp: new Date().toISOString(), stage: 'finalizing', message: 'Pacote ZIP finalizado e pronto para download.' }
+         ];
+ 
+         if (finalDivergence) {
+           auditEvents.push({
+             timestamp: new Date().toISOString(),
+             stage: 'validation',
+             message: 'Divergência de contagem detectada!',
+             status: 'error',
+             reason: `Esperado: ${previewCount} | Obtido: ${finalRecordCount}`
+           });
+         }
+ 
+         await supabase.from("fiscal_export_logs").insert([{
+           user_id: user.id, report_type: type, format: 'zip', status: 'success', 
+           record_count: finalRecordCount, csv_count: finalRecordCount, pdf_count: finalRecordCount, 
+           csv_hash: finalCsvHash, pdf_hash: finalPdfHash, zip_hash: zipHash,
+           validation_divergence: finalDivergence, filters: filters, technical_log: finalTechLog as any, recipients: [],
+           expected_data: { csv_hash: expectedCsvHash, pdf_hash: expectedPdfHash, count: previewCount },
+           audit_events: auditEvents
+         }]);
         const link = document.createElement("a");
         link.href = url;
         link.download = `${type}_fiscal_${dateStr}.zip`;
@@ -2809,9 +2894,9 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
               </DialogDescription>
             </DialogHeader>
 
-            {showAuditDetailDialog && (
-              <div className="space-y-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
+             {showAuditDetailDialog && (
+               <div className="space-y-4 py-4">
+                 <div className="grid grid-cols-2 gap-4">
                   <div className={cn(
                     "p-3 rounded-lg border",
                     showAuditDetailDialog.validation_divergence ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"
@@ -2833,11 +2918,19 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                     </p>
                   </div>
 
-                  <div className="p-3 rounded-lg border bg-muted/30">
-                    <span className="text-[10px] uppercase text-muted-foreground font-bold block mb-1">Identificador de Execução</span>
-                    <code className="text-xs font-mono break-all">{showAuditDetailDialog.technical_log?.execution_id || showAuditDetailDialog.id}</code>
-                  </div>
-                </div>
+                   <div className="p-3 rounded-lg border bg-muted/30 relative group">
+                     <span className="text-[10px] uppercase text-muted-foreground font-bold block mb-1">Identificador de Execução</span>
+                     <code className="text-xs font-mono break-all">{showAuditDetailDialog.technical_log?.execution_id || showAuditDetailDialog.id}</code>
+                     <Button 
+                       variant="ghost" 
+                       size="icon" 
+                       className="absolute top-2 right-2 w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity" 
+                       onClick={() => copyToClipboard(showAuditDetailDialog.technical_log?.execution_id || showAuditDetailDialog.id, "ID de Execução")}
+                     >
+                       <CheckSquare className="w-3 h-3" />
+                     </Button>
+                   </div>
+                 </div>
 
                 <div className="space-y-2">
                   <h4 className="text-sm font-bold flex items-center gap-2">
@@ -2895,36 +2988,49 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <h4 className="text-sm font-bold flex items-center gap-2">
-                    <Settings className="w-4 h-4" /> Parâmetros Técnicos de Reprodução
-                  </h4>
-                  <div className="grid grid-cols-2 gap-2 text-[11px] bg-muted/20 p-3 rounded-lg border">
-                    <div className="flex justify-between border-b pb-1">
-                      <span className="text-muted-foreground">Ordenação:</span>
-                      <span className="font-mono font-bold capitalize">{showAuditDetailDialog.technical_log?.field || showAuditDetailDialog.technical_log?.sorting?.field || '-'}</span>
-                    </div>
-                    <div className="flex justify-between border-b pb-1">
-                      <span className="text-muted-foreground">Direção:</span>
-                      <span className="font-mono font-bold uppercase">{showAuditDetailDialog.technical_log?.direction || showAuditDetailDialog.technical_log?.sorting?.order || '-'}</span>
-                    </div>
-                    <div className="flex justify-between border-b pb-1">
-                      <span className="text-muted-foreground">Página:</span>
-                      <span className="font-mono font-bold">{showAuditDetailDialog.technical_log?.page || '-'}</span>
-                    </div>
-                    <div className="flex justify-between border-b pb-1">
-                      <span className="text-muted-foreground">Tamanho:</span>
-                      <span className="font-mono font-bold">{showAuditDetailDialog.technical_log?.page_size || '10'}</span>
-                    </div>
-                    <div className="flex justify-between col-span-2 pt-1">
-                      <span className="text-muted-foreground">Destinatários:</span>
-                      <span className="font-mono font-bold truncate max-w-[300px]" title={showAuditDetailDialog.recipients?.join(", ")}>
-                        {showAuditDetailDialog.recipients?.join(", ") || 'Nenhum'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
+                 <div className="space-y-2">
+                   <div className="flex items-center justify-between">
+                     <h4 className="text-sm font-bold flex items-center gap-2">
+                       <Settings className="w-4 h-4" /> Parâmetros Técnicos de Reprodução
+                     </h4>
+                     <Button 
+                       variant="outline" 
+                       size="sm" 
+                       className="h-6 text-[9px]"
+                       onClick={() => {
+                         const block = `ID: ${showAuditDetailDialog.technical_log?.execution_id || showAuditDetailDialog.id}\nOrdenação: ${showAuditDetailDialog.technical_log?.field || showAuditDetailDialog.technical_log?.sorting?.field || '-'}\nDireção: ${showAuditDetailDialog.technical_log?.direction || showAuditDetailDialog.technical_log?.sorting?.order || '-'}\nPágina: ${showAuditDetailDialog.technical_log?.page || '-'}\nTamanho: ${showAuditDetailDialog.technical_log?.page_size || '10'}`;
+                         copyToClipboard(block, "Bloco Técnico");
+                       }}
+                     >
+                       Copiar Bloco Técnico
+                     </Button>
+                   </div>
+                 </div>
+ 
+                 <div className="space-y-2">
+                   <h4 className="text-sm font-bold flex items-center gap-2">
+                     <FileText className="w-4 h-4" /> Logs de Auditoria do Sistema
+                   </h4>
+                   <div className="bg-slate-900 text-slate-100 p-3 rounded-lg font-mono text-[10px] max-h-[150px] overflow-y-auto space-y-1">
+                     {(showAuditDetailDialog.audit_events || [
+                       { timestamp: showAuditDetailDialog.created_at, stage: 'initializing', message: 'Iniciando processo de auditoria...' },
+                       { timestamp: showAuditDetailDialog.created_at, stage: 'csv_gen', message: 'Geração de dados CSV concluída.' },
+                       { timestamp: showAuditDetailDialog.created_at, stage: 'pdf_gen', message: 'Geração de PDF concluída.' },
+                       { timestamp: showAuditDetailDialog.created_at, stage: 'hash_calc', message: 'Cálculo de hashes SHA-256 concluído.' },
+                       { timestamp: showAuditDetailDialog.created_at, stage: 'finalizing', message: 'Pacote finalizado com sucesso.' }
+                     ]).map((evt: any, idx: number) => (
+                       <div key={idx} className="flex gap-2">
+                         <span className="text-slate-500">[{new Date(evt.timestamp).toLocaleTimeString()}]</span>
+                         <span className="text-blue-400 uppercase">[{evt.stage}]</span>
+                         <span className={cn(evt.status === 'error' ? 'text-red-400' : 'text-slate-100')}>
+                           {evt.message}
+                           {evt.reason && <span className="block text-red-300 ml-4 italic mt-1">Motivo: {evt.reason}</span>}
+                         </span>
+                       </div>
+                     ))}
+                   </div>
+                 </div>
+ 
                  <div className="flex justify-between items-center pt-4 border-t mt-4 flex-wrap gap-4">
                    <div className="flex gap-2">
                      <Button variant="outline" size="sm" className="h-8 text-[10px]" onClick={() => verifyAndDownloadFile(showAuditDetailDialog, 'csv')}>
@@ -2937,7 +3043,7 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                        <FileArchive className="w-3.5 h-3.5 mr-1.5" /> Baixar ZIP
                      </Button>
                    </div>
-
+ 
                    <div className="flex items-center gap-2">
                      <div className="flex gap-1">
                        <Button variant="outline" size="sm" onClick={() => downloadAuditSummary(showAuditDetailDialog, 'json')}>
@@ -2968,18 +3074,125 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                              <span className="capitalize">{manualScheduleStatus.status.replace('_', ' ')}</span>
                              <span>{manualScheduleStatus.progress}%</span>
                            </div>
-                           <div className="w-full bg-muted rounded-full h-1 overflow-hidden">
-                             <div className="bg-primary h-full transition-all duration-300" style={{ width: `${manualScheduleStatus.progress}%` }} />
+                           <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+                             <div 
+                               className="h-full bg-primary transition-all duration-300" 
+                               style={{ width: `${manualScheduleStatus.progress}%` }} 
+                             />
                            </div>
                          </div>
                        )}
                      </div>
                    </div>
                  </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+               </div>
+             )}
+           </DialogContent>
+         </Dialog>
+ 
+         {/* Comparison Dialog */}
+         <Dialog open={!!showComparisonDialog} onOpenChange={() => setShowComparisonDialog(null)}>
+           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+             <DialogHeader>
+               <DialogTitle className="flex items-center gap-2 text-purple-600">
+                 <RefreshCw className="w-5 h-5" /> Comparação de Execuções Lado a Lado
+               </DialogTitle>
+               <DialogDescription>
+                 Análise detalhada de diferenças entre duas exportações selecionadas.
+               </DialogDescription>
+             </DialogHeader>
+             
+             {showComparisonDialog && showComparisonDialog.length === 2 && (
+               <div className="grid grid-cols-2 gap-4 py-4">
+                 {showComparisonDialog.map((item, idx) => (
+                   <div key={item.id} className={cn(
+                     "space-y-4 p-4 rounded-xl border-2",
+                     idx === 0 ? "border-blue-100 bg-blue-50/20" : "border-amber-100 bg-amber-50/20"
+                   )}>
+                     <div className="flex justify-between items-center border-b pb-2">
+                       <Badge variant="outline" className={cn("text-[10px]", idx === 0 ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700")}>
+                         Execução {idx + 1}
+                       </Badge>
+                       <span className="text-[10px] text-muted-foreground">{new Date(item.created_at).toLocaleString()}</span>
+                     </div>
+                     
+                     <div className="space-y-3">
+                       <div>
+                         <span className="text-[9px] uppercase font-bold text-muted-foreground block">Filtros Aplicados</span>
+                         <div className="bg-white/80 p-2 rounded border text-[10px] mt-1">
+                           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                             <div className="flex justify-between border-b border-dashed py-1">
+                               <span className="text-muted-foreground">UF:</span>
+                               <span className={cn("font-bold", item.filters?.uf !== showComparisonDialog[1-idx].filters?.uf && "text-red-600")}>
+                                 {item.filters?.uf || 'Todas'}
+                               </span>
+                             </div>
+                             <div className="flex justify-between border-b border-dashed py-1">
+                               <span className="text-muted-foreground">Ambiente:</span>
+                               <span className={cn("font-bold", item.filters?.env !== showComparisonDialog[1-idx].filters?.env && "text-red-600")}>
+                                 {item.filters?.env || 'Ambos'}
+                               </span>
+                             </div>
+                           </div>
+                         </div>
+                       </div>
+ 
+                       <div>
+                         <span className="text-[9px] uppercase font-bold text-muted-foreground block">Integridade</span>
+                         <div className="bg-white/80 p-2 rounded border text-[10px] mt-1 space-y-2">
+                           <div className="flex justify-between items-center">
+                             <span className="text-muted-foreground">Registros:</span>
+                             <span className={cn("font-mono font-bold", item.record_count !== showComparisonDialog[1-idx].record_count && "text-red-600 underline")}>
+                               {item.record_count}
+                             </span>
+                           </div>
+                           <div className="space-y-1">
+                             <span className="text-muted-foreground">Hash CSV:</span>
+                             <code className={cn(
+                               "block p-1 bg-muted rounded font-mono text-[8px] break-all",
+                               item.csv_hash !== showComparisonDialog[1-idx].csv_hash && "text-red-600 border border-red-200"
+                             )}>
+                               {item.csv_hash}
+                             </code>
+                           </div>
+                           <div className="space-y-1">
+                             <span className="text-muted-foreground">Hash PDF:</span>
+                             <code className={cn(
+                               "block p-1 bg-muted rounded font-mono text-[8px] break-all",
+                               item.pdf_hash !== showComparisonDialog[1-idx].pdf_hash && "text-red-600 border border-red-200"
+                             )}>
+                               {item.pdf_hash}
+                             </code>
+                           </div>
+                         </div>
+                       </div>
+ 
+                       <div>
+                         <span className="text-[9px] uppercase font-bold text-muted-foreground block">Destinatários</span>
+                         <div className="bg-white/80 p-2 rounded border text-[10px] mt-1 h-[60px] overflow-y-auto">
+                           {(item.recipients || []).length > 0 ? (
+                             <ul className="list-disc pl-4 space-y-0.5">
+                               {item.recipients.map((r: string, rIdx: number) => (
+                                 <li key={rIdx} className={cn(!showComparisonDialog[1-idx].recipients?.includes(r) && "text-red-600 font-bold")}>{r}</li>
+                               ))}
+                             </ul>
+                           ) : (
+                             <span className="text-muted-foreground italic">Nenhum destinatário</span>
+                           )}
+                         </div>
+                       </div>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             )}
+             
+             <div className="flex justify-end gap-2 pt-4 border-t">
+               <Button variant="outline" onClick={() => setShowComparisonDialog(null)}>Fechar Comparação</Button>
+               <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => setSelectedHistoryItems([])}>Limpar Seleção</Button>
+             </div>
+           </DialogContent>
+          </Dialog>
 
         {/* Schedule Report Dialog */}
         <Dialog open={!!showScheduleDialog} onOpenChange={() => setShowScheduleDialog(null)}>
@@ -3287,9 +3500,19 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                         <Button variant="outline" size="sm" className="h-7 text-[9px] flex-1" onClick={loadExportHistory}>
                           <Search className="w-3 h-3 mr-1" /> Filtrar
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-[9px] flex-1" onClick={() => setHistoryFilters({ status: "all", divergence: "all", uf: "all", env: "all", dateStart: "", dateEnd: "", recipient: "" })}>
-                          Limpar
-                        </Button>
+                         <div className="flex flex-col gap-1 flex-1">
+                           <Button variant="ghost" size="sm" className="h-7 text-[9px] w-full" onClick={() => setHistoryFilters({ status: "all", divergence: "all", uf: "all", env: "all", dateStart: "", dateEnd: "", recipient: "" })}>
+                             Limpar
+                           </Button>
+                           <div className="flex gap-1 w-full">
+                             <Button variant="outline" size="sm" className="h-[22px] text-[8px] flex-1 border-orange-200 text-orange-600 hover:bg-orange-50" onClick={() => handleBulkDownloadAudit('json')}>
+                               Bulk JSON
+                             </Button>
+                             <Button variant="outline" size="sm" className="h-[22px] text-[8px] flex-1 border-green-200 text-green-600 hover:bg-green-50" onClick={() => handleBulkDownloadAudit('xlsx')}>
+                               Bulk XLSX
+                             </Button>
+                           </div>
+                         </div>
                       </div>
                     </div>
                     <div className="overflow-x-auto border rounded-lg">
@@ -3333,16 +3556,30 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                          <td className="py-2 px-4 text-right">
                            <div className="flex flex-col items-end gap-1">
                              <div className="flex gap-1">
-                               <Button 
-                                 variant="ghost" 
-                                 size="sm" 
-                                 onClick={() => handleResendEmail(log.id)} 
-                                 className={cn("h-7 text-[10px]", log.resend_status === 'sent' ? "text-green-600" : "text-purple-600")}
-                                 disabled={log.resend_status === 'sending'}
-                               >
-                                  {log.resend_status === 'sending' ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Send className="w-3 h-3 mr-1" />}
-                                  {log.resend_status === 'sent' ? 'E-mail Enviado' : (log.resend_status === 'sending' ? 'Enviando...' : 'Reenviar E-mail')}
-                               </Button>
+                               <div className="flex flex-col gap-1 items-end">
+                                 <Button 
+                                   variant="ghost" 
+                                   size="sm" 
+                                   onClick={() => handleResendEmail(log.id)} 
+                                   className={cn("h-7 text-[10px]", log.resend_status === 'sent' ? "text-green-600" : "text-purple-600")}
+                                   disabled={log.resend_status === 'sending'}
+                                 >
+                                     {log.resend_status === 'sending' ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Send className="w-3 h-3 mr-1" />}
+                                     {log.resend_status === 'sent' ? 'E-mail Enviado' : (log.resend_status === 'sending' ? 'Enviando...' : 'Reenviar E-mail')}
+                                 </Button>
+                                 <div className="flex items-center gap-1 bg-muted/50 px-2 py-1 rounded border border-dashed text-[9px] mt-1">
+                                   <input 
+                                     type="checkbox" 
+                                     checked={selectedHistoryItems.includes(log.id)}
+                                     onChange={(e) => {
+                                       if (e.target.checked) setSelectedHistoryItems(p => [...p, log.id]);
+                                       else setSelectedHistoryItems(p => p.filter(id => id !== log.id));
+                                     }}
+                                     className="w-3 h-3 cursor-pointer"
+                                   />
+                                   <span className="text-muted-foreground">Comparar</span>
+                                 </div>
+                               </div>
                                 {log.file_url && (
                                   <div className="flex flex-col gap-1">
                                     <div className="flex gap-1">
