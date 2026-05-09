@@ -368,6 +368,8 @@ export default function Sefaz() {
       const rows = deadLetterNotifs.map(n => [
         n.id,
         n.document_id,
+        n.processed_documents?.uf || "",
+        n.processed_documents?.environment || "",
         new Date(n.created_at).toLocaleString(),
         n.status,
         (n.channels || []).join(", "),
