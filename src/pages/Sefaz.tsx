@@ -712,12 +712,110 @@ export default function Sefaz() {
        }
      };
  
-     const calculateHash = async (content: string | Blob) => {
-       const data = typeof content === 'string' ? new TextEncoder().encode(content) : new Uint8Array(await (content as Blob).arrayBuffer());
-       const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-       const hashArray = Array.from(new Uint8Array(hashBuffer));
-       return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-     };
+    const calculateHash = async (content: string | Blob | Uint8Array) => {
+      let data: Uint8Array;
+      if (typeof content === 'string') {
+        data = new TextEncoder().encode(content);
+      } else if (content instanceof Blob) {
+        data = new Uint8Array(await content.arrayBuffer());
+      } else {
+        data = content;
+      }
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    };
+
+    const verifyAndDownloadFile = async (log: any, fileType: 'csv' | 'pdf') => {
+      if (!log.file_url) {
+        toast.error("URL do arquivo não disponível.");
+        return;
+      }
+      toast.info(`Extraindo e verificando ${fileType.toUpperCase()}...`);
+      try {
+        const response = await fetch(log.file_url);
+        const blob = await response.blob();
+        const zip = await JSZip.loadAsync(blob);
+        let targetFileName = "";
+        zip.forEach((path) => { 
+          if (path.toLowerCase().endsWith(`.${fileType}`) && !path.startsWith("log_tecnico")) {
+            targetFileName = path;
+          }
+        });
+
+        if (!targetFileName) {
+          toast.error(`Arquivo ${fileType.toUpperCase()} não encontrado no pacote.`);
+          return;
+        }
+
+        const fileContent = await zip.file(targetFileName)?.async(fileType === 'csv' ? "string" : "uint8array");
+        if (fileContent) {
+          const currentHash = await calculateHash(fileContent);
+          const expectedHash = fileType === 'csv' ? log.csv_hash : log.pdf_hash;
+          
+          if (expectedHash && currentHash !== expectedHash) {
+            toast.error(`DIVERGÊNCIA: Hash do ${fileType.toUpperCase()} não confere!`, {
+              description: `Esperado: ${expectedHash.substring(0, 10)}... | Obtido: ${currentHash.substring(0, 10)}...`,
+              duration: 10000
+            });
+            return;
+          }
+
+          const downloadBlob = fileType === 'csv' 
+            ? new Blob([fileContent as string], { type: "text/csv;charset=utf-8;" })
+            : new Blob([fileContent as Uint8Array], { type: "application/pdf" });
+          
+          const url = URL.createObjectURL(downloadBlob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = targetFileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          toast.success(`${fileType.toUpperCase()} baixado e verificado.`);
+        }
+      } catch (err) {
+        toast.error(`Erro ao processar ${fileType.toUpperCase()}.`);
+      }
+    };
+
+    const downloadAuditSummary = (log: any) => {
+      const summary = {
+        id_execucao: log.id,
+        report_id: log.report_id,
+        data_criacao: log.created_at,
+        tipo: log.report_type,
+        filtros: log.filters,
+        contagens: {
+          total: log.record_count,
+          csv: log.csv_count,
+          pdf: log.pdf_count
+        },
+        hashes: {
+          csv: log.csv_hash,
+          pdf: log.pdf_hash
+        },
+        destinatarios: log.recipients,
+        tecnico: log.technical_log,
+        status: log.status,
+        divergencia: log.validation_divergence
+      };
+
+      const blob = new Blob([JSON.stringify(summary, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `resumo_auditoria_${log.id.substring(0, 8)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Resumo de auditoria exportado.");
+    };
+
+    const handleRunProofFromHistory = (log: any) => {
+      toast.info("Iniciando Modo Prova a partir do histórico...");
+      handleExportZip(log.report_type as 'backlog' | 'audit', 'proof');
+    };
 
      const handleExportZip = async (type: 'backlog' | 'audit', mode: 'full' | 'proof' = 'full') => {
        const filters = type === 'backlog' ? backlogFilters : auditFilters;
