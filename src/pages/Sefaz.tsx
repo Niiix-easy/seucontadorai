@@ -713,13 +713,13 @@ export default function Sefaz() {
      };
  
     const calculateHash = async (content: string | Blob | Uint8Array) => {
-      let data: Uint8Array;
+      let data: BufferSource;
       if (typeof content === 'string') {
         data = new TextEncoder().encode(content);
       } else if (content instanceof Blob) {
-        data = new Uint8Array(await content.arrayBuffer());
+        data = await content.arrayBuffer();
       } else {
-        data = content;
+        data = content as any;
       }
       const hashBuffer = await crypto.subtle.digest('SHA-256', data);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -763,7 +763,7 @@ export default function Sefaz() {
 
           const downloadBlob = fileType === 'csv' 
             ? new Blob([fileContent as string], { type: "text/csv;charset=utf-8;" })
-            : new Blob([fileContent as Uint8Array], { type: "application/pdf" });
+            : new Blob([fileContent as any], { type: "application/pdf" });
           
           const url = URL.createObjectURL(downloadBlob);
           const link = document.createElement("a");
@@ -2979,16 +2979,32 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                                   {log.resend_status === 'sending' ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Send className="w-3 h-3 mr-1" />}
                                   {log.resend_status === 'sent' ? 'E-mail Enviado' : (log.resend_status === 'sending' ? 'Enviando...' : 'Reenviar E-mail')}
                                </Button>
-                               {log.file_url && (
-                                 <div className="flex gap-1">
-                                   <Button variant="ghost" size="sm" onClick={() => verifyAndDownload(log)} className="h-7 text-[10px] text-green-600">
-                                      <Download className="w-3 h-3 mr-1" /> Baixar ZIP (Verificado)
-                                   </Button>
-                                   <Button variant="ghost" size="sm" onClick={() => handleRerunExport(log)} className="h-7 text-[10px] text-blue-600" title="Repetir Exportação com mesmos filtros">
-                                      <RefreshCw className="w-3 h-3 mr-1" /> Repetir
-                                   </Button>
-                                 </div>
-                               )}
+                                {log.file_url && (
+                                  <div className="flex flex-col gap-1">
+                                    <div className="flex gap-1">
+                                      <Button variant="ghost" size="sm" onClick={() => verifyAndDownload(log)} className="h-6 text-[9px] text-green-600 border border-green-100 bg-green-50/50">
+                                         <FileArchive className="w-3 h-3 mr-1" /> ZIP
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={() => verifyAndDownloadFile(log, 'csv')} className="h-6 text-[9px] text-green-600 border border-green-100 bg-green-50/50">
+                                         <FileText className="w-3 h-3 mr-1" /> CSV
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={() => verifyAndDownloadFile(log, 'pdf')} className="h-6 text-[9px] text-green-600 border border-green-100 bg-green-50/50">
+                                         <FileDown className="w-3 h-3 mr-1" /> PDF
+                                      </Button>
+                                    </div>
+                                    <div className="flex gap-1">
+                                      <Button variant="ghost" size="sm" onClick={() => downloadAuditSummary(log)} className="h-6 text-[9px] text-orange-600 border border-orange-100 bg-orange-50/50">
+                                         <Calculator className="w-3 h-3 mr-1" /> Auditoria
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={() => handleRunProofFromHistory(log)} className="h-6 text-[9px] text-amber-600 border border-amber-100 bg-amber-50/50" title="Validar sem baixar">
+                                         <Zap className="w-3 h-3 mr-1" /> Prova
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={() => handleRerunExport(log)} className="h-6 text-[9px] text-blue-600 border border-blue-100 bg-blue-50/50" title="Repetir Exportação">
+                                         <RefreshCw className="w-3 h-3 mr-1" /> Repetir
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
                              </div>
                              <div className="flex flex-col items-end">
                                {log.status === 'success' ? (
