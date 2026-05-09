@@ -501,6 +501,92 @@ export default function Sefaz() {
       toast.success("Auditoria exportada!");
     };
 
+    const handleExportAuditPDF = () => {
+      if (auditLogs.length === 0) return;
+      const doc = new jsPDF();
+      doc.text("Auditoria de Ações Fiscais", 14, 15);
+      doc.setFontSize(8);
+      doc.text(`Gerado em: ${new Date().toLocaleString()}`, 14, 22);
+      
+      const tableData = auditLogs.map(log => [
+        new Date(log.created_at).toLocaleString(),
+        log.action.toUpperCase(),
+        `${log.uf}/${log.environment}`,
+        log.reason || "—",
+        log.user_id?.substring(0, 8) || "—"
+      ]);
+
+      autoTable(doc, {
+        head: [["Data/Hora", "Ação", "UF/Amb", "Motivo", "Usuário"]],
+        body: tableData,
+        startY: 25,
+        theme: 'grid',
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [66, 66, 66] }
+      });
+
+      doc.save(`auditoria_fiscal_${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.success("Auditoria PDF exportada!");
+    };
+
+    const handleExportBacklogCSV = () => {
+      if (backlogData.length === 0) return;
+      const headers = ["UF", "Ambiente", "Quantidade", "Próximo Envio", "Status"];
+      const rows = backlogData.map(b => {
+        const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
+        const status = state?.is_suspended ? "Suspenso" : (state?.is_paused ? "Pausado" : "Ativo");
+        return [
+          b.uf,
+          b.env,
+          b.count,
+          b.next ? new Date(b.next).toLocaleString() : "—",
+          status
+        ];
+      });
+      const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `backlog_fiscal_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Backlog CSV exportado!");
+    };
+
+    const handleExportBacklogPDF = () => {
+      if (backlogData.length === 0) return;
+      const doc = new jsPDF();
+      doc.text("Backlog de Processamento Fiscal", 14, 15);
+      doc.setFontSize(8);
+      doc.text(`Filtros: UF=${backlogFilters.uf}, Amb=${backlogFilters.env}, Data=${backlogFilters.date || 'Todas'}`, 14, 22);
+      
+      const tableData = backlogData.map(b => {
+        const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
+        const status = state?.is_suspended ? "Suspenso" : (state?.is_paused ? "Pausado" : "Ativo");
+        return [
+          b.uf,
+          b.env.toUpperCase(),
+          `${b.count} docs`,
+          b.next ? new Date(b.next).toLocaleString() : "—",
+          status
+        ];
+      });
+
+      autoTable(doc, {
+        head: [["UF", "Ambiente", "Fila", "Próximo Envio", "Status"]],
+        body: tableData,
+        startY: 28,
+        theme: 'grid',
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [41, 128, 185] }
+      });
+
+      doc.save(`backlog_fiscal_${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.success("Backlog PDF exportada!");
+    };
+
     const handleExportDeadLetterCSV = () => {
       if (deadLetterNotifs.length === 0) return;
       const headers = ["ID", "Documento ID", "UF", "Ambiente", "Data", "Status Alerta", "Canais", "cStat", "xMotivo", "Retentativas", "Próximo Retry", "ID XML", "ID Comprovante", "Link XML"];
