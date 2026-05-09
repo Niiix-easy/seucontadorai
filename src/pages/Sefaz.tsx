@@ -2032,12 +2032,18 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
              <div className="overflow-x-auto border rounded-lg">
                <table className="w-full text-xs">
                  <thead className="bg-muted uppercase">
-                   <tr>
-                     <th className="text-left py-2 px-4">Data/Hora</th>
-                     <th className="text-left py-2 px-4">Ação</th>
-                     <th className="text-left py-2 px-4">UF/Amb</th>
-                     <th className="text-left py-2 px-4">Motivo</th>
-                   </tr>
+                    <tr>
+                      <th className="text-left py-2 px-4 cursor-pointer hover:bg-muted" onClick={() => setAuditSort({ field: 'created_at', order: auditSort.field === 'created_at' && auditSort.order === 'asc' ? 'desc' : 'asc' })}>
+                        Data/Hora {auditSort.field === 'created_at' && (auditSort.order === 'asc' ? '↑' : '↓')}
+                      </th>
+                      <th className="text-left py-2 px-4 cursor-pointer hover:bg-muted" onClick={() => setAuditSort({ field: 'action', order: auditSort.field === 'action' && auditSort.order === 'asc' ? 'desc' : 'asc' })}>
+                        Ação {auditSort.field === 'action' && (auditSort.order === 'asc' ? '↑' : '↓')}
+                      </th>
+                      <th className="text-left py-2 px-4 cursor-pointer hover:bg-muted" onClick={() => setAuditSort({ field: 'uf', order: auditSort.field === 'uf' && auditSort.order === 'asc' ? 'desc' : 'asc' })}>
+                        UF/Amb {auditSort.field === 'uf' && (auditSort.order === 'asc' ? '↑' : '↓')}
+                      </th>
+                      <th className="text-left py-2 px-4">Motivo</th>
+                    </tr>
                  </thead>
                  <tbody>
                    {auditLogs.map(log => (
