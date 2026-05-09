@@ -2795,11 +2795,16 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                                   {log.resend_status === 'sent' ? 'E-mail Enviado' : (log.resend_status === 'sending' ? 'Enviando...' : 'Reenviar E-mail')}
                                </Button>
                                {log.file_url && (
-                                 <Button variant="ghost" size="sm" asChild className="h-7 text-[10px] text-green-600">
-                                   <a href={log.file_url} target="_blank" rel="noopener noreferrer">
-                                     <Download className="w-3 h-3 mr-1" /> Baixar ZIP
-                                   </a>
-                                 </Button>
+                                 <div className="flex gap-1">
+                                   <Button variant="ghost" size="sm" asChild className="h-7 text-[10px] text-green-600">
+                                     <a href={log.file_url} target="_blank" rel="noopener noreferrer">
+                                       <Download className="w-3 h-3 mr-1" /> Baixar ZIP
+                                     </a>
+                                   </Button>
+                                   <Button variant="ghost" size="sm" onClick={() => handleRerunExport(log)} className="h-7 text-[10px] text-blue-600" title="Repetir Exportação com mesmos filtros">
+                                      <RefreshCw className="w-3 h-3 mr-1" /> Repetir
+                                   </Button>
+                                 </div>
                                )}
                              </div>
                              <div className="flex flex-col items-end">
@@ -2807,9 +2812,17 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                                  <div className="flex flex-col items-end text-[8px] text-green-600">
                                    <span>Geração: {log.stage_counts?.generation || 0} reg | Proc: {log.stage_counts?.processing || 0} reg</span>
                                    {log.technical_log?.sorting && (
-                                     <span className="text-muted-foreground font-mono">
-                                       Log: {log.technical_log.sorting.field} ({log.technical_log.sorting.order}), P{log.technical_log.page}
-                                     </span>
+                                     <div className="flex flex-col items-end">
+                                       <span className="text-muted-foreground font-mono">
+                                         Log: {log.technical_log.sorting.field} ({log.technical_log.sorting.order}), P{log.technical_log.page}
+                                       </span>
+                                       <span className="text-[7px] text-muted-foreground font-mono">
+                                         Hash CSV: {log.csv_hash?.substring(0, 16)}...
+                                       </span>
+                                       {log.validation_divergence && (
+                                         <Badge variant="destructive" className="text-[7px] h-3 px-1 mt-0.5">Divergência Detectada</Badge>
+                                       )}
+                                     </div>
                                    )}
                                  </div>
                                ) : (
