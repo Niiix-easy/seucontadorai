@@ -25,11 +25,11 @@ serve(async (req) => {
         try {
           // Trigger the fiscal-engine for each document
           // We use the service role key internally
-          const response = await fetch(\`\${Deno.env.get("SUPABASE_URL")}/functions/v1/fiscal-engine\`, {
+          const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/fiscal-engine`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "Authorization": \`Bearer \${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}\`
+              "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`
             },
             body: JSON.stringify({ action: "sign_and_send", documentId: doc.id })
           });
