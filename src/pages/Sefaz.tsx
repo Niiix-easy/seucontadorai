@@ -143,6 +143,7 @@ export default function Sefaz() {
     const [suspensionStates, setSuspensionStates] = useState<any[]>([]);
     const [backlogData, setBacklogData] = useState<any[]>([]);
      const [backlogFilters, setBacklogFilters] = useState({ uf: "all", env: "all", date: "", cStat: "", xMotivo: "" });
+    const [auditFilters, setAuditFilters] = useState({ dateStart: "", dateEnd: "", uf: "all", env: "all", action: "all" });
      const [showPauseDialog, setShowPauseDialog] = useState<{ uf: string, env: string, paused: boolean, manual?: boolean } | null>(null);
      const [manualRetryProgress, setManualRetryProgress] = useState<{ [key: string]: { status: 'queued' | 'processing' | 'done' | 'error', count: number, total: number } }>({});
     const [pauseReason, setPauseReason] = useState("");
@@ -323,11 +324,18 @@ export default function Sefaz() {
     };
 
     const loadAuditLogs = async () => {
-      const { data } = await supabase
+      let query = supabase
         .from("fiscal_action_logs")
         .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50);
+        .order("created_at", { ascending: false });
+
+      if (auditFilters.uf !== "all") query = query.eq("uf", auditFilters.uf);
+      if (auditFilters.env !== "all") query = query.eq("environment", auditFilters.env);
+      if (auditFilters.action !== "all") query = query.eq("action", auditFilters.action);
+      if (auditFilters.dateStart) query = query.gte("created_at", `${auditFilters.dateStart}T00:00:00`);
+      if (auditFilters.dateEnd) query = query.lte("created_at", `${auditFilters.dateEnd}T23:59:59`);
+
+      const { data } = await query.limit(100);
       if (data) setAuditLogs(data);
     };
 
