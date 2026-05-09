@@ -3192,10 +3192,7 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => setSelectedHistoryItems([])}>Limpar Seleção</Button>
              </div>
            </DialogContent>
-         </Dialog>
-
-          </DialogContent>
-        </Dialog>
+          </Dialog>
 
         {/* Schedule Report Dialog */}
         <Dialog open={!!showScheduleDialog} onOpenChange={() => setShowScheduleDialog(null)}>
