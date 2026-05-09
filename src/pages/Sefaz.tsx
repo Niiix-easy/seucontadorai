@@ -1784,7 +1784,7 @@ export default function Sefaz() {
                       </tr>
                     </thead>
                     <tbody>
-                      {backlogData.length > 0 ? backlogData.map(b => {
+                      {backlogData.length > 0 ? backlogData.slice((backlogPage - 1) * 10, backlogPage * 10).map(b => {
                         const state = suspensionStates.find(s => s.uf === b.uf && s.environment === b.env);
                         const isPaused = state?.is_paused;
                         const isSuspended = state?.is_suspended;
@@ -1852,6 +1852,15 @@ export default function Sefaz() {
                       )}
                     </tbody>
                   </table>
+                  {backlogData.length > 10 && (
+                    <div className="flex items-center justify-between p-2 border-t bg-muted/10">
+                      <span className="text-[10px] text-muted-foreground">Página {backlogPage} de {Math.ceil(backlogData.length / 10)}</span>
+                      <div className="flex gap-1">
+                        <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setBacklogPage(p => Math.max(1, p - 1))} disabled={backlogPage === 1}><ArrowLeft className="w-3 h-3" /></Button>
+                        <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setBacklogPage(p => Math.min(Math.ceil(backlogData.length / 10), p + 1))} disabled={backlogPage === Math.ceil(backlogData.length / 10)}><ArrowLeft className="w-3 h-3 rotate-180" /></Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <p className="text-sm font-medium text-muted-foreground">Canais de Alerta (Dead-Letter)</p>
