@@ -1145,8 +1145,11 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                </Tabs>
                
                <div className="flex justify-end gap-2">
-                 <Button variant="outline" onClick={() => handleDownloadXml(docInDetail)}>Download XML</Button>
-                 {docInDetail.status === 'error' && <Button onClick={() => handleRetry(docInDetail.id)}>Tentar Novamente</Button>}
+                <Button variant="outline" onClick={() => handleExportLog(docInDetail)} className="gap-2">
+                  <Download className="w-4 h-4" /> Exportar Log
+                </Button>
+                <Button variant="outline" onClick={() => handleDownloadXml(docInDetail)}>Download XML</Button>
+                {(docInDetail.status === 'error' || docInDetail.status === 'dead-letter') && <Button onClick={() => handleRetry(docInDetail.id)}>Tentar Novamente</Button>}
                </div>
              </div>
            )}
