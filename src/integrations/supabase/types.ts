@@ -545,10 +545,12 @@ export type Database = {
       }
       fiscal_export_logs: {
         Row: {
+          audit_events: Json | null
           created_at: string
           csv_count: number | null
           csv_hash: string | null
           error_message: string | null
+          expected_data: Json | null
           file_url: string | null
           filters: Json
           format: string
@@ -569,12 +571,15 @@ export type Database = {
           technical_log_url: string | null
           user_id: string
           validation_divergence: boolean | null
+          zip_hash: string | null
         }
         Insert: {
+          audit_events?: Json | null
           created_at?: string
           csv_count?: number | null
           csv_hash?: string | null
           error_message?: string | null
+          expected_data?: Json | null
           file_url?: string | null
           filters: Json
           format: string
@@ -595,12 +600,15 @@ export type Database = {
           technical_log_url?: string | null
           user_id: string
           validation_divergence?: boolean | null
+          zip_hash?: string | null
         }
         Update: {
+          audit_events?: Json | null
           created_at?: string
           csv_count?: number | null
           csv_hash?: string | null
           error_message?: string | null
+          expected_data?: Json | null
           file_url?: string | null
           filters?: Json
           format?: string
@@ -621,6 +629,7 @@ export type Database = {
           technical_log_url?: string | null
           user_id?: string
           validation_divergence?: boolean | null
+          zip_hash?: string | null
         }
         Relationships: [
           {
