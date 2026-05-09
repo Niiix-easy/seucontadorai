@@ -74,7 +74,7 @@ async function signXml(xml: string, privateKeyPem: string, certPem: string) {
   
   sig.signingKey = privateKeyPem;
   sig.keyInfoProvider = {
-    getKeyInfo: () => `<X509Data><X509Certificate>${certPem.replace(/-----(BEGIN|END) CERTIFICATE-----|\n/g, '')}</X509Certificate></X509Data>`,
+    getKeyInfo: () => `<X509Data><X509Certificate>${certPem.replace(/-----(BEGIN|END) CERTIFICATE-----|n/g, '')}</X509Certificate></X509Data>`,
     getKey: () => privateKeyPem
   };
   
@@ -87,15 +87,15 @@ async function signXml(xml: string, privateKeyPem: string, certPem: string) {
 
 async function sendToSefaz(signedXml: string, uf: string, env: string) {
   const endpoint = env === 'producao' 
-    ? \`https://nfe.sefaz.\${uf.toLowerCase()}.gov.br/ws/NFeAutorizacao4\`
-    : \`https://homologacao.nfe.sefaz.\${uf.toLowerCase()}.gov.br/ws/NFeAutorizacao4\`;
+    ? `https://nfe.sefaz.${uf.toLowerCase()}.gov.br/ws/NFeAutorizacao4`
+    : `https://homologacao.nfe.sefaz.${uf.toLowerCase()}.gov.br/ws/NFeAutorizacao4`;
 
-  const soapEnvelope = \`<?xml version="1.0" encoding="utf-8"?>
+  const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
-    <nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">\${signedXml}</nfeDadosMsg>
+    <nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">${signedXml}</nfeDadosMsg>
   </soap12:Body>
-</soap12:Envelope>\`;
+</soap12:Envelope>`;
 
   return await fetch(endpoint, {
     method: 'POST',
@@ -115,13 +115,13 @@ async function sendDeadLetterNotification(supabase: any, userId: string, docId: 
     await supabase.from("notifications").insert({
       user_id: userId,
       title: "Documento em Dead-Letter",
-      message: \`O documento \${docId} excedeu o limite de \${maxRetries} tentativas e foi movido para dead-letter.\`,
+      message: `O documento ${docId} excedeu o limite de ${maxRetries} tentativas e foi movido para dead-letter.`,
       type: "error"
     });
   }
 
   if (prefs?.dead_letter_alerts_email) {
-    console.log(\`[EMAIL ALERT] Sending dead-letter email to user \${userId} for doc \${docId}\`);
+    console.log(`[EMAIL ALERT] Sending dead-letter email to user ${userId} for doc ${docId}`);
   }
 }
 
@@ -279,7 +279,7 @@ serve(async (req) => {
         const responseText = await response.text();
 
         const getTag = (tag: string) => {
-          const match = responseText.match(new RegExp(\`<\${tag}[^>]*>(.*?)</\${tag}>\`, 'i'));
+          const match = responseText.match(new RegExp(`<${tag}[^>]*>(.*?)</${tag}>`, 'i'));
           return match ? match[1] : null;
         };
 
@@ -298,7 +298,7 @@ serve(async (req) => {
             processing_log: [...(doc.processing_log || []), { timestamp: new Date().toISOString(), event: "Autorizado pela SEFAZ", cStat, xMotivo }]
           }).eq("id", documentId);
         } else {
-          throw new Error(\`SEFAZ [\${cStat || 'ERRO'}]: \${xMotivo || 'Erro desconhecido'}\`);
+          throw new Error(`SEFAZ [${cStat || 'ERRO'}]: ${xMotivo || 'Erro desconhecido'}`);
         }
       } catch (error) {
         const isValidationError = error.message.includes("Certificado inválido") || error.message.includes("senha incorreta") || error.message.includes("Decryption error");
@@ -329,8 +329,8 @@ serve(async (req) => {
           is_processing: false,
           processing_log: [...(doc.processing_log || []), { 
             timestamp: new Date().toISOString(), 
-            event: \`Tentativa \${newRetryCount}: \${error.message}\`,
-            cStat: error.message.match(/\\[(.*?)\\]/)?.[1] || null
+            event: `Tentativa ${newRetryCount}: ${error.message}`,
+            cStat: error.message.match(/[(.*?)]/)?.[1] || null
           }]
         }).eq("id", documentId);
 
