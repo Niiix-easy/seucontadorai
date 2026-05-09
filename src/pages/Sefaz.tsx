@@ -767,6 +767,7 @@ export default function Sefaz() {
         link.click();
         document.body.removeChild(link);
         toast.success("Pacote ZIP exportado!");
+      };
     const handleExportAuditXLSX = () => {
       if (auditLogs.length === 0) return;
       const data = auditLogs.map(log => ({
