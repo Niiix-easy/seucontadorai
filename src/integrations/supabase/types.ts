@@ -268,6 +268,9 @@ export type Database = {
           document_id: string | null
           error_message: string | null
           id: string
+          last_receipt_number: string | null
+          last_xml_url: string | null
+          retry_count_at_failure: number | null
           sent_at: string | null
           status: string | null
           user_id: string | null
@@ -280,6 +283,9 @@ export type Database = {
           document_id?: string | null
           error_message?: string | null
           id?: string
+          last_receipt_number?: string | null
+          last_xml_url?: string | null
+          retry_count_at_failure?: number | null
           sent_at?: string | null
           status?: string | null
           user_id?: string | null
@@ -292,6 +298,9 @@ export type Database = {
           document_id?: string | null
           error_message?: string | null
           id?: string
+          last_receipt_number?: string | null
+          last_xml_url?: string | null
+          retry_count_at_failure?: number | null
           sent_at?: string | null
           status?: string | null
           user_id?: string | null
@@ -459,6 +468,7 @@ export type Database = {
           id: string
           is_suspended: boolean | null
           last_failure_at: string | null
+          throughput_per_minute: number | null
           uf: string
           updated_at: string | null
           user_id: string | null
@@ -469,6 +479,7 @@ export type Database = {
           id?: string
           is_suspended?: boolean | null
           last_failure_at?: string | null
+          throughput_per_minute?: number | null
           uf: string
           updated_at?: string | null
           user_id?: string | null
@@ -479,6 +490,7 @@ export type Database = {
           id?: string
           is_suspended?: boolean | null
           last_failure_at?: string | null
+          throughput_per_minute?: number | null
           uf?: string
           updated_at?: string | null
           user_id?: string | null
