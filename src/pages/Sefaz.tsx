@@ -812,6 +812,7 @@ export default function Sefaz() {
           newEvent.verified = true;
           toast.success(`${fileType.toUpperCase()} baixado e verificado.`);
         }
+        } // Close else
         const updatedEvents = [...(log.audit_events || []), newEvent];
         await supabase.from("fiscal_export_logs").update({ audit_events: updatedEvents }).eq("id", log.id);
         loadExportHistory();
