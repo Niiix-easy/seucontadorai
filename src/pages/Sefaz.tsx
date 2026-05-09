@@ -140,9 +140,9 @@ export default function Sefaz() {
     });
     const [suspensionStates, setSuspensionStates] = useState<any[]>([]);
     const [backlogData, setBacklogData] = useState<any[]>([]);
-    const [backlogFilters, setBacklogFilters] = useState({ uf: "all", env: "all", date: "" });
-    const [backlogSearch, setBacklogSearch] = useState("");
-    const [showPauseDialog, setShowPauseDialog] = useState<{ uf: string, env: string, paused: boolean } | null>(null);
+     const [backlogFilters, setBacklogFilters] = useState({ uf: "all", env: "all", date: "", cStat: "", xMotivo: "" });
+     const [showPauseDialog, setShowPauseDialog] = useState<{ uf: string, env: string, paused: boolean, manual?: boolean } | null>(null);
+     const [manualRetryProgress, setManualRetryProgress] = useState<{ [key: string]: { status: 'queued' | 'processing' | 'done' | 'error', count: number, total: number } }>({});
     const [pauseReason, setPauseReason] = useState("");
     const [auditLogs, setAuditLogs] = useState<any[]>([]);
     const [showAuditLogs, setShowAuditLogs] = useState(false);
@@ -292,12 +292,14 @@ export default function Sefaz() {
     const loadBacklogData = async () => {
       let query = supabase
         .from("processed_documents")
-        .select("uf, environment, status, next_retry_at")
+        .select("uf, environment, status, next_retry_at, sefaz_response_code, sefaz_response_message")
         .or('status.in.("pending","error")');
       
       if (backlogFilters.uf !== "all") query = query.eq("uf", backlogFilters.uf);
       if (backlogFilters.env !== "all") query = query.eq("environment", backlogFilters.env);
       if (backlogFilters.date) query = query.gte("next_retry_at", `${backlogFilters.date}T00:00:00`);
+      if (backlogFilters.cStat) query = query.ilike("sefaz_response_code", `%${backlogFilters.cStat}%`);
+      if (backlogFilters.xMotivo) query = query.ilike("sefaz_response_message", `%${backlogFilters.xMotivo}%`);
 
       const { data: backlog } = await query;
       
@@ -328,14 +330,33 @@ export default function Sefaz() {
     };
 
     const handleManualRetryBatch = async (uf: string, env: string) => {
+      const key = `${uf}-${env}`;
+      setManualRetryProgress(prev => ({
+        ...prev,
+        [key]: { status: 'queued', count: 0, total: backlogData.find(b => b.uf === uf && b.env === env)?.count || 0 }
+      }));
+
       try {
+        setManualRetryProgress(prev => ({ ...prev, [key]: { ...prev[key], status: 'processing' } }));
         const { data, error } = await supabase.functions.invoke("fiscal-engine", {
           body: { action: "manual_retry_batch", uf, environment: env, userId: user?.id }
         });
         if (error) throw error;
+        
+        await supabase.from("fiscal_action_logs").insert({
+          user_id: user?.id,
+          action: "manual_retry",
+          uf,
+          environment: env,
+          reason: "Reprocessamento manual disparado pelo usuário"
+        });
+
+        setManualRetryProgress(prev => ({ ...prev, [key]: { ...prev[key], status: 'done', count: data.count || 0 } }));
         toast.success(`${data.count || 0} documentos colocados na fila para reprocessamento imediato.`);
         loadBacklogData();
+        loadAuditLogs();
       } catch (err: any) {
+        setManualRetryProgress(prev => ({ ...prev, [key]: { ...prev[key], status: 'error' } }));
         toast.error("Erro ao disparar reprocessamento: " + err.message);
       }
     };
@@ -406,7 +427,7 @@ export default function Sefaz() {
           supabase.removeChannel(channel);
         };
       }
-    }, [user, backlogFilters]);
+    }, [user, backlogFilters, periodo, cStatFilter, xMotivoFilter, dlPeriodo, dlCStatFilter, dlXMotivoFilter]);
 
     const loadFiscalConfig = async () => {
       const { data, error } = await supabase
@@ -445,6 +466,29 @@ export default function Sefaz() {
         const { data: dlNotifs } = await dlQuery.limit(100);
         if (dlNotifs) setDeadLetterNotifs(dlNotifs);
       }
+    };
+
+    const handleExportAuditCSV = () => {
+      if (auditLogs.length === 0) return;
+      const headers = ["Data/Hora", "Ação", "UF", "Ambiente", "Motivo", "Usuário ID"];
+      const rows = auditLogs.map(log => [
+        new Date(log.created_at).toLocaleString(),
+        log.action,
+        log.uf,
+        log.environment,
+        log.reason || "",
+        log.user_id
+      ]);
+      const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `auditoria_fiscal_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Auditoria exportada!");
     };
 
     const handleExportDeadLetterCSV = () => {
