@@ -351,6 +351,7 @@ export type Database = {
       fiscal_configurations: {
         Row: {
           certificate_filename: string | null
+          certificate_password_encrypted: string | null
           certificate_password_hash: string | null
           certificate_path: string | null
           created_at: string
@@ -362,6 +363,7 @@ export type Database = {
         }
         Insert: {
           certificate_filename?: string | null
+          certificate_password_encrypted?: string | null
           certificate_password_hash?: string | null
           certificate_path?: string | null
           created_at?: string
@@ -373,6 +375,7 @@ export type Database = {
         }
         Update: {
           certificate_filename?: string | null
+          certificate_password_encrypted?: string | null
           certificate_password_hash?: string | null
           certificate_path?: string | null
           created_at?: string
@@ -817,10 +820,13 @@ export type Database = {
           created_at: string
           document_type: string
           id: string
+          last_error: string | null
+          next_retry_at: string | null
           period_date: string
           processing_log: Json | null
           protocol_number: string | null
           receipt_number: string | null
+          retry_count: number | null
           sefaz_response_code: string | null
           sefaz_response_message: string | null
           signed_xml_content: string | null
@@ -833,10 +839,13 @@ export type Database = {
           created_at?: string
           document_type: string
           id?: string
+          last_error?: string | null
+          next_retry_at?: string | null
           period_date?: string
           processing_log?: Json | null
           protocol_number?: string | null
           receipt_number?: string | null
+          retry_count?: number | null
           sefaz_response_code?: string | null
           sefaz_response_message?: string | null
           signed_xml_content?: string | null
@@ -849,10 +858,13 @@ export type Database = {
           created_at?: string
           document_type?: string
           id?: string
+          last_error?: string | null
+          next_retry_at?: string | null
           period_date?: string
           processing_log?: Json | null
           protocol_number?: string | null
           receipt_number?: string | null
+          retry_count?: number | null
           sefaz_response_code?: string | null
           sefaz_response_message?: string | null
           signed_xml_content?: string | null
