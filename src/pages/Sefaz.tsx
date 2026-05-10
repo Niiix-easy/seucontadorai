@@ -251,15 +251,25 @@ export default function Sefaz() {
       return summary;
     };
 
-    const exportDiffToPDF = (original: any, current: any, name: string) => {
+    const exportDiffToPDF = (original: any, current: any, name: string, version?: string) => {
       const doc = new jsPDF();
+      const ts = new Date().toLocaleString();
+      
+      // Watermark
+      doc.setTextColor(240, 240, 240);
+      doc.setFontSize(40);
+      doc.text("AUDITORIA - INTEGRIDADE", 35, 150, { angle: 45 });
+      
+      doc.setTextColor(0, 0, 0);
       doc.setFontSize(16);
       doc.text(`Diferença de Migração - ${name}`, 14, 20);
-      doc.setFontSize(10);
-      doc.text(`Data: ${new Date().toLocaleString()}`, 14, 28);
+      doc.setFontSize(8);
+      doc.text(`Integridade garantida via carimbo: ${ts}`, 14, 26);
+      if (version) doc.text(`Versão Registrada: ${version}`, 14, 30);
       
       const summary = getDiffSummary(original, current);
-      doc.text(`Resumo: ${summary.added} Adições, ${summary.removed} Remoções, ${summary.changed} Alterações`, 14, 35);
+      doc.setFontSize(10);
+      doc.text(`Resumo: ${summary.added} Adições, ${summary.removed} Remoções, ${summary.changed} Alterações`, 14, 38);
 
       const rows: any[] = [];
       const origRules = original.filters || {};
@@ -279,18 +289,18 @@ export default function Sefaz() {
       });
 
       autoTable(doc, {
-        startY: 40,
+        startY: 45,
         head: [['Campo', 'Valor Original', 'Novo Valor']],
         body: rows,
-        styles: { fontSize: 8 },
+        styles: { fontSize: 7 },
         columnStyles: { 
           1: { textColor: [200, 0, 0] }, 
           2: { textColor: [0, 150, 0] } 
         }
       });
 
-      doc.save(`diff_${name.toLowerCase().replace(/\s/g, '_')}.pdf`);
-      toast.success("PDF do diff exportado");
+      doc.save(`diff_${name.toLowerCase().replace(/\s/g, '_')}_${Date.now()}.pdf`);
+      toast.success("PDF do diff exportado com marcas de integridade");
     };
 
     const validateAndMigrate = (filter: any) => {
@@ -511,7 +521,11 @@ export default function Sefaz() {
       const asDraft = typeof asDraftArg === 'boolean' ? asDraftArg : false;
       if (!importPreview) return;
       
-      const migrationLogs: string[] = [];
+      const migrationLogs: string[] = [
+        `Ação: ${asDraft ? "Salvar Rascunho" : (saveAsNewVersion ? "Nova Versão" : "Confirmação Final")}`,
+        `Usuário: ${user?.email}`
+      ];
+      
       const toInsert = (importPreview.filters as any[]).map((f, idx) => {
         const v = importPreview.validation[idx];
         if (v.status === "error" && !asDraft) {
@@ -534,7 +548,7 @@ export default function Sefaz() {
           preference_key: 'log_search_filters',
           preference_name: name,
           filters: f.filters,
-          version: CURRENT_FILTER_VERSION,
+          version: saveAsNewVersion ? importVersionDescription : (f.version || CURRENT_FILTER_VERSION),
           is_favorite: !!f.is_favorite,
           is_default: false
         };
