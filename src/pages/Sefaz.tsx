@@ -1,3 +1,70 @@
+    const handleDeleteFilter = async (id: string) => {
+      const { error } = await supabase.from("user_preferences").delete().eq("id", id);
+      if (error) return toast.error("Erro ao deletar filtro");
+      setSavedPreferences(prev => prev.filter(p => p.id !== id));
+      toast.success("Filtro removido");
+    };
+
+    const handleRenameFilter = async (id: string, newName: string) => {
+      const { error } = await supabase.from("user_preferences").update({ preference_name: newName }).eq("id", id);
+      if (error) return toast.error("Erro ao renomear filtro");
+      setSavedPreferences(prev => prev.map(p => p.id === id ? { ...p, preference_name: newName } : p));
+      setEditingFilterId(null);
+      toast.success("Filtro renomeado");
+    };
+
+    const handleDuplicateFilter = async (filter: any) => {
+      const { data, error } = await supabase.from("user_preferences").insert([{
+        user_id: user?.id,
+        preference_key: filter.preference_key,
+        preference_name: `${filter.preference_name} (Cópia)`,
+        filters: filter.filters
+      }]).select();
+      if (error) return toast.error("Erro ao duplicar filtro");
+      setSavedPreferences(prev => [...prev, ...data]);
+      toast.success("Filtro duplicado");
+    };
+
+    const handleExportFilters = () => {
+      const filtersToExport = savedPreferences.filter(p => p.preference_key === 'log_search_filters');
+      const blob = new Blob([JSON.stringify(filtersToExport, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `filtros_logs_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Filtros exportados com sucesso!");
+    };
+
+    const handleImportFilters = (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const imported = JSON.parse(e.target?.result as string);
+          if (!Array.isArray(imported)) throw new Error("Formato inválido");
+          
+          const toInsert = imported.map(f => ({
+            user_id: user?.id,
+            preference_key: 'log_search_filters',
+            preference_name: f.preference_name,
+            filters: f.filters
+          }));
+
+          const { data, error } = await supabase.from("user_preferences").insert(toInsert).select();
+          if (error) throw error;
+          setSavedPreferences(prev => [...prev, ...data]);
+          toast.success(`${data.length} filtros importados!`);
+        } catch (err: any) {
+          toast.error("Falha na importação: " + err.message);
+        }
+      };
+      reader.readAsText(file);
+    };
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
