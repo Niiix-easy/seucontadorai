@@ -4727,10 +4727,10 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                                       <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0 border-blue-200 text-blue-700 hover:bg-blue-100" onClick={sug.action}>
                                         Corrigir
                                       </Button>
-                                    </div>
                                       <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0 border-blue-200 text-blue-700 hover:bg-blue-100" onClick={() => exportDiffToPDF(importPreview.originals[idx], f, f.preference_name || 'Filtro')}>
                                         <FileDown className="w-3 h-3 mr-1" /> PDF Diff
                                       </Button>
+                                    </div>
                                    </div>
                                    {importPreview?.showDiff === (f.id || idx.toString()) && (
                                      <div className="space-y-2">
