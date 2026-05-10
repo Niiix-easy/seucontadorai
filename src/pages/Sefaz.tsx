@@ -981,7 +981,7 @@ export default function Sefaz() {
     const loadUserPreferences = async () => {
       if (!user) return;
       const { data } = await supabase
-        .from("fiscal_fiscal_user_preferences")
+        .from("fiscal_user_preferences")
         .select("*")
         .eq("user_id", user.id);
       if (data) setSavedPreferences(data);
@@ -989,7 +989,7 @@ export default function Sefaz() {
 
     const handleSavePreference = async () => {
       if (!user || !showSavePrefDialog || !newPrefName.trim()) return;
-      const { error } = await supabase.from("fiscal_fiscal_user_preferences").upsert({
+      const { error } = await supabase.from("fiscal_user_preferences").upsert({
         user_id: user.id,
         preference_key: `${showSavePrefDialog.type}_filters`,
         preference_name: newPrefName.trim(),
