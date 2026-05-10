@@ -278,6 +278,9 @@ export default function RecuperacaoTributaria() {
       return;
     }
     setLoading(true);
+    // Auditoria: Rastreabilidade de quem iniciou a análise
+    console.log(`[AUDIT] Análise iniciada por ${user?.email || 'Sistema'} para CNPJ ${cnpj}`);
+    
     await new Promise(r => setTimeout(r, 900));
     const novaAnalise = gerarAnalise(cnpj);
     
@@ -285,26 +288,28 @@ export default function RecuperacaoTributaria() {
       setPendingAnalysis(novaAnalise);
       setShowDiffDialog(true);
     } else {
-      confirmarAnalise(novaAnalise);
+      confirmarAnalise(novaAnalise, isReprocess ? 'reprocessamento' : 'nova');
     }
     setLoading(false);
   };
 
-  const confirmarAnalise = (novaData: ReturnType<typeof gerarAnalise>) => {
+  const confirmarAnalise = (novaData: ReturnType<typeof gerarAnalise>, tipo: string = 'nova') => {
     setData(novaData);
     setPendingAnalysis(null);
     setShowDiffDialog(false);
     
     const historyItem = {
-      id: Math.random().toString(36).substring(7),
+      id: Math.random().toString(36).substring(2, 10).toUpperCase(),
       cnpj: novaData.empresa.cnpj,
       razaoSocial: novaData.empresa.razaoSocial,
       date: new Date().toISOString(),
       user: user?.email || 'Sistema',
+      tipo: tipo,
+      versao: `v${new Date().getTime()}`,
       data: JSON.stringify(novaData)
     };
     setAnalysisHistory(prev => [historyItem, ...prev]);
-    toast.success("Análise tributária concluída e registrada no histórico");
+    toast.success(tipo === 'reprocessamento' ? "Análise reprocessada com sucesso" : "Análise tributária concluída");
   };
 
   const limpar = () => {

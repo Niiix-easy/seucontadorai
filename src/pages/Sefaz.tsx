@@ -4849,6 +4849,19 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                     </Button>
                   </div>
                 </div>
+
+                <div className="flex justify-between items-center p-2 bg-muted/20 rounded border border-dashed">
+                   <div className="flex gap-2">
+                     <Button variant="outline" size="sm" className="h-7 text-[9px]" onClick={() => exportSummaryToCSV(importPreview.originals[0], importPreview.filters[0], importPreview.fileName)}>
+                       <FileSpreadsheet className="w-3 h-3 mr-1" /> Resumo CSV
+                     </Button>
+                     <Button variant="outline" size="sm" className="h-7 text-[9px]" onClick={() => exportDiffToXLSX(importPreview.originals[0], importPreview.filters[0], importPreview.fileName)}>
+                       <Download className="w-3 h-3 mr-1" /> Diff XLSX
+                     </Button>
+                   </div>
+                   <span className="text-[9px] text-muted-foreground">Integridade e rastreabilidade garantidas no histórico.</span>
+                </div>
+                </div>
                 {!importVersionDescription && (
                   <p className="text-[10px] text-muted-foreground italic text-right">
                     Preencha a descrição para habilitar "Salvar como Nova Versão".
