@@ -359,27 +359,77 @@ export default function Sefaz() {
       const file = event.target.files?.[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = async (e) => {
+      reader.onload = (e) => {
         try {
-          const imported = JSON.parse(e.target?.result as string);
-          if (!Array.isArray(imported)) throw new Error("Formato inválido");
-          
-          const toInsert = imported.map((f: any) => ({
-            user_id: user?.id,
-            preference_key: 'log_search_filters',
-            preference_name: f.preference_name,
-            filters: f.filters
-          }));
+          const content = e.target?.result as string;
+          let imported = JSON.parse(content);
+          if (!Array.isArray(imported)) imported = [imported];
 
-          const { data, error } = await (supabase.from as any)("user_preferences").insert(toInsert).select();
-          if (error) throw error;
-          setSavedPreferences(prev => [...prev, ...(data || [])]);
-          toast.success(`${(data || []).length} filtros importados!`);
+          const validation = imported.map((f: any) => validateAndMigrate(f));
+          setImportPreview({
+            filters: imported,
+            validation,
+            fileName: file.name
+          });
         } catch (err: any) {
-          toast.error("Falha na importação: " + err.message);
+          toast.error("Falha ao ler arquivo: " + err.message);
         }
       };
       reader.readAsText(file);
+      // Reset input
+      event.target.value = '';
+    };
+
+    const confirmImport = async () => {
+      if (!importPreview) return;
+      
+      const migrationLogs: string[] = [];
+      const toInsert = importPreview.filters.map((f, idx) => {
+        const v = importPreview.validation[idx];
+        if (v.status === "error") {
+          migrationLogs.push(`Pulado: ${f.preference_name || 'Sem Nome'} - Erros: ${v.errors.join(', ')}`);
+          return null;
+        }
+        
+        if (v.version !== CURRENT_FILTER_VERSION) {
+          migrationLogs.push(`Migrado: ${f.preference_name} da versão ${v.version} para ${CURRENT_FILTER_VERSION}`);
+        } else {
+          migrationLogs.push(`Importado: ${f.preference_name} (OK)`);
+        }
+
+        return {
+          user_id: user?.id,
+          preference_key: 'log_search_filters',
+          preference_name: f.preference_name,
+          filters: f.filters,
+          version: CURRENT_FILTER_VERSION,
+          is_favorite: !!f.is_favorite
+        };
+      }).filter(Boolean);
+
+      const { data, error } = await (supabase.from as any)("user_preferences").insert(toInsert).select();
+      
+      const resultStatus = error ? "error" : (migrationLogs.some(l => l.startsWith('Migrado')) ? "migrated" : "success");
+      
+      const historyItem: FilterImportHistory = {
+        id: Math.random().toString(36).substr(2, 9),
+        fileName: importPreview.fileName,
+        userName: user?.email || "Sistema",
+        date: new Date().toLocaleString(),
+        detectedVersion: importPreview.validation[0]?.version || "Unknown",
+        result: resultStatus as any,
+        migrationLog: migrationLogs
+      };
+
+      setImportHistory(prev => [historyItem, ...prev]);
+      
+      if (error) {
+        toast.error("Erro na importação final");
+      } else {
+        setSavedPreferences(prev => [...prev, ...(data || [])]);
+        toast.success(`${(data || []).length} filtros importados com sucesso!`);
+      }
+      setImportPreview(null);
     };
     const [scheduledReports, setScheduledReports] = useState<any[]>([]);
     const [showScheduleDialog, setShowScheduleDialog] = useState<{ type: 'backlog' | 'audit' } | null>(null);
