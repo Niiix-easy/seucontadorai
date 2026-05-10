@@ -3271,16 +3271,14 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                         { timestamp: showAuditDetailDialog.created_at, stage: 'pdf_gen', message: 'Geração de PDF concluída.' },
                         { timestamp: showAuditDetailDialog.created_at, stage: 'hash_calc', message: 'Cálculo de hashes SHA-256 concluído.' },
                         { timestamp: showAuditDetailDialog.created_at, stage: 'finalizing', message: 'Pacote finalizado com sucesso.' }
-                      ]).filter((evt: any) => {
-                        const matchesSearch = logSearch === "" || 
-                          evt.message.toLowerCase().includes(logSearch.toLowerCase()) || 
-                          (evt.reason && evt.reason.toLowerCase().includes(logSearch.toLowerCase())) ||
-                          evt.stage.toLowerCase().includes(logSearch.toLowerCase()) || idx.toString().includes(logSearch);
-                        const matchesStage = logFilterStage === "all" || evt.stage === logFilterStage;
-                        const matchesStage = logFilterStage === "all" || evt.stage === logFilterStage;
-                        return matchesSearch && matchesStage;
-                      }).slice((logPagination.page - 1) * logPagination.pageSize, logPagination.page * logPagination.pageSize).map((evt: any, idx: number) => (
-                      }).map((evt: any, idx: number) => (
+                       ]).filter((evt: any, idx: number) => {
+                         const matchesSearch = logSearch === "" || 
+                           evt.message.toLowerCase().includes(logSearch.toLowerCase()) || 
+                           (evt.reason && evt.reason.toLowerCase().includes(logSearch.toLowerCase())) ||
+                           evt.stage.toLowerCase().includes(logSearch.toLowerCase()) || idx.toString().includes(logSearch);
+                         const matchesStage = logFilterStage === "all" || evt.stage === logFilterStage;
+                         return matchesSearch && matchesStage;
+                       }).slice((logPagination.page - 1) * logPagination.pageSize, logPagination.page * logPagination.pageSize).map((evt: any, idx: number) => (
                         <div 
                           key={idx} 
                           className={cn(
