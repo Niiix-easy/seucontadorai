@@ -134,6 +134,7 @@ function generateChave() {
    detectedVersion: string;
    result: "success" | "migrated" | "error";
    migrationLog?: string[];
+   sourceData?: string;
  };
 
 export default function Sefaz() {
@@ -432,7 +433,8 @@ export default function Sefaz() {
 
           const validation = imported.map((f: any) => validateAndMigrate(f));
           setImportPreview({
-            filters: imported,
+            filters: JSON.parse(JSON.stringify(imported)),
+            originals: JSON.parse(JSON.stringify(imported)),
             validation,
             fileName: file.name
           });
@@ -4617,10 +4619,16 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setImportPreview(null)}>Cancelar</Button>
                 <Button 
-                  disabled={importPreview?.validation.every(v => v.status === "error")}
-                  onClick={confirmImport}
+                  variant="secondary"
+                  onClick={() => confirmImport(true)}
                 >
-                  Confirmar Importa00e700e3o
+                  Salvar como Rascunho
+                </Button>
+                <Button 
+                  disabled={importPreview?.validation.every(v => v.status === "error")}
+                  onClick={() => confirmImport(false)}
+                >
+                  Confirmar Importa\u00e7\u00e3o
                 </Button>
               </div>
             </div>
@@ -4714,6 +4722,11 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                         </td>
                         <td className="py-2 px-3 text-right">
                           <div className="flex justify-end gap-1">
+                            {h.sourceData && (
+                               <Button variant="ghost" size="icon" className="h-6 w-6 text-blue-600" onClick={() => handleReprocessImport(h)} title="Reprocessar">
+                                 <RefreshCw className="w-3 h-3" />
+                               </Button>
+                            )}
                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => exportMigrationReport([h], "csv")} title="Exportar CSV">
                               <FileText className="w-3 h-3" />
                             </Button>
