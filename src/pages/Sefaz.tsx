@@ -150,7 +150,18 @@ export default function Sefaz() {
      const [manualRetryProgress, setManualRetryProgress] = useState<{ [key: string]: { status: 'queued' | 'processing' | 'done' | 'error', count: number, total: number } }>({});
     const [pauseReason, setPauseReason] = useState("");
     const [auditLogs, setAuditLogs] = useState<any[]>([]);
-    const [savedPreferences, setSavedPreferences] = useState<any[]>([]);
+   const [savedPreferences, setSavedPreferences] = useState<any[]>(() => {
+     const stored = localStorage.getItem('sefaz_saved_preferences');
+     return stored ? JSON.parse(stored) : [];
+   });
+ 
+   useEffect(() => {
+     localStorage.setItem('sefaz_saved_preferences', JSON.stringify(savedPreferences));
+   }, [savedPreferences]);
+ 
+   const [logPagination, setLogPagination] = useState({ page: 1, pageSize: 50 });
+   const [historyPagination, setHistoryPagination] = useState({ page: 1, pageSize: 10 });
+   const [historySort, setHistorySort] = useState<{ field: string, order: 'asc' | 'desc' }>({ field: 'created_at', order: 'desc' });
     const [showSavePrefDialog, setShowSavePrefDialog] = useState<{ type: 'backlog' | 'audit' | 'log_search', filters: any } | null>(null);
     const [newPrefName, setNewPrefName] = useState("");
     const [showFiltersManager, setShowFiltersManager] = useState(false);
