@@ -211,6 +211,7 @@ export default function Sefaz() {
 
     const [showImportHistory, setShowImportHistory] = useState(false);
     const [importHistoryFilters, setImportHistoryFilters] = useState({ dateStart: "", dateEnd: "", version: "all", result: "all", query: "" });
+    const [importVersionDescription, setImportVersionDescription] = useState("");
     const [importHistoryPage, setImportHistoryPage] = useState(1);
 
     useEffect(() => {
@@ -233,6 +234,64 @@ export default function Sefaz() {
         }
       }
     }, []);
+
+    const getDiffSummary = (original: any, current: any) => {
+      const summary = { added: 0, removed: 0, changed: 0 };
+      const origRules = original.filters || {};
+      const currRules = current.filters || {};
+      
+      const allKeys = new Set([...Object.keys(origRules), ...Object.keys(currRules)]);
+      
+      allKeys.forEach(key => {
+        if (!(key in origRules) && (key in currRules)) summary.added++;
+        else if ((key in origRules) && !(key in currRules)) summary.removed++;
+        else if (JSON.stringify(origRules[key]) !== JSON.stringify(currRules[key])) summary.changed++;
+      });
+      
+      return summary;
+    };
+
+    const exportDiffToPDF = (original: any, current: any, name: string) => {
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text(`Diferença de Migração - ${name}`, 14, 20);
+      doc.setFontSize(10);
+      doc.text(`Data: ${new Date().toLocaleString()}`, 14, 28);
+      
+      const summary = getDiffSummary(original, current);
+      doc.text(`Resumo: ${summary.added} Adições, ${summary.removed} Remoções, ${summary.changed} Alterações`, 14, 35);
+
+      const rows: any[] = [];
+      const origRules = original.filters || {};
+      const currRules = current.filters || {};
+      const allKeys = new Set([...Object.keys(origRules), ...Object.keys(currRules)]);
+
+      allKeys.forEach(key => {
+        const origVal = origRules[key];
+        const currVal = currRules[key];
+        if (JSON.stringify(origVal) !== JSON.stringify(currVal)) {
+          rows.push([
+            key,
+            origVal !== undefined ? JSON.stringify(origVal) : '(Ausente)',
+            currVal !== undefined ? JSON.stringify(currVal) : '(Removido)'
+          ]);
+        }
+      });
+
+      autoTable(doc, {
+        startY: 40,
+        head: [['Campo', 'Valor Original', 'Novo Valor']],
+        body: rows,
+        styles: { fontSize: 8 },
+        columnStyles: { 
+          1: { textColor: [200, 0, 0] }, 
+          2: { textColor: [0, 150, 0] } 
+        }
+      });
+
+      doc.save(`diff_${name.toLowerCase().replace(/\s/g, '_')}.pdf`);
+      toast.success("PDF do diff exportado");
+    };
 
     const validateAndMigrate = (filter: any) => {
       const errors: { field: string; message: string }[] = [];
