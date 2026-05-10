@@ -361,8 +361,6 @@ export default function Sefaz() {
       link.click();
       toast.success("Resumo exportado em CSV");
     };
-      toast.success("PDF do diff exportado com marcas de integridade");
-    };
 
     const validateAndMigrate = (filter: any) => {
       const errors: { field: string; message: string }[] = [];
