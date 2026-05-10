@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Search, Building2, Gauge, Scale, Sparkles, FileSearch, BarChart3,
-  Bot, AlertTriangle, CheckCircle2, TrendingUp, Send, Loader2, Download, Trash2
+  Bot, AlertTriangle, CheckCircle2, TrendingUp, Send, Loader2, Download, Trash2, History, ArrowRight, X, List, FileDown, RefreshCw
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
+
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -237,9 +241,22 @@ function gerarAnalise(cnpj: string): {
 // ───────────────────────────── Page ─────────────────────────────
 
 export default function RecuperacaoTributaria() {
+  const { user } = useAuth();
   const [cnpj, setCnpj] = useState("");
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<ReturnType<typeof gerarAnalise> | null>(null);
+  const [analysisHistory, setAnalysisHistory] = useState<any[]>(() => {
+    const stored = localStorage.getItem('rt_analysis_history');
+    return stored ? JSON.parse(stored) : [];
+  });
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  const [historySearch, setHistorySearch] = useState("");
+  const [pendingAnalysis, setPendingAnalysis] = useState<ReturnType<typeof gerarAnalise> | null>(null);
+  const [showDiffDialog, setShowDiffDialog] = useState(false);
+  
+  useEffect(() => {
+    localStorage.setItem('rt_analysis_history', JSON.stringify(analysisHistory));
+  }, [analysisHistory]);
 
   const [chat, setChat] = useState<ChatMsg[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -251,16 +268,39 @@ export default function RecuperacaoTributaria() {
     [data]
   );
 
-  const analisar = async () => {
+  const analisar = async (isReprocess = false) => {
     if (!isValidCNPJ(cnpj)) {
       toast.error("CNPJ inválido");
       return;
     }
     setLoading(true);
     await new Promise(r => setTimeout(r, 900));
-    setData(gerarAnalise(cnpj));
+    const novaAnalise = gerarAnalise(cnpj);
+    
+    if (data && data.empresa.cnpj === novaAnalise.empresa.cnpj) {
+      setPendingAnalysis(novaAnalise);
+      setShowDiffDialog(true);
+    } else {
+      confirmarAnalise(novaAnalise);
+    }
     setLoading(false);
-    toast.success("Análise tributária concluída");
+  };
+
+  const confirmarAnalise = (novaData: ReturnType<typeof gerarAnalise>) => {
+    setData(novaData);
+    setPendingAnalysis(null);
+    setShowDiffDialog(false);
+    
+    const historyItem = {
+      id: Math.random().toString(36).substring(7),
+      cnpj: novaData.empresa.cnpj,
+      razaoSocial: novaData.empresa.razaoSocial,
+      date: new Date().toISOString(),
+      user: user?.email || 'Sistema',
+      data: JSON.stringify(novaData)
+    };
+    setAnalysisHistory(prev => [historyItem, ...prev]);
+    toast.success("Análise tributária concluída e registrada no histórico");
   };
 
   const limpar = () => {
@@ -270,32 +310,47 @@ export default function RecuperacaoTributaria() {
     toast.info("Análise removida");
   };
 
-  const exportarRelatorio = () => {
+  const exportarRelatorioPDF = () => {
     if (!data) return;
-    const linhas = [
-      `Relatório de Recuperação Tributária`,
-      `Empresa: ${data.empresa.razaoSocial}`,
-      `CNPJ: ${data.empresa.cnpj}`,
-      `Regime atual: ${data.empresa.regime}`,
-      `Faturamento anual estimado: ${brl(data.empresa.faturamentoAnual)}`,
-      ``,
-      `Score Fiscal: ${data.score.total}/100`,
-      `Total potencial recuperável (ponderado): ${brl(totalRecuperavel)}`,
-      ``,
-      `Teses identificadas:`,
-      ...data.teses.map(t => `- ${t.titulo} | êxito ${t.exitoEstimado}% | est. ${brl(t.valorEstimado)} | ${t.fundamento}`),
-      ``,
-      `Alertas:`,
-      ...data.alertas.map(a => `- [${a.severidade.toUpperCase()}] ${a.titulo}: ${a.descricao}`),
-    ].join("\n");
-    const blob = new Blob([linhas], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `recuperacao-tributaria-${onlyDigits(data.empresa.cnpj)}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Relatório exportado");
+    const doc = new jsPDF();
+    const ts = new Date().toLocaleString();
+    
+    doc.setFontSize(18);
+    doc.text("Relatório de Recuperação Tributária IA", 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Empresa: ${data.empresa.razaoSocial} | CNPJ: ${data.empresa.cnpj}`, 14, 28);
+    doc.text(`Gerado em: ${ts} | Responsável: ${user?.email || 'Sistema'}`, 14, 33);
+    
+    doc.setFontSize(14);
+    doc.text("Sumário Executivo", 14, 45);
+    doc.setFontSize(10);
+    doc.text([
+      `Regime tributário atual: ${data.empresa.regime}`,
+      `Score fiscal consolidado: ${data.score.total}/100`,
+      `Potencial total estimado: ${brl(totalRecuperavel)}`,
+      `Faturamento anual projetado: ${brl(data.empresa.faturamentoAnual)}`
+    ], 14, 52);
+
+    autoTable(doc, {
+      startY: 75,
+      head: [['Tese Identificada', 'Fundamento', 'Êxito', 'Valor Est.']],
+      body: data.teses.map(t => [t.titulo, t.fundamento, `${t.exitoEstimado}%`, brl(t.valorEstimado)]),
+      styles: { fontSize: 8 }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY + 15;
+    doc.setFontSize(12);
+    doc.text("Alertas de Auditoria", 14, finalY);
+    autoTable(doc, {
+      startY: finalY + 5,
+      head: [['Título', 'Severidade', 'Impacto']],
+      body: data.alertas.map(a => [a.titulo, a.severidade.toUpperCase(), a.descricao]),
+      styles: { fontSize: 8 },
+      columnStyles: { 1: { fontStyle: 'bold' } }
+    });
+
+    doc.save(`relatorio_rt_${onlyDigits(data.empresa.cnpj)}.pdf`);
+    toast.success("Relatório PDF gerado com auditoria completa");
   };
 
   const enviarChat = async () => {
