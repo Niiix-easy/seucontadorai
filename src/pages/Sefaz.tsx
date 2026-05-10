@@ -4008,14 +4008,40 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                                size="sm" 
                                className="h-5 text-[8px] text-purple-600"
                                onClick={() => {
-                                 const data = batchProofProgress.results.map(r => {
-                                   const h = exportHistory.find(x => x.id === r.id);
-                                   return {
-                                     ID: r.id,
-                                     Data: h ? new Date(h.created_at).toLocaleString() : '-',
-                                     Resultado: r.status === 'success' ? 'OK' : 'ERRO'
-                                   };
-                                 });
+                                 const data = batchProofProgress.results.map(r => ({
+                                   ID: r.id,
+                                   Data: r.log_ref ? new Date(r.log_ref.created_at).toLocaleString() : '-',
+                                   Resultado: r.status === 'success' ? 'OK' : 'ERRO',
+                                   Duração: r.duration ? `${r.duration.toFixed(2)}s` : '-',
+                                   Timestamp: r.timestamp || '-',
+                                   Filtros: JSON.stringify(r.log_ref?.filters || {})
+                                 }));
+                            </div>
+                            {batchProofProgress.results.length > 0 && (
+                              <div className="bg-purple-50/50 p-2 border-b space-y-1">
+                                {batchProofProgress.results.slice(-3).map((r, i) => (
+                                  <div key={i} className="flex items-center justify-between text-[8px]">
+                                    <div className="flex items-center gap-2">
+                                      <span className={cn("w-1.5 h-1.5 rounded-full", r.status === 'success' ? "bg-green-500" : "bg-red-500")} />
+                                      <span className="text-muted-foreground font-mono">{r.id.substring(0, 8)}</span>
+                                      <span className="font-medium">{r.status === 'success' ? 'Concluído' : 'Falhou'} ({r.duration?.toFixed(1)}s)</span>
+                                    </div>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-4 px-1 text-[7px] text-purple-600 underline"
+                                      onClick={() => setShowAuditDetailDialog(r.log_ref)}
+                                    >
+                                      Abrir Logs
+                                    </Button>
+                                  </div>
+                                ))}
+                                {batchProofProgress.results.length > 3 && (
+                                  <p className="text-[7px] text-center text-muted-foreground italic">...e mais {batchProofProgress.results.length - 3} itens</p>
+                                )}
+                              </div>
+                            )}
+                          </td>
                                  const ws = XLSX.utils.json_to_sheet(data);
                                  const wb = XLSX.utils.book_new();
                                  XLSX.utils.book_append_sheet(wb, ws, "Resultado Lote");
