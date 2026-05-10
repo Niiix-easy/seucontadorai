@@ -12,9 +12,10 @@ import { Switch } from "@/components/ui/switch";
 import { 
     Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
      Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
-       FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X, ArrowLeft, Pin, PinOff, ChevronUp, ChevronDown, ChevronLeft, ChevronRight
+      FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X, ArrowLeft, Pin, PinOff, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
+      Star, Share2, ClipboardCheck, Info, List
   } from "lucide-react";
- import { Zap, Copy, Save, Upload, Edit3 } from "lucide-react";
+ import { Zap, Copy, Save, Upload, Edit3, ExternalLink } from "lucide-react";
 import JSZip from "jszip";
  import * as XLSX from "xlsx";
  import jsPDF from "jspdf";
@@ -123,6 +124,18 @@ function generateChave() {
    is_processing?: boolean;
  };
 
+ const CURRENT_FILTER_VERSION = "2.0";
+
+ type FilterImportHistory = {
+   id: string;
+   fileName: string;
+   userName: string;
+   date: string;
+   detectedVersion: string;
+   result: "success" | "migrated" | "error";
+   migrationLog?: string[];
+ };
+
 export default function Sefaz() {
   const { user } = useAuth();
   const [search, setSearch] = useState("");
@@ -178,7 +191,123 @@ export default function Sefaz() {
    useEffect(() => localStorage.setItem('sefaz_history_pagination', JSON.stringify(historyPagination)), [historyPagination]);
    useEffect(() => localStorage.setItem('sefaz_history_sort', JSON.stringify(historySort)), [historySort]);
  
-   const [importPreview, setImportPreview] = useState<any[] | null>(null);
+    const [importPreview, setImportPreview] = useState<{
+      filters: any[];
+      validation: { id: string; errors: string[]; suggestions: string[]; version: string; status: "valid" | "warning" | "error" }[];
+      fileName: string;
+    } | null>(null);
+    const [importHistory, setImportHistory] = useState<FilterImportHistory[]>(() => {
+      const stored = localStorage.getItem('sefaz_import_history');
+      return stored ? JSON.parse(stored) : [];
+    });
+
+    useEffect(() => {
+      localStorage.setItem('sefaz_import_history', JSON.stringify(importHistory));
+    }, [importHistory]);
+
+    const [showImportHistory, setShowImportHistory] = useState(false);
+    useEffect(() => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const importData = urlParams.get('importFilter');
+      if (importData) {
+        try {
+          const decoded = JSON.parse(atob(importData));
+          setImportPreview({
+            filters: [decoded],
+            validation: [validateAndMigrate(decoded)],
+            fileName: "Link Compartilhado"
+          });
+          // Clear param
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } catch (e) {
+          toast.error("Link de filtro inválido");
+        }
+      }
+    }, []);
+
+    const validateAndMigrate = (filter: any) => {
+      const errors: string[] = [];
+      const suggestions: string[] = [];
+      let status: "valid" | "warning" | "error" = "valid";
+      const version = filter.version || "1.0";
+
+      if (!filter.preference_name) {
+        errors.push("Nome do filtro ausente");
+        status = "error";
+      }
+
+      if (!filter.filters) {
+        errors.push("Regras de filtro ausentes");
+        status = "error";
+      }
+
+      if (version !== CURRENT_FILTER_VERSION) {
+        suggestions.push(`Migrar da versão ${version} para ${CURRENT_FILTER_VERSION}`);
+        if (status !== "error") status = "warning";
+      }
+
+      // Example specific rule check
+      if (filter.filters && filter.filters.stage && !['all', 'CSV', 'PDF', 'ZIP'].includes(filter.filters.stage)) {
+        errors.push(`Etapa inválida: ${filter.filters.stage}`);
+        suggestions.push("Redefinir etapa para 'all'");
+        status = "error";
+      }
+
+      return { id: filter.id || Math.random().toString(), errors, suggestions, version, status };
+    };
+
+    const handleShareFilter = (filter: any) => {
+      const shareableData = btoa(JSON.stringify({
+        ...filter,
+        version: CURRENT_FILTER_VERSION
+      }));
+      const url = `${window.location.origin}${window.location.pathname}?importFilter=${shareableData}`;
+      navigator.clipboard.writeText(url);
+      toast.success("Link copiado para a área de transferência!");
+    };
+
+    const toggleFavoriteFilter = async (id: string, current: boolean) => {
+      const { error } = await (supabase.from as any)("fiscal_user_preferences").update({ is_favorite: !current }).eq("id", id);
+      if (error) return toast.error("Erro ao atualizar favorito");
+      setSavedPreferences(prev => prev.map(p => p.id === id ? { ...p, is_favorite: !current } : p));
+    };
+
+    const exportMigrationReport = (historyItem: FilterImportHistory, format: 'csv' | 'pdf') => {
+      if (format === 'csv') {
+        const content = [
+          ["Data", "Arquivo", "Versão", "Resultado"],
+          [historyItem.date, historyItem.fileName, historyItem.detectedVersion, historyItem.result],
+          [],
+          ["Log de Alterações/Erros"],
+          ...(historyItem.migrationLog || []).map(log => [log])
+        ].map(row => row.join(";")).join("\n");
+
+        const blob = new Blob([content], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `relatorio_migracao_${historyItem.id}.csv`;
+        link.click();
+      } else {
+        const doc = new jsPDF();
+        doc.setFontSize(16);
+        doc.text("Relatório de Migração de Filtros", 14, 20);
+        doc.setFontSize(10);
+        doc.text(`Arquivo: ${historyItem.fileName}`, 14, 30);
+        doc.text(`Data: ${historyItem.date}`, 14, 35);
+        doc.text(`Versão Detectada: ${historyItem.detectedVersion}`, 14, 40);
+        doc.text(`Resultado: ${historyItem.result}`, 14, 45);
+
+        autoTable(doc, {
+          startY: 55,
+          head: [['Log de Eventos']],
+          body: (historyItem.migrationLog || []).map(log => [log]),
+        });
+
+        doc.save(`relatorio_migracao_${historyItem.id}.pdf`);
+      }
+      toast.success("Relatório exportado");
+    };
    const [filterSearchQuery, setFilterSearchQuery] = useState("");
     const [showSavePrefDialog, setShowSavePrefDialog] = useState<{ type: 'backlog' | 'audit' | 'log_search', filters: any } | null>(null);
     const [newPrefName, setNewPrefName] = useState("");
@@ -186,15 +315,40 @@ export default function Sefaz() {
     const [editingFilterId, setEditingFilterId] = useState<string | null>(null);
     const [filterNewName, setFilterNewName] = useState("");
 
+    const handleSetDefaultFilter = async (id: string) => {
+      const currentFilter = savedPreferences.find(p => p.id === id);
+      if (!currentFilter) return;
+      const newIsDefault = !currentFilter.is_default;
+
+      // First, remove default from others of same key
+      if (newIsDefault) {
+        await (supabase.from as any)("fiscal_user_preferences")
+          .update({ is_default: false })
+          .eq("preference_key", currentFilter.preference_key);
+      }
+
+      const { error } = await (supabase.from as any)("fiscal_user_preferences")
+        .update({ is_default: newIsDefault })
+        .eq("id", id);
+
+      if (error) return toast.error("Erro ao definir filtro padrão");
+
+      setSavedPreferences(prev => prev.map(p => ({
+        ...p,
+        is_default: p.id === id ? newIsDefault : (newIsDefault && p.preference_key === currentFilter.preference_key ? false : p.is_default)
+      })));
+      toast.success(newIsDefault ? "Filtro definido como padrão" : "Filtro padrão removido");
+    };
+
     const handleDeleteFilter = async (id: string) => {
-      const { error } = await (supabase.from as any)("user_preferences").delete().eq("id", id);
+      const { error } = await (supabase.from as any)("fiscal_user_preferences").delete().eq("id", id);
       if (error) return toast.error("Erro ao deletar filtro");
       setSavedPreferences(prev => prev.filter(p => p.id !== id));
       toast.success("Filtro removido");
     };
 
     const handleRenameFilter = async (id: string, newName: string) => {
-      const { error } = await (supabase.from as any)("user_preferences").update({ preference_name: newName }).eq("id", id);
+      const { error } = await (supabase.from as any)("fiscal_user_preferences").update({ preference_name: newName }).eq("id", id);
       if (error) return toast.error("Erro ao renomear filtro");
       setSavedPreferences(prev => prev.map(p => p.id === id ? { ...p, preference_name: newName } : p));
       setEditingFilterId(null);
@@ -202,11 +356,14 @@ export default function Sefaz() {
     };
 
     const handleDuplicateFilter = async (filter: any) => {
-      const { data, error } = await (supabase.from as any)("user_preferences").insert([{
+      const { data, error } = await (supabase.from as any)("fiscal_user_preferences").insert([{
         user_id: user?.id,
         preference_key: filter.preference_key,
         preference_name: `${filter.preference_name} (Cópia)`,
-        filters: filter.filters
+        filters: filter.filters,
+        is_favorite: !!filter.is_favorite,
+        version: filter.version || CURRENT_FILTER_VERSION,
+        is_default: false
       }]).select();
       if (error) return toast.error("Erro ao duplicar filtro");
       setSavedPreferences(prev => [...prev, ...data]);
@@ -230,27 +387,77 @@ export default function Sefaz() {
       const file = event.target.files?.[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = async (e) => {
+      reader.onload = (e) => {
         try {
-          const imported = JSON.parse(e.target?.result as string);
-          if (!Array.isArray(imported)) throw new Error("Formato inválido");
-          
-          const toInsert = imported.map((f: any) => ({
-            user_id: user?.id,
-            preference_key: 'log_search_filters',
-            preference_name: f.preference_name,
-            filters: f.filters
-          }));
+          const content = e.target?.result as string;
+          let imported = JSON.parse(content);
+          if (!Array.isArray(imported)) imported = [imported];
 
-          const { data, error } = await (supabase.from as any)("user_preferences").insert(toInsert).select();
-          if (error) throw error;
-          setSavedPreferences(prev => [...prev, ...(data || [])]);
-          toast.success(`${(data || []).length} filtros importados!`);
+          const validation = imported.map((f: any) => validateAndMigrate(f));
+          setImportPreview({
+            filters: imported,
+            validation,
+            fileName: file.name
+          });
         } catch (err: any) {
-          toast.error("Falha na importação: " + err.message);
+          toast.error("Falha ao ler arquivo: " + err.message);
         }
       };
       reader.readAsText(file);
+      // Reset input
+      event.target.value = '';
+    };
+
+    const confirmImport = async () => {
+      if (!importPreview) return;
+      
+      const migrationLogs: string[] = [];
+      const toInsert = importPreview.filters.map((f, idx) => {
+        const v = importPreview.validation[idx];
+        if (v.status === "error") {
+          migrationLogs.push(`Pulado: ${f.preference_name || 'Sem Nome'} - Erros: ${v.errors.join(', ')}`);
+          return null;
+        }
+        
+        if (v.version !== CURRENT_FILTER_VERSION) {
+          migrationLogs.push(`Migrado: ${f.preference_name} da versão ${v.version} para ${CURRENT_FILTER_VERSION}`);
+        } else {
+          migrationLogs.push(`Importado: ${f.preference_name} (OK)`);
+        }
+
+        return {
+          user_id: user?.id,
+          preference_key: 'log_search_filters',
+          preference_name: f.preference_name,
+          filters: f.filters,
+          version: CURRENT_FILTER_VERSION,
+          is_favorite: !!f.is_favorite
+        };
+      }).filter(Boolean);
+
+      const { data, error } = await (supabase.from as any)("fiscal_user_preferences").insert(toInsert).select();
+      
+      const resultStatus = error ? "error" : (migrationLogs.some(l => l.startsWith('Migrado')) ? "migrated" : "success");
+      
+      const historyItem: FilterImportHistory = {
+        id: Math.random().toString(36).substr(2, 9),
+        fileName: importPreview.fileName,
+        userName: user?.email || "Sistema",
+        date: new Date().toLocaleString(),
+        detectedVersion: importPreview.validation[0]?.version || "Unknown",
+        result: resultStatus as any,
+        migrationLog: migrationLogs
+      };
+
+      setImportHistory(prev => [historyItem, ...prev]);
+      
+      if (error) {
+        toast.error("Erro na importação final");
+      } else {
+        setSavedPreferences(prev => [...prev, ...(data || [])]);
+        toast.success(`${(data || []).length} filtros importados com sucesso!`);
+      }
+      setImportPreview(null);
     };
     const [scheduledReports, setScheduledReports] = useState<any[]>([]);
     const [showScheduleDialog, setShowScheduleDialog] = useState<{ type: 'backlog' | 'audit' } | null>(null);
@@ -773,8 +980,7 @@ export default function Sefaz() {
 
     const loadUserPreferences = async () => {
       if (!user) return;
-      const { data } = await supabase
-        .from("fiscal_user_preferences")
+      const { data } = await (supabase.from as any)("fiscal_user_preferences")
         .select("*")
         .eq("user_id", user.id);
       if (data) setSavedPreferences(data);
@@ -782,7 +988,7 @@ export default function Sefaz() {
 
     const handleSavePreference = async () => {
       if (!user || !showSavePrefDialog || !newPrefName.trim()) return;
-      const { error } = await supabase.from("fiscal_user_preferences").upsert({
+      const { error } = await (supabase.from as any)("fiscal_user_preferences").upsert({
         user_id: user.id,
         preference_key: `${showSavePrefDialog.type}_filters`,
         preference_name: newPrefName.trim(),
@@ -3035,92 +3241,81 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
          </Dialog>
  
          {/* Filters Manager Dialog */}
-         <Dialog open={showFiltersManager} onOpenChange={setShowFiltersManager}>
-           <DialogContent className="max-w-md">
-             <DialogHeader>
-               <DialogTitle className="flex items-center gap-2">
-                 <Settings className="w-5 h-5" /> Gerenciar Filtros Salvos
-               </DialogTitle>
-               <DialogDescription>
-                 Listar, renomear, duplicar e excluir configurações de filtros.
-               </DialogDescription>
-             </DialogHeader>
-             <div className="space-y-4 pt-2">
-               <div className="border rounded-lg overflow-hidden">
-                 <table className="w-full text-xs">
-                   <thead className="bg-muted">
-                     <tr>
-                       <th className="text-left py-2 px-3">Nome</th>
-                       <th className="text-right py-2 px-3">Ações</th>
-                     </tr>
-                   </thead>
-                   <tbody className="divide-y">
-                     {savedPreferences.filter(p => p.preference_key === 'log_search_filters').map(pref => (
-                       <tr key={pref.id} className="hover:bg-muted/50">
-                         <td className="py-2 px-3">
-                           <div className="flex flex-col">
-                             <span className="font-medium">{pref.preference_name}</span>
-                             <span className="text-[10px] text-muted-foreground">{pref.is_default ? 'Padrão' : ''}</span>
-                           </div>
-                         </td>
-                         <td className="py-2 px-3 text-right">
-                           <div className="flex justify-end gap-1">
-                             <Button 
-                               variant="ghost" 
-                               size="icon" 
-                               className="h-7 w-7" 
-                               title="Definir como Padrão"
-                               onClick={() => {
-                                 setSavedPreferences(prev => prev.map(p => ({
-                                   ...p,
-                                   is_default: p.id === pref.id ? !p.is_default : (p.preference_key === pref.preference_key ? false : p.is_default)
-                                 })));
-                                 toast.success("Filtro padrão atualizado.");
-                               }}
-                             >
-                               <CheckCircle2 className={cn("h-3.5 w-3.5", pref.is_default ? "text-green-600" : "text-muted-foreground")} />
-                             </Button>
-                             <Button 
-                               variant="ghost" 
-                               size="icon" 
-                               className="h-7 w-7" 
-                               title="Duplicar"
-                               onClick={() => {
-                                 const newPref = { ...pref, id: crypto.randomUUID(), preference_name: `${pref.preference_name} (Cópia)`, is_default: false };
-                                 setSavedPreferences(prev => [...prev, newPref]);
-                                 toast.success("Filtro duplicado.");
-                               }}
-                             >
-                               <Copy className="h-3.5 w-3.5" />
-                             </Button>
-                             <Button 
-                               variant="ghost" 
-                               size="icon" 
-                               className="h-7 w-7 text-destructive" 
-                               title="Excluir"
-                               onClick={() => {
-                                 setSavedPreferences(prev => prev.filter(p => p.id !== pref.id));
-                                 toast.info("Filtro excluído.");
-                               }}
-                             >
-                               <Trash2 className="h-3.5 w-3.5" />
-                             </Button>
-                           </div>
-                         </td>
-                       </tr>
-                     ))}
-                     {savedPreferences.filter(p => p.preference_key === 'log_search_filters').length === 0 && (
-                       <tr><td colSpan={2} className="py-8 text-center text-muted-foreground italic">Nenhum filtro salvo.</td></tr>
-                     )}
-                   </tbody>
-                 </table>
-               </div>
-               <div className="flex justify-end">
-                 <Button onClick={() => setShowFiltersManager(false)}>Fechar</Button>
-               </div>
-             </div>
-           </DialogContent>
-         </Dialog>
+          <Dialog open={showFiltersManager} onOpenChange={setShowFiltersManager}>
+            <DialogContent className="max-w-xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Settings className="w-5 h-5 text-primary" /> Gerenciar Filtros Salvos
+                  </div>
+                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => setShowImportHistory(true)}>
+                    <History className="w-4 h-4 mr-2" /> Histu00f3rico
+                  </Button>
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Buscar filtros..." 
+                    className="pl-9 h-9" 
+                    value={filterSearchQuery}
+                    onChange={e => setFilterSearchQuery(e.target.value)}
+                  />
+                </div>
+                <div className="border rounded-lg overflow-hidden max-h-[300px] overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted sticky top-0 z-10">
+                      <tr>
+                        <th className="text-left py-2 px-3">Filtro / Versu00e3o</th>
+                        <th className="text-right py-2 px-3">Au00e7u00f5es</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {savedPreferences
+                        .filter(p => p.preference_key === "log_search_filters")
+                        .filter(p => p.preference_name.toLowerCase().includes(filterSearchQuery.toLowerCase()))
+                        .sort((a, b) => (a.is_favorite ? -1 : 1))
+                        .map(pref => (
+                          <tr key={pref.id} className="hover:bg-muted/50">
+                            <td className="py-2 px-3">
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-2">
+                                  {pref.is_favorite && <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
+                                  <span className="font-semibold">{pref.preference_name}</span>
+                                </div>
+                                <span className="text-[9px] text-muted-foreground">Versu00e3o {pref.version || "1.0"}</span>
+                              </div>
+                            </td>
+                            <td className="py-2 px-3 text-right flex justify-end gap-1">
+                              <Button variant="ghost" size="icon" className={cn("h-7 w-7", pref.is_favorite && "text-yellow-600")} onClick={() => toggleFavoriteFilter(pref.id, !!pref.is_favorite)}>
+                                <Star className={cn("w-3.5 h-3.5", pref.is_favorite && "fill-current")} />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600" onClick={() => handleShareFilter(pref)} title="Compartilhar">
+                                <Share2 className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteFilter(pref.id)}>
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex gap-2">
+                  <Button className="flex-1" variant="outline" onClick={() => document.getElementById("import-filters-v2")?.click()}>
+                    <Upload className="w-4 h-4 mr-2" /> Importar
+                  </Button>
+                  <input id="import-filters-v2" type="file" className="hidden" accept=".json" onChange={handleImportFilters} />
+                  <Button className="flex-1" variant="outline" onClick={handleExportFilters}>
+                    <Download className="w-4 h-4 mr-2" /> Exportar Todos
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
 
         <Dialog open={!!showAuditDetailDialog} onOpenChange={() => setShowAuditDetailDialog(null)}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -4271,6 +4466,127 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
              </TabsContent>
            </Tabs>
          </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Import Preview Dialog */}
+        <Dialog open={!!importPreview} onOpenChange={() => setImportPreview(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Info className="w-5 h-5 text-blue-500" /> Pré-visualização da Importação
+              </DialogTitle>
+              <DialogDescription>
+                Verifique os filtros e regras antes de confirmar a aplicação.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="bg-muted/30 p-3 rounded-lg border text-sm">
+                <p><strong>Arquivo:</strong> {importPreview?.fileName}</p>
+                <p><strong>Total de Filtros:</strong> {importPreview?.filters.length}</p>
+              </div>
+
+              <div className="border rounded-lg overflow-hidden max-h-[300px] overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted sticky top-0">
+                    <tr>
+                      <th className="text-left py-2 px-3">Filtro</th>
+                      <th className="text-left py-2 px-3">Status / Sugestões</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {importPreview?.filters.map((f, idx) => {
+                      const v = importPreview.validation[idx];
+                      return (
+                        <tr key={idx} className={cn("hover:bg-muted/50", v.status === 'error' && "bg-red-50/50")}>
+                          <td className="py-2 px-3">
+                            <p className="font-semibold">{f.preference_name || 'Sem Nome'}</p>
+                            <p className="text-[10px] text-muted-foreground">Versão: {v.version}</p>
+                          </td>
+                          <td className="py-2 px-3">
+                            <div className="space-y-1">
+                              {v.status === 'valid' && <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">Válido</Badge>}
+                              {v.status === 'warning' && <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-yellow-200">Migração Necessária</Badge>}
+                              {v.status === 'error' && <Badge variant="destructive">Inválido</Badge>}
+                              
+                              {v.errors.map((err, i) => (
+                                <p key={i} className="text-red-600 font-medium">{err}</p>
+                              ))}
+                              {v.suggestions.map((sug, i) => (
+                                <p key={i} className="text-blue-600 italic">Sugestão: {sug}</p>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setImportPreview(null)}>Cancelar</Button>
+                <Button 
+                  disabled={importPreview?.validation.every(v => v.status === 'error')}
+                  onClick={confirmImport}
+                >
+                  Confirmar Importação
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Import History Dialog */}
+        <Dialog open={showImportHistory} onOpenChange={setShowImportHistory}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ClipboardCheck className="w-5 h-5 text-purple-500" /> Histórico de Importações de Filtros
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="text-left py-2 px-3">Data</th>
+                      <th className="text-left py-2 px-3">Arquivo</th>
+                      <th className="text-left py-2 px-3">Versão</th>
+                      <th className="text-left py-2 px-3">Resultado</th>
+                      <th className="text-right py-2 px-3">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {importHistory.map(h => (
+                      <tr key={h.id} className="hover:bg-muted/50">
+                        <td className="py-2 px-3">{h.date}</td>
+                        <td className="py-2 px-3 font-medium">{h.fileName}</td>
+                        <td className="py-2 px-3">{h.detectedVersion}</td>
+                        <td className="py-2 px-3">
+                          <Badge variant={h.result === 'error' ? 'destructive' : (h.result === 'migrated' ? 'secondary' : 'default')}>
+                            {h.result.toUpperCase()}
+                          </Badge>
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => exportMigrationReport(h, 'csv')} title="Exportar CSV">
+                              <FileText className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => exportMigrationReport(h, 'pdf')} title="Exportar PDF">
+                              <FileDown className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {importHistory.length === 0 && (
+                      <tr><td colSpan={5} className="py-8 text-center text-muted-foreground italic">Nenhuma importação registrada.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

@@ -1,0 +1,4 @@
+ALTER TABLE public.fiscal_user_preferences 
+ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS is_default BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS version TEXT DEFAULT '1.0';
