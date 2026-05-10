@@ -14,7 +14,7 @@ import {
      Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
       FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X, ArrowLeft, Pin, PinOff, ChevronUp, ChevronDown
   } from "lucide-react";
-  import { Zap, Copy } from "lucide-react";
+ import { Zap, Copy, Save, Upload, Edit3 } from "lucide-react";
 import JSZip from "jszip";
  import * as XLSX from "xlsx";
  import jsPDF from "jspdf";
@@ -153,6 +153,76 @@ export default function Sefaz() {
     const [savedPreferences, setSavedPreferences] = useState<any[]>([]);
     const [showSavePrefDialog, setShowSavePrefDialog] = useState<{ type: 'backlog' | 'audit' | 'log_search', filters: any } | null>(null);
     const [newPrefName, setNewPrefName] = useState("");
+    const [showFiltersManager, setShowFiltersManager] = useState(false);
+    const [editingFilterId, setEditingFilterId] = useState<string | null>(null);
+    const [filterNewName, setFilterNewName] = useState("");
+
+    const handleDeleteFilter = async (id: string) => {
+      const { error } = await (supabase.from as any)("user_preferences").delete().eq("id", id);
+      if (error) return toast.error("Erro ao deletar filtro");
+      setSavedPreferences(prev => prev.filter(p => p.id !== id));
+      toast.success("Filtro removido");
+    };
+
+    const handleRenameFilter = async (id: string, newName: string) => {
+      const { error } = await (supabase.from as any)("user_preferences").update({ preference_name: newName }).eq("id", id);
+      if (error) return toast.error("Erro ao renomear filtro");
+      setSavedPreferences(prev => prev.map(p => p.id === id ? { ...p, preference_name: newName } : p));
+      setEditingFilterId(null);
+      toast.success("Filtro renomeado");
+    };
+
+    const handleDuplicateFilter = async (filter: any) => {
+      const { data, error } = await (supabase.from as any)("user_preferences").insert([{
+        user_id: user?.id,
+        preference_key: filter.preference_key,
+        preference_name: `${filter.preference_name} (Cópia)`,
+        filters: filter.filters
+      }]).select();
+      if (error) return toast.error("Erro ao duplicar filtro");
+      setSavedPreferences(prev => [...prev, ...data]);
+      toast.success("Filtro duplicado");
+    };
+
+    const handleExportFilters = () => {
+      const filtersToExport = savedPreferences.filter(p => p.preference_key === 'log_search_filters');
+      const blob = new Blob([JSON.stringify(filtersToExport, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `filtros_logs_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Filtros exportados com sucesso!");
+    };
+
+    const handleImportFilters = (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const imported = JSON.parse(e.target?.result as string);
+          if (!Array.isArray(imported)) throw new Error("Formato inválido");
+          
+          const toInsert = imported.map((f: any) => ({
+            user_id: user?.id,
+            preference_key: 'log_search_filters',
+            preference_name: f.preference_name,
+            filters: f.filters
+          }));
+
+          const { data, error } = await (supabase.from as any)("user_preferences").insert(toInsert).select();
+          if (error) throw error;
+          setSavedPreferences(prev => [...prev, ...(data || [])]);
+          toast.success(`${(data || []).length} filtros importados!`);
+        } catch (err: any) {
+          toast.error("Falha na importação: " + err.message);
+        }
+      };
+      reader.readAsText(file);
+    };
     const [scheduledReports, setScheduledReports] = useState<any[]>([]);
     const [showScheduleDialog, setShowScheduleDialog] = useState<{ type: 'backlog' | 'audit' } | null>(null);
      const [newSchedule, setNewSchedule] = useState({ format: 'pdf', frequency: 'daily', emails: [] as string[] as string[], currentEmail: "" });
@@ -930,19 +1000,28 @@ export default function Sefaz() {
       toast.success(`Resumo de auditoria (${format.toUpperCase()}) exportado.`);
     };
 
-    const handleRunProofFromHistory = async (log: any) => {
-      setManualScheduleStatus({ id: 'proof-rerun', status: 'initializing', progress: 10 });
-      toast.info("Iniciando Modo Prova a partir do histórico...");
+    const handleRunProofFromHistory = async (log: any, silent = false) => {
+      const startTime = performance.now();
+      if (!silent) setManualScheduleStatus({ id: 'proof-rerun', status: 'initializing', progress: 10 });
+      if (!silent) toast.info("Iniciando Modo Prova a partir do histórico...");
       
       try {
         // Using the same logic as handleExportZip but focused on proof from history
         await handleExportZip(log.report_type as 'backlog' | 'audit', 'proof', log.filters, log.technical_log?.sorting);
         
-        setManualScheduleStatus(prev => prev ? { ...prev, status: 'success', progress: 100 } : null);
-        toast.success("Reexecução (Prova) concluída com sucesso!");
+        const endTime = performance.now();
+        const duration = (endTime - startTime) / 1000;
+
+        if (!silent) setManualScheduleStatus(prev => prev ? { ...prev, status: 'success', progress: 100 } : null);
+        if (!silent) toast.success(`Reexecução (Prova) concluída em ${duration.toFixed(2)}s!`);
+        
+        // Find the newly created log (it will be the most recent one with format 'proof')
+        // Actually, we can just return success and the duration.
+        return { success: true, duration, timestamp: new Date().toISOString() };
       } catch (err: any) {
-        setManualScheduleStatus(prev => prev ? { ...prev, status: 'error', progress: 100 } : null);
-        toast.error("Erro na reexecução: " + err.message);
+        if (!silent) setManualScheduleStatus(prev => prev ? { ...prev, status: 'error', progress: 100 } : null);
+        if (!silent) toast.error("Erro na reexecução: " + err.message);
+        return { success: false, error: err.message, duration: 0 };
       }
     };
 
@@ -3053,26 +3132,52 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                         />
                       </div>
                        <div className="flex items-center gap-1">
-                         <Select value={logFilterStage} onValueChange={setLogFilterStage}>
-                           <SelectTrigger className="w-[80px] h-8 text-[10px]">
-                             <SelectValue placeholder="Etapa" />
-                           </SelectTrigger>
-                           <SelectContent>
-                             <SelectItem value="all">Todas</SelectItem>
-                             <SelectItem value="csv_gen">CSV</SelectItem>
-                             <SelectItem value="pdf_gen">PDF</SelectItem>
-                             <SelectItem value="hash_calc">Hash</SelectItem>
-                           </SelectContent>
-                         </Select>
-                         <Button 
-                           variant="outline" 
-                           size="icon" 
-                           className="h-8 w-8" 
-                           title="Salvar busca nos logs"
-                           onClick={() => setShowSavePrefDialog({ type: 'log_search', filters: { search: logSearch, stage: logFilterStage } })}
-                         >
-                           <Settings className="h-3 w-3" />
-                         </Button>
+                          <div className="flex gap-1 overflow-x-auto pb-1 max-w-[200px] no-scrollbar">
+                            {[
+                              { id: 'all', label: 'Tudo' },
+                              { id: 'csv_gen', label: 'CSV' },
+                              { id: 'pdf_gen', label: 'PDF' },
+                              { id: 'hash_calc', label: 'Hash' },
+                              { id: 'validation', label: 'Falha' }
+                            ].map(chip => {
+                              const count = (showAuditDetailDialog.audit_events || []).filter((e: any) => 
+                                chip.id === 'all' ? true : (chip.id === 'validation' ? e.status === 'error' || e.status === 'warning' : e.stage === chip.id)
+                              ).length;
+                              return (
+                                <Badge 
+                                  key={chip.id}
+                                  variant={logFilterStage === chip.id ? "default" : "outline"}
+                                  className={cn(
+                                    "cursor-pointer whitespace-nowrap h-6 text-[9px] px-2",
+                                    logFilterStage === chip.id ? "bg-primary" : "hover:bg-muted"
+                                  )}
+                                  onClick={() => setLogFilterStage(chip.id)}
+                                >
+                                  {chip.label} ({count})
+                                </Badge>
+                              );
+                            })}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              className="h-8 w-8" 
+                              title="Salvar busca nos logs"
+                              onClick={() => setShowSavePrefDialog({ type: 'log_search', filters: { search: logSearch, stage: logFilterStage } })}
+                            >
+                              <Save className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              className="h-8 w-8" 
+                              title="Gerenciar filtros salvos"
+                              onClick={() => setShowFiltersManager(true)}
+                            >
+                              <Settings className="h-3 w-3" />
+                            </Button>
+                          </div>
                          <Select 
                            onValueChange={(v) => {
                              const pref = savedPreferences.find(p => p.id === v);
@@ -3685,32 +3790,30 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                          variant="outline" 
                          size="sm" 
                          className="h-[22px] text-[8px] col-span-3 border-purple-200 text-purple-600 hover:bg-purple-50" 
-                         onClick={async () => {
-                           if (selectedHistoryItems.length === 0) return toast.info("Selecione itens no histórico primeiro.");
-                           toast.info(`Iniciando Modo Prova em Lote (${selectedHistoryItems.length} itens)...`);
-                           setBatchProofProgress({ total: selectedHistoryItems.length, current: 0, results: [] });
-                           
-                           for (const id of selectedHistoryItems) {
-                             const log = exportHistory.find(h => h.id === id);
-                             if (log) {
-                               try {
-                                 await handleRunProofFromHistory(log);
-                                 setBatchProofProgress(prev => prev ? { 
-                                   ...prev, 
-                                   current: prev.current + 1,
-                                   results: [...prev.results, { id: log.id, status: 'success' }]
-                                 } : null);
-                               } catch (e) {
-                                 setBatchProofProgress(prev => prev ? { 
-                                   ...prev, 
-                                   current: prev.current + 1,
-                                   results: [...prev.results, { id: log.id, status: 'error' }]
-                                 } : null);
-                               }
-                             }
-                           }
-                           toast.success("Processamento em lote concluído!");
-                         }}
+                          onClick={async () => {
+                            if (selectedHistoryItems.length === 0) return toast.info("Selecione itens no histórico primeiro.");
+                            toast.info(`Iniciando Modo Prova em Lote (${selectedHistoryItems.length} itens)...`);
+                            setBatchProofProgress({ total: selectedHistoryItems.length, current: 0, results: [] });
+                            
+                            for (const id of selectedHistoryItems) {
+                              const log = exportHistory.find(h => h.id === id);
+                              if (log) {
+                                const result = await handleRunProofFromHistory(log, true);
+                                setBatchProofProgress(prev => prev ? { 
+                                  ...prev, 
+                                  current: prev.current + 1,
+                                  results: [...prev.results, { 
+                                    id: log.id, 
+                                    status: result.success ? 'success' : 'error',
+                                    duration: result.duration,
+                                    timestamp: result.timestamp,
+                                    log_ref: log
+                                  }]
+                                } : null);
+                              }
+                            }
+                            toast.success("Processamento em lote concluído!");
+                          }}
                        >
                          <Zap className="h-2.5 w-2.5 mr-1" /> Reexecutar Prova Selecionados
                        </Button>
@@ -3903,25 +4006,49 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                                variant="ghost" 
                                size="sm" 
                                className="h-5 text-[8px] text-purple-600"
-                               onClick={() => {
-                                 const data = batchProofProgress.results.map(r => {
-                                   const h = exportHistory.find(x => x.id === r.id);
-                                   return {
-                                     ID: r.id,
-                                     Data: h ? new Date(h.created_at).toLocaleString() : '-',
-                                     Resultado: r.status === 'success' ? 'OK' : 'ERRO'
-                                   };
-                                 });
-                                 const ws = XLSX.utils.json_to_sheet(data);
-                                 const wb = XLSX.utils.book_new();
-                                 XLSX.utils.book_append_sheet(wb, ws, "Resultado Lote");
-                                 XLSX.writeFile(wb, "resultado_auditoria_lote.xlsx");
-                               }}
-                             >
-                               <Download className="w-2.5 h-2.5 mr-1" /> Relatório Lote
-                             </Button>
-                           </div>
-                         </td>
+                                onClick={() => {
+                                  const data = batchProofProgress.results.map(r => ({
+                                    ID: r.id,
+                                    Data: r.log_ref ? new Date(r.log_ref.created_at).toLocaleString() : '-',
+                                    Resultado: r.status === 'success' ? 'OK' : 'ERRO',
+                                    Duração: r.duration ? `${r.duration.toFixed(2)}s` : '-',
+                                    Timestamp: r.timestamp || '-',
+                                    Filtros: JSON.stringify(r.log_ref?.filters || {})
+                                  }));
+                                  const ws = XLSX.utils.json_to_sheet(data);
+                                  const wb = XLSX.utils.book_new();
+                                  XLSX.utils.book_append_sheet(wb, ws, "Resultado Lote");
+                                  XLSX.writeFile(wb, "resultado_auditoria_lote.xlsx");
+                                }}
+                              >
+                                <Download className="w-2.5 h-2.5 mr-1" /> Relatório Lote
+                              </Button>
+                            </div>
+                            {batchProofProgress.results.length > 0 && (
+                              <div className="bg-purple-50/50 p-2 border-b space-y-1">
+                                {batchProofProgress.results.slice(-3).map((r, i) => (
+                                  <div key={i} className="flex items-center justify-between text-[8px]">
+                                    <div className="flex items-center gap-2">
+                                      <span className={cn("w-1.5 h-1.5 rounded-full", r.status === 'success' ? "bg-green-500" : "bg-red-500")} />
+                                      <span className="text-muted-foreground font-mono">{r.id.substring(0, 8)}</span>
+                                      <span className="font-medium">{r.status === 'success' ? 'Concluído' : 'Falhou'} ({r.duration?.toFixed(1)}s)</span>
+                                    </div>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-4 px-1 text-[7px] text-purple-600 underline"
+                                      onClick={() => setShowAuditDetailDialog(r.log_ref)}
+                                    >
+                                      Abrir Logs
+                                    </Button>
+                                  </div>
+                                ))}
+                                {batchProofProgress.results.length > 3 && (
+                                  <p className="text-[7px] text-center text-muted-foreground italic">...e mais {batchProofProgress.results.length - 3} itens</p>
+                                )}
+                              </div>
+                            )}
+                          </td>
                        </tr>
                      )}
                      {exportHistory.length === 0 && (
