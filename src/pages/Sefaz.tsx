@@ -4441,6 +4441,127 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
          </div>
           </DialogContent>
         </Dialog>
+
+        {/* Import Preview Dialog */}
+        <Dialog open={!!importPreview} onOpenChange={() => setImportPreview(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Info className="w-5 h-5 text-blue-500" /> Pré-visualização da Importação
+              </DialogTitle>
+              <DialogDescription>
+                Verifique os filtros e regras antes de confirmar a aplicação.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="bg-muted/30 p-3 rounded-lg border text-sm">
+                <p><strong>Arquivo:</strong> {importPreview?.fileName}</p>
+                <p><strong>Total de Filtros:</strong> {importPreview?.filters.length}</p>
+              </div>
+
+              <div className="border rounded-lg overflow-hidden max-h-[300px] overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted sticky top-0">
+                    <tr>
+                      <th className="text-left py-2 px-3">Filtro</th>
+                      <th className="text-left py-2 px-3">Status / Sugestões</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {importPreview?.filters.map((f, idx) => {
+                      const v = importPreview.validation[idx];
+                      return (
+                        <tr key={idx} className={cn("hover:bg-muted/50", v.status === 'error' && "bg-red-50/50")}>
+                          <td className="py-2 px-3">
+                            <p className="font-semibold">{f.preference_name || 'Sem Nome'}</p>
+                            <p className="text-[10px] text-muted-foreground">Versão: {v.version}</p>
+                          </td>
+                          <td className="py-2 px-3">
+                            <div className="space-y-1">
+                              {v.status === 'valid' && <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">Válido</Badge>}
+                              {v.status === 'warning' && <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-yellow-200">Migração Necessária</Badge>}
+                              {v.status === 'error' && <Badge variant="destructive">Inválido</Badge>}
+                              
+                              {v.errors.map((err, i) => (
+                                <p key={i} className="text-red-600 font-medium">{err}</p>
+                              ))}
+                              {v.suggestions.map((sug, i) => (
+                                <p key={i} className="text-blue-600 italic">Sugestão: {sug}</p>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setImportPreview(null)}>Cancelar</Button>
+                <Button 
+                  disabled={importPreview?.validation.every(v => v.status === 'error')}
+                  onClick={confirmImport}
+                >
+                  Confirmar Importação
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Import History Dialog */}
+        <Dialog open={showImportHistory} onOpenChange={setShowImportHistory}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ClipboardCheck className="w-5 h-5 text-purple-500" /> Histórico de Importações de Filtros
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="text-left py-2 px-3">Data</th>
+                      <th className="text-left py-2 px-3">Arquivo</th>
+                      <th className="text-left py-2 px-3">Versão</th>
+                      <th className="text-left py-2 px-3">Resultado</th>
+                      <th className="text-right py-2 px-3">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {importHistory.map(h => (
+                      <tr key={h.id} className="hover:bg-muted/50">
+                        <td className="py-2 px-3">{h.date}</td>
+                        <td className="py-2 px-3 font-medium">{h.fileName}</td>
+                        <td className="py-2 px-3">{h.detectedVersion}</td>
+                        <td className="py-2 px-3">
+                          <Badge variant={h.result === 'error' ? 'destructive' : (h.result === 'migrated' ? 'secondary' : 'default')}>
+                            {h.result.toUpperCase()}
+                          </Badge>
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => exportMigrationReport(h, 'csv')} title="Exportar CSV">
+                              <FileText className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => exportMigrationReport(h, 'pdf')} title="Exportar PDF">
+                              <FileDown className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {importHistory.length === 0 && (
+                      <tr><td colSpan={5} className="py-8 text-center text-muted-foreground italic">Nenhuma importação registrada.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
