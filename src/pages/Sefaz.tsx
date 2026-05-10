@@ -14,7 +14,10 @@ import {
      Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
       FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X, ArrowLeft, Pin, PinOff, ChevronUp, ChevronDown
   } from "lucide-react";
-  import { Zap, Copy } from "lucide-react";
+ import { Zap, Copy, Save, Upload, Edit3 } from "lucide-react";
+    const [showFiltersManager, setShowFiltersManager] = useState(false);
+    const [editingFilterId, setEditingFilterId] = useState<string | null>(null);
+    const [filterNewName, setFilterNewName] = useState("");
 import JSZip from "jszip";
  import * as XLSX from "xlsx";
  import jsPDF from "jspdf";
