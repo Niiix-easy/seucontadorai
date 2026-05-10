@@ -507,7 +507,7 @@ export default function Sefaz() {
       event.target.value = '';
     };
 
-    const confirmImport = async (asDraftArg: any) => {
+    const confirmImport = async (asDraftArg: any, saveAsNewVersion = false) => {
       const asDraft = typeof asDraftArg === 'boolean' ? asDraftArg : false;
       if (!importPreview) return;
       
@@ -519,7 +519,9 @@ export default function Sefaz() {
           return null;
         }
         
-        const name = asDraft ? `${f.preference_name} (Rascunho)` : f.preference_name;
+        let name = f.preference_name;
+        if (asDraft) name = `${name} (Rascunho)`;
+        else if (saveAsNewVersion && importVersionDescription) name = `${name} - v${importVersionDescription}`;
         
         if (v.version !== CURRENT_FILTER_VERSION) {
           migrationLogs.push(`Migrado: ${f.preference_name} da versão ${v.version} para ${CURRENT_FILTER_VERSION}`);
@@ -562,6 +564,8 @@ export default function Sefaz() {
         toast.success(asDraft ? "Rascunhos salvos com sucesso!" : `${(data || []).length} filtros importados com sucesso!`);
       }
       setImportPreview(null);
+      setImportVersionDescription("");
+    };
     };
 
     const handleReprocessImport = (historyItem: any) => {
