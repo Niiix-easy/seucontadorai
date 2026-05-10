@@ -730,28 +730,37 @@ export type Database = {
           created_at: string
           filters: Json
           id: string
+          is_default: boolean | null
+          is_favorite: boolean | null
           preference_key: string
           preference_name: string
           updated_at: string
           user_id: string
+          version: string | null
         }
         Insert: {
           created_at?: string
           filters: Json
           id?: string
+          is_default?: boolean | null
+          is_favorite?: boolean | null
           preference_key: string
           preference_name: string
           updated_at?: string
           user_id: string
+          version?: string | null
         }
         Update: {
           created_at?: string
           filters?: Json
           id?: string
+          is_default?: boolean | null
+          is_favorite?: boolean | null
           preference_key?: string
           preference_name?: string
           updated_at?: string
           user_id?: string
+          version?: string | null
         }
         Relationships: []
       }
