@@ -3238,7 +3238,33 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                          </div>
                        )}
                     </div>
-                    <div className="bg-slate-900 text-slate-100 p-3 rounded-lg font-mono text-[10px] max-h-[150px] overflow-y-auto space-y-1">
+                    <div className="flex justify-between items-center mt-2 px-1">
+                      <div className="text-[9px] text-muted-foreground">
+                        Mostrando {Math.min((logPagination.page - 1) * logPagination.pageSize + 1, (showAuditDetailDialog.audit_events || []).length)} - {Math.min(logPagination.page * logPagination.pageSize, (showAuditDetailDialog.audit_events || []).length)} de {(showAuditDetailDialog.audit_events || []).length} logs
+                      </div>
+                      <div className="flex gap-1">
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="h-6 w-6" 
+                          disabled={logPagination.page === 1}
+                          onClick={() => setLogPagination(p => ({ ...p, page: p.page - 1 }))}
+                        >
+                          <ChevronLeft className="h-3 w-3" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="h-6 w-6" 
+                          disabled={logPagination.page * logPagination.pageSize >= (showAuditDetailDialog.audit_events || []).length}
+                          onClick={() => setLogPagination(p => ({ ...p, page: p.page + 1 }))}
+                        >
+                          <ChevronRight className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-900 text-slate-100 p-3 rounded-lg font-mono text-[10px] max-h-[150px] overflow-y-auto space-y-1 mt-1">
                       {(showAuditDetailDialog.audit_events || [
                         { timestamp: showAuditDetailDialog.created_at, stage: 'initializing', message: 'Iniciando processo de auditoria...' },
                         { timestamp: showAuditDetailDialog.created_at, stage: 'csv_gen', message: 'Geração de dados CSV concluída.' },
@@ -3249,9 +3275,11 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                         const matchesSearch = logSearch === "" || 
                           evt.message.toLowerCase().includes(logSearch.toLowerCase()) || 
                           (evt.reason && evt.reason.toLowerCase().includes(logSearch.toLowerCase())) ||
-                          evt.stage.toLowerCase().includes(logSearch.toLowerCase());
+                          evt.stage.toLowerCase().includes(logSearch.toLowerCase()) || idx.toString().includes(logSearch);
+                        const matchesStage = logFilterStage === "all" || evt.stage === logFilterStage;
                         const matchesStage = logFilterStage === "all" || evt.stage === logFilterStage;
                         return matchesSearch && matchesStage;
+                      }).slice((logPagination.page - 1) * logPagination.pageSize, logPagination.page * logPagination.pageSize).map((evt: any, idx: number) => (
                       }).map((evt: any, idx: number) => (
                         <div 
                           key={idx} 
