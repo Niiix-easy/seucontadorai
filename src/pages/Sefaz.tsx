@@ -1,12 +1,33 @@
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { 
+    Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
+     Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
+      FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X, ArrowLeft, Pin, PinOff, ChevronUp, ChevronDown
+  } from "lucide-react";
+ import { Zap, Copy, Save, Upload, Edit3 } from "lucide-react";
+    const [showFiltersManager, setShowFiltersManager] = useState(false);
+    const [editingFilterId, setEditingFilterId] = useState<string | null>(null);
+    const [filterNewName, setFilterNewName] = useState("");
+
     const handleDeleteFilter = async (id: string) => {
-      const { error } = await supabase.from("user_preferences").delete().eq("id", id);
+      const { error } = await (supabase.from as any)("user_preferences").delete().eq("id", id);
       if (error) return toast.error("Erro ao deletar filtro");
       setSavedPreferences(prev => prev.filter(p => p.id !== id));
       toast.success("Filtro removido");
     };
 
     const handleRenameFilter = async (id: string, newName: string) => {
-      const { error } = await supabase.from("user_preferences").update({ preference_name: newName }).eq("id", id);
+      const { error } = await (supabase.from as any)("user_preferences").update({ preference_name: newName }).eq("id", id);
       if (error) return toast.error("Erro ao renomear filtro");
       setSavedPreferences(prev => prev.map(p => p.id === id ? { ...p, preference_name: newName } : p));
       setEditingFilterId(null);
@@ -14,7 +35,7 @@
     };
 
     const handleDuplicateFilter = async (filter: any) => {
-      const { data, error } = await supabase.from("user_preferences").insert([{
+      const { data, error } = await (supabase.from as any)("user_preferences").insert([{
         user_id: user?.id,
         preference_key: filter.preference_key,
         preference_name: `${filter.preference_name} (Cópia)`,
@@ -47,44 +68,23 @@
           const imported = JSON.parse(e.target?.result as string);
           if (!Array.isArray(imported)) throw new Error("Formato inválido");
           
-          const toInsert = imported.map(f => ({
+          const toInsert = imported.map((f: any) => ({
             user_id: user?.id,
             preference_key: 'log_search_filters',
             preference_name: f.preference_name,
             filters: f.filters
           }));
 
-          const { data, error } = await supabase.from("user_preferences").insert(toInsert).select();
+          const { data, error } = await (supabase.from as any)("user_preferences").insert(toInsert).select();
           if (error) throw error;
-          setSavedPreferences(prev => [...prev, ...data]);
-          toast.success(`${data.length} filtros importados!`);
+          setSavedPreferences(prev => [...prev, ...(data || [])]);
+          toast.success(`${(data || []).length} filtros importados!`);
         } catch (err: any) {
           toast.error("Falha na importação: " + err.message);
         }
       };
       reader.readAsText(file);
     };
-
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { 
-    Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
-     Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
-      FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X, ArrowLeft, Pin, PinOff, ChevronUp, ChevronDown
-  } from "lucide-react";
- import { Zap, Copy, Save, Upload, Edit3 } from "lucide-react";
-    const [showFiltersManager, setShowFiltersManager] = useState(false);
-    const [editingFilterId, setEditingFilterId] = useState<string | null>(null);
-    const [filterNewName, setFilterNewName] = useState("");
 import JSZip from "jszip";
  import * as XLSX from "xlsx";
  import jsPDF from "jspdf";
