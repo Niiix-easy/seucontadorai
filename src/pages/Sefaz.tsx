@@ -134,6 +134,7 @@ function generateChave() {
    detectedVersion: string;
    result: "success" | "migrated" | "error";
    migrationLog?: string[];
+   sourceData?: string;
  };
 
 export default function Sefaz() {
@@ -193,8 +194,11 @@ export default function Sefaz() {
  
     const [importPreview, setImportPreview] = useState<{
       filters: any[];
-      validation: { id: string; errors: string[]; suggestions: string[]; version: string; status: "valid" | "warning" | "error" }[];
+      originals: any[];
+      validation: { id: string; errors: string[]; errorFields: string[]; suggestions: string[]; suggestionActions: any[]; version: string; status: "valid" | "warning" | "error" }[];
       fileName: string;
+      sourceLink?: string;
+      showDiff?: string | null;
     } | null>(null);
     const [importHistory, setImportHistory] = useState<FilterImportHistory[]>(() => {
       const stored = localStorage.getItem('sefaz_import_history');
@@ -217,8 +221,10 @@ export default function Sefaz() {
           const decoded = JSON.parse(atob(importData));
           setImportPreview({
             filters: [decoded],
+            originals: [JSON.parse(JSON.stringify(decoded))],
             validation: [validateAndMigrate(decoded)],
-            fileName: "Link Compartilhado"
+            fileName: "Link Compartilhado",
+            sourceLink: importData
           });
           // Clear param
           window.history.replaceState({}, document.title, window.location.pathname);
@@ -428,7 +434,8 @@ export default function Sefaz() {
 
           const validation = imported.map((f: any) => validateAndMigrate(f));
           setImportPreview({
-            filters: imported,
+            filters: JSON.parse(JSON.stringify(imported)),
+            originals: JSON.parse(JSON.stringify(imported)),
             validation,
             fileName: file.name
           });
@@ -441,16 +448,19 @@ export default function Sefaz() {
       event.target.value = '';
     };
 
-    const confirmImport = async () => {
+    const confirmImport = async (asDraftArg: any) => {
+      const asDraft = typeof asDraftArg === 'boolean' ? asDraftArg : false;
       if (!importPreview) return;
       
       const migrationLogs: string[] = [];
-      const toInsert = importPreview.filters.map((f, idx) => {
+      const toInsert = (importPreview.filters as any[]).map((f, idx) => {
         const v = importPreview.validation[idx];
-        if (v.status === "error") {
+        if (v.status === "error" && !asDraft) {
           migrationLogs.push(`Pulado: ${f.preference_name || 'Sem Nome'} - Erros: ${v.errors.join(', ')}`);
           return null;
         }
+        
+        const name = asDraft ? `${f.preference_name} (Rascunho)` : f.preference_name;
         
         if (v.version !== CURRENT_FILTER_VERSION) {
           migrationLogs.push(`Migrado: ${f.preference_name} da versão ${v.version} para ${CURRENT_FILTER_VERSION}`);
@@ -461,10 +471,11 @@ export default function Sefaz() {
         return {
           user_id: user?.id,
           preference_key: 'log_search_filters',
-          preference_name: f.preference_name,
+          preference_name: name,
           filters: f.filters,
           version: CURRENT_FILTER_VERSION,
-          is_favorite: !!f.is_favorite
+          is_favorite: !!f.is_favorite,
+          is_default: false
         };
       }).filter(Boolean);
 
@@ -479,7 +490,8 @@ export default function Sefaz() {
         date: new Date().toLocaleString(),
         detectedVersion: importPreview.validation[0]?.version || "Unknown",
         result: resultStatus as any,
-        migrationLog: migrationLogs
+        migrationLog: migrationLogs,
+        sourceData: importPreview.sourceLink || JSON.stringify(importPreview.originals)
       };
 
       setImportHistory(prev => [historyItem, ...prev]);
@@ -488,9 +500,36 @@ export default function Sefaz() {
         toast.error("Erro na importação final");
       } else {
         setSavedPreferences(prev => [...prev, ...(data || [])]);
-        toast.success(`${(data || []).length} filtros importados com sucesso!`);
+        toast.success(asDraft ? "Rascunhos salvos com sucesso!" : `${(data || []).length} filtros importados com sucesso!`);
       }
       setImportPreview(null);
+    };
+
+    const handleReprocessImport = (historyItem: any) => {
+      try {
+        let decoded;
+        if (historyItem.sourceData.startsWith('http') || historyItem.fileName === "Link Compartilhado") {
+           // It's probably a link or the data was a link
+           const linkData = historyItem.sourceData.includes('importFilter=') 
+            ? historyItem.sourceData.split('importFilter=')[1]
+            : historyItem.sourceData;
+           decoded = JSON.parse(atob(linkData));
+        } else {
+           decoded = JSON.parse(historyItem.sourceData);
+        }
+        
+        const filters = Array.isArray(decoded) ? decoded : [decoded];
+        setImportPreview({
+          filters: JSON.parse(JSON.stringify(filters)),
+          originals: JSON.parse(JSON.stringify(filters)),
+          validation: filters.map((f: any) => validateAndMigrate(f)),
+          fileName: `Reprocessando: ${historyItem.fileName}`
+        });
+        setShowImportHistory(false);
+        toast.info("Importação carregada para reprocessamento.");
+      } catch (e) {
+        toast.error("Erro ao recuperar dados da importação");
+      }
     };
     const [scheduledReports, setScheduledReports] = useState<any[]>([]);
     const [showScheduleDialog, setShowScheduleDialog] = useState<{ type: 'backlog' | 'audit' } | null>(null);
@@ -4552,9 +4591,9 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                           </td>
                           <td className="py-2 px-3">
                             <div className="space-y-2">
-                              {v.status === "valid" && <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">V00e1lido</Badge>}
-                              {v.status === "warning" && <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-yellow-200">Migra00e700e3o Sugerida</Badge>}
-                              {v.status === "error" && <Badge variant="destructive">Inv00e1lido (Requer Ajuste)</Badge>}
+                              {v.status === "valid" && <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">Válido</Badge>}
+                              {v.status === "warning" && <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-yellow-200">Migração Sugerida</Badge>}
+                              {v.status === "error" && <Badge variant="destructive">Inválido (Requer Ajuste)</Badge>}
                               
                               {v.errors.map((err, i) => (
                                 <p key={i} className="text-red-600 font-medium flex items-center gap-1">
@@ -4563,11 +4602,33 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                               ))}
                               
                               {(v as any).suggestionActions?.map((sug: any, i: number) => (
-                                <div key={i} className="bg-blue-50 p-2 rounded border border-blue-100 flex items-center justify-between gap-2">
-                                  <p className="text-blue-700 text-[10px] italic">{sug.message}</p>
-                                  <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0 border-blue-200 text-blue-700 hover:bg-blue-100" onClick={sug.action}>
-                                    Corrigir
-                                  </Button>
+                                <div key={i} className="bg-blue-50 p-2 rounded border border-blue-100 flex flex-col gap-2">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="text-blue-700 text-[10px] italic">{sug.message}</p>
+                                    <div className="flex gap-1">
+                                      <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0 border-blue-200 text-blue-700 hover:bg-blue-100" onClick={() => setImportPreview(p => p ? {...p, showDiff: f.id || idx.toString()} : null)}>
+                                        Ver Diferença
+                                      </Button>
+                                      <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0 border-blue-200 text-blue-700 hover:bg-blue-100" onClick={sug.action}>
+                                        Corrigir
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  {importPreview?.showDiff === (f.id || idx.toString()) && (
+                                    <div className="text-[9px] font-mono bg-white p-2 rounded border border-blue-100 overflow-auto max-h-[100px]">
+                                      <p className="text-muted-foreground border-b mb-1">Original vs Sugerido:</p>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div className="text-red-600">
+                                          <p className="font-bold">- Original</p>
+                                          <pre>{JSON.stringify(importPreview.originals[idx].filters, null, 2)}</pre>
+                                        </div>
+                                        <div className="text-green-600 border-l pl-2">
+                                          <p className="font-bold">+ Sugerido</p>
+                                          <pre>{JSON.stringify(f.filters, null, 2)}</pre>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -4582,10 +4643,16 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setImportPreview(null)}>Cancelar</Button>
                 <Button 
-                  disabled={importPreview?.validation.every(v => v.status === "error")}
-                  onClick={confirmImport}
+                  variant="secondary"
+                  onClick={() => confirmImport(true)}
                 >
-                  Confirmar Importa00e700e3o
+                  Salvar como Rascunho
+                </Button>
+                <Button 
+                  disabled={importPreview?.validation.every(v => v.status === "error")}
+                  onClick={() => confirmImport(false)}
+                >
+                  Confirmar Importa\u00e7\u00e3o
                 </Button>
               </div>
             </div>
@@ -4628,7 +4695,7 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-[9px]">In00edcio</Label>
+                <Label className="text-[9px]">Início</Label>
                 <Input type="date" className="h-7 text-[10px]" value={importHistoryFilters.dateStart} onChange={e => setImportHistoryFilters(p => ({ ...p, dateStart: e.target.value }))} />
               </div>
               <div className="space-y-1">
@@ -4650,10 +4717,10 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   <tr>
                     <th className="text-left py-2 px-3">Data</th>
                     <th className="text-left py-2 px-3">Arquivo</th>
-                    <th className="text-left py-2 px-3">Usu00e1rio</th>
-                    <th className="text-left py-2 px-3 text-center">Vers00e3o</th>
+                    <th className="text-left py-2 px-3">Usuário</th>
+                    <th className="text-left py-2 px-3 text-center">Versão</th>
                     <th className="text-left py-2 px-3">Resultado</th>
-                    <th className="text-right py-2 px-3">A00e700f5es</th>
+                    <th className="text-right py-2 px-3">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -4679,6 +4746,11 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                         </td>
                         <td className="py-2 px-3 text-right">
                           <div className="flex justify-end gap-1">
+                            {h.sourceData && (
+                               <Button variant="ghost" size="icon" className="h-6 w-6 text-blue-600" onClick={() => handleReprocessImport(h)} title="Reprocessar">
+                                 <RefreshCw className="w-3 h-3" />
+                               </Button>
+                            )}
                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => exportMigrationReport([h], "csv")} title="Exportar CSV">
                               <FileText className="w-3 h-3" />
                             </Button>
