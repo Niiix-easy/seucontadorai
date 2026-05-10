@@ -1000,19 +1000,28 @@ export default function Sefaz() {
       toast.success(`Resumo de auditoria (${format.toUpperCase()}) exportado.`);
     };
 
-    const handleRunProofFromHistory = async (log: any) => {
-      setManualScheduleStatus({ id: 'proof-rerun', status: 'initializing', progress: 10 });
-      toast.info("Iniciando Modo Prova a partir do histórico...");
+    const handleRunProofFromHistory = async (log: any, silent = false) => {
+      const startTime = performance.now();
+      if (!silent) setManualScheduleStatus({ id: 'proof-rerun', status: 'initializing', progress: 10 });
+      if (!silent) toast.info("Iniciando Modo Prova a partir do histórico...");
       
       try {
         // Using the same logic as handleExportZip but focused on proof from history
         await handleExportZip(log.report_type as 'backlog' | 'audit', 'proof', log.filters, log.technical_log?.sorting);
         
-        setManualScheduleStatus(prev => prev ? { ...prev, status: 'success', progress: 100 } : null);
-        toast.success("Reexecução (Prova) concluída com sucesso!");
+        const endTime = performance.now();
+        const duration = (endTime - startTime) / 1000;
+
+        if (!silent) setManualScheduleStatus(prev => prev ? { ...prev, status: 'success', progress: 100 } : null);
+        if (!silent) toast.success(`Reexecução (Prova) concluída em ${duration.toFixed(2)}s!`);
+        
+        // Find the newly created log (it will be the most recent one with format 'proof')
+        // Actually, we can just return success and the duration.
+        return { success: true, duration, timestamp: new Date().toISOString() };
       } catch (err: any) {
-        setManualScheduleStatus(prev => prev ? { ...prev, status: 'error', progress: 100 } : null);
-        toast.error("Erro na reexecução: " + err.message);
+        if (!silent) setManualScheduleStatus(prev => prev ? { ...prev, status: 'error', progress: 100 } : null);
+        if (!silent) toast.error("Erro na reexecução: " + err.message);
+        return { success: false, error: err.message, duration: 0 };
       }
     };
 
