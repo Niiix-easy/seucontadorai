@@ -12,10 +12,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import {
-  Search, Building2, Gauge, Scale, Sparkles, FileSearch, BarChart3,
-  Bot, AlertTriangle, CheckCircle2, TrendingUp, Send, Loader2, Download, Trash2, History, ArrowRight, X, List, FileDown, RefreshCw,
-  ArrowUpRight, ArrowDownRight, Equal, Eye
+import { 
+  Search, Building2, Gauge, Scale, Sparkles, FileSearch, BarChart3, 
+  Bot, AlertTriangle, CheckCircle2, TrendingUp, Send, Loader2, Download, 
+  Trash2, History, ArrowRight, X, List, FileDown, RefreshCw,
+  ArrowUpRight, ArrowDownRight, Equal, Eye, ShieldCheck, FileSpreadsheet
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -277,6 +278,9 @@ export default function RecuperacaoTributaria() {
       return;
     }
     setLoading(true);
+    // Auditoria: Rastreabilidade de quem iniciou a análise
+    console.log(`[AUDIT] Análise iniciada por ${user?.email || 'Sistema'} para CNPJ ${cnpj}`);
+    
     await new Promise(r => setTimeout(r, 900));
     const novaAnalise = gerarAnalise(cnpj);
     
@@ -284,26 +288,28 @@ export default function RecuperacaoTributaria() {
       setPendingAnalysis(novaAnalise);
       setShowDiffDialog(true);
     } else {
-      confirmarAnalise(novaAnalise);
+      confirmarAnalise(novaAnalise, isReprocess ? 'reprocessamento' : 'nova');
     }
     setLoading(false);
   };
 
-  const confirmarAnalise = (novaData: ReturnType<typeof gerarAnalise>) => {
+  const confirmarAnalise = (novaData: ReturnType<typeof gerarAnalise>, tipo: string = 'nova') => {
     setData(novaData);
     setPendingAnalysis(null);
     setShowDiffDialog(false);
     
     const historyItem = {
-      id: Math.random().toString(36).substring(7),
+      id: Math.random().toString(36).substring(2, 10).toUpperCase(),
       cnpj: novaData.empresa.cnpj,
       razaoSocial: novaData.empresa.razaoSocial,
       date: new Date().toISOString(),
       user: user?.email || 'Sistema',
+      tipo: tipo,
+      versao: `v${new Date().getTime()}`,
       data: JSON.stringify(novaData)
     };
     setAnalysisHistory(prev => [historyItem, ...prev]);
-    toast.success("Análise tributária concluída e registrada no histórico");
+    toast.success(tipo === 'reprocessamento' ? "Análise reprocessada com sucesso" : "Análise tributária concluída");
   };
 
   const limpar = () => {
@@ -318,18 +324,25 @@ export default function RecuperacaoTributaria() {
     if (!d) return;
     const doc = new jsPDF();
     const ts = new Date().toLocaleString();
-    const authCode = Math.random().toString(36).substring(2).toUpperCase();
+    const authCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+    
+    // Integridade: Watermark
+    doc.setTextColor(245, 245, 245);
+    doc.setFontSize(60);
+    doc.text("ORIGINAL - AUDITORIA", 20, 150, { angle: 45 });
+    doc.setTextColor(0, 0, 0);
     
     doc.setFontSize(18);
     doc.text("Relatório de Recuperação Tributária IA", 14, 20);
     doc.setFontSize(8);
     doc.text(`Autenticidade: ${authCode} | Auditor: ${user?.email || 'Sistema'}`, 14, 25);
+    doc.text(`Carimbo de integridade: ${ts}`, 14, 29);
     doc.setFontSize(10);
-    doc.text(`Empresa: ${d.empresa.razaoSocial} | CNPJ: ${d.empresa.cnpj}`, 14, 32);
-    doc.text(`Gerado em: ${ts}`, 14, 37);
+    doc.text(`Empresa: ${d.empresa.razaoSocial} | CNPJ: ${d.empresa.cnpj}`, 14, 36);
+    doc.text(`Gerado em: ${ts}`, 14, 41);
     
     doc.setFontSize(14);
-    doc.text("1. Sumário Executivo", 14, 48);
+    doc.text("1. Sumário Executivo", 14, 52);
     doc.setFontSize(10);
     const tr = d.teses.reduce((sum: number, t: any) => sum + t.valorEstimado * (t.exitoEstimado / 100), 0);
     doc.text([
@@ -337,7 +350,7 @@ export default function RecuperacaoTributaria() {
       `Score fiscal consolidado: ${d.score.total}/100`,
       `Potencial total estimado (ponderado): ${brl(tr)}`,
       `Faturamento anual projetado: ${brl(d.empresa.faturamentoAnual)}`
-    ], 14, 55);
+    ], 14, 60);
 
     doc.setFontSize(14);
     doc.text("2. Teses Identificadas", 14, 80);
