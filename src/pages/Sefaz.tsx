@@ -4591,9 +4591,9 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                           </td>
                           <td className="py-2 px-3">
                             <div className="space-y-2">
-                              {v.status === "valid" && <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">V00e1lido</Badge>}
-                              {v.status === "warning" && <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-yellow-200">Migra00e700e3o Sugerida</Badge>}
-                              {v.status === "error" && <Badge variant="destructive">Inv00e1lido (Requer Ajuste)</Badge>}
+                              {v.status === "valid" && <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">Válido</Badge>}
+                              {v.status === "warning" && <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-yellow-200">Migração Sugerida</Badge>}
+                              {v.status === "error" && <Badge variant="destructive">Inválido (Requer Ajuste)</Badge>}
                               
                               {v.errors.map((err, i) => (
                                 <p key={i} className="text-red-600 font-medium flex items-center gap-1">
@@ -4695,7 +4695,7 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-[9px]">In00edcio</Label>
+                <Label className="text-[9px]">Início</Label>
                 <Input type="date" className="h-7 text-[10px]" value={importHistoryFilters.dateStart} onChange={e => setImportHistoryFilters(p => ({ ...p, dateStart: e.target.value }))} />
               </div>
               <div className="space-y-1">
@@ -4717,10 +4717,10 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   <tr>
                     <th className="text-left py-2 px-3">Data</th>
                     <th className="text-left py-2 px-3">Arquivo</th>
-                    <th className="text-left py-2 px-3">Usu00e1rio</th>
-                    <th className="text-left py-2 px-3 text-center">Vers00e3o</th>
+                    <th className="text-left py-2 px-3">Usuário</th>
+                    <th className="text-left py-2 px-3 text-center">Versão</th>
                     <th className="text-left py-2 px-3">Resultado</th>
-                    <th className="text-right py-2 px-3">A00e700f5es</th>
+                    <th className="text-right py-2 px-3">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
