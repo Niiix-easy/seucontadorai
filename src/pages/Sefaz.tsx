@@ -4007,15 +4007,23 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                                variant="ghost" 
                                size="sm" 
                                className="h-5 text-[8px] text-purple-600"
-                               onClick={() => {
-                                 const data = batchProofProgress.results.map(r => ({
-                                   ID: r.id,
-                                   Data: r.log_ref ? new Date(r.log_ref.created_at).toLocaleString() : '-',
-                                   Resultado: r.status === 'success' ? 'OK' : 'ERRO',
-                                   Duração: r.duration ? `${r.duration.toFixed(2)}s` : '-',
-                                   Timestamp: r.timestamp || '-',
-                                   Filtros: JSON.stringify(r.log_ref?.filters || {})
-                                 }));
+                                onClick={() => {
+                                  const data = batchProofProgress.results.map(r => ({
+                                    ID: r.id,
+                                    Data: r.log_ref ? new Date(r.log_ref.created_at).toLocaleString() : '-',
+                                    Resultado: r.status === 'success' ? 'OK' : 'ERRO',
+                                    Duração: r.duration ? `${r.duration.toFixed(2)}s` : '-',
+                                    Timestamp: r.timestamp || '-',
+                                    Filtros: JSON.stringify(r.log_ref?.filters || {})
+                                  }));
+                                  const ws = XLSX.utils.json_to_sheet(data);
+                                  const wb = XLSX.utils.book_new();
+                                  XLSX.utils.book_append_sheet(wb, ws, "Resultado Lote");
+                                  XLSX.writeFile(wb, "resultado_auditoria_lote.xlsx");
+                                }}
+                              >
+                                <Download className="w-2.5 h-2.5 mr-1" /> Relatório Lote
+                              </Button>
                             </div>
                             {batchProofProgress.results.length > 0 && (
                               <div className="bg-purple-50/50 p-2 border-b space-y-1">
@@ -4042,16 +4050,6 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                               </div>
                             )}
                           </td>
-                                 const ws = XLSX.utils.json_to_sheet(data);
-                                 const wb = XLSX.utils.book_new();
-                                 XLSX.utils.book_append_sheet(wb, ws, "Resultado Lote");
-                                 XLSX.writeFile(wb, "resultado_auditoria_lote.xlsx");
-                               }}
-                             >
-                               <Download className="w-2.5 h-2.5 mr-1" /> Relatório Lote
-                             </Button>
-                           </div>
-                         </td>
                        </tr>
                      )}
                      {exportHistory.length === 0 && (
