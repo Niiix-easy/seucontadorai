@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { 
     Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
      Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
-      FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X, ArrowLeft, Pin, PinOff, ChevronUp, ChevronDown
+       FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X, ArrowLeft, Pin, PinOff, ChevronUp, ChevronDown, ChevronLeft, ChevronRight
   } from "lucide-react";
  import { Zap, Copy, Save, Upload, Edit3 } from "lucide-react";
 import JSZip from "jszip";
@@ -150,7 +150,18 @@ export default function Sefaz() {
      const [manualRetryProgress, setManualRetryProgress] = useState<{ [key: string]: { status: 'queued' | 'processing' | 'done' | 'error', count: number, total: number } }>({});
     const [pauseReason, setPauseReason] = useState("");
     const [auditLogs, setAuditLogs] = useState<any[]>([]);
-    const [savedPreferences, setSavedPreferences] = useState<any[]>([]);
+   const [savedPreferences, setSavedPreferences] = useState<any[]>(() => {
+     const stored = localStorage.getItem('sefaz_saved_preferences');
+     return stored ? JSON.parse(stored) : [];
+   });
+ 
+   useEffect(() => {
+     localStorage.setItem('sefaz_saved_preferences', JSON.stringify(savedPreferences));
+   }, [savedPreferences]);
+ 
+   const [logPagination, setLogPagination] = useState({ page: 1, pageSize: 50 });
+   const [historyPagination, setHistoryPagination] = useState({ page: 1, pageSize: 10 });
+   const [historySort, setHistorySort] = useState<{ field: string, order: 'asc' | 'desc' }>({ field: 'created_at', order: 'desc' });
     const [showSavePrefDialog, setShowSavePrefDialog] = useState<{ type: 'backlog' | 'audit' | 'log_search', filters: any } | null>(null);
     const [newPrefName, setNewPrefName] = useState("");
     const [showFiltersManager, setShowFiltersManager] = useState(false);
@@ -238,7 +249,21 @@ export default function Sefaz() {
       isCalculating?: boolean
     } | null>(null);
     const [manualScheduleStatus, setManualScheduleStatus] = useState<{ id: string, status: string, progress: number, zipUrl?: string } | null>(null);
-     const [showAuditDetailDialog, setShowAuditDetailDialog] = useState<any | null>(null);
+   const [showAuditDetailDialog, setShowAuditDetailDialog] = useState<any | null>(null);
+ 
+   useEffect(() => {
+     if (showAuditDetailDialog) {
+       const defaultFilter = savedPreferences.find(p => p.preference_key === 'log_search_filters' && p.is_default);
+       if (defaultFilter) {
+         setLogSearch(defaultFilter.filters.search || "");
+         setLogFilterStage(defaultFilter.filters.stage || "all");
+       } else {
+         setLogSearch("");
+         setLogFilterStage("all");
+       }
+       setLogPagination({ page: 1, pageSize: 50 });
+     }
+   }, [showAuditDetailDialog, savedPreferences]);
      const [selectedHistoryItems, setSelectedHistoryItems] = useState<string[]>([]);
      const [showComparisonDialog, setShowComparisonDialog] = useState<any[] | null>(null);
      const [logSearch, setLogSearch] = useState("");
@@ -2988,8 +3013,96 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                 <Button onClick={handleSavePreference}>Salvar Filtro</Button>
               </div>
             </div>
-          </DialogContent>
-        </Dialog>
+           </DialogContent>
+         </Dialog>
+ 
+         {/* Filters Manager Dialog */}
+         <Dialog open={showFiltersManager} onOpenChange={setShowFiltersManager}>
+           <DialogContent className="max-w-md">
+             <DialogHeader>
+               <DialogTitle className="flex items-center gap-2">
+                 <Settings className="w-5 h-5" /> Gerenciar Filtros Salvos
+               </DialogTitle>
+               <DialogDescription>
+                 Listar, renomear, duplicar e excluir configurações de filtros.
+               </DialogDescription>
+             </DialogHeader>
+             <div className="space-y-4 pt-2">
+               <div className="border rounded-lg overflow-hidden">
+                 <table className="w-full text-xs">
+                   <thead className="bg-muted">
+                     <tr>
+                       <th className="text-left py-2 px-3">Nome</th>
+                       <th className="text-right py-2 px-3">Ações</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y">
+                     {savedPreferences.filter(p => p.preference_key === 'log_search_filters').map(pref => (
+                       <tr key={pref.id} className="hover:bg-muted/50">
+                         <td className="py-2 px-3">
+                           <div className="flex flex-col">
+                             <span className="font-medium">{pref.preference_name}</span>
+                             <span className="text-[10px] text-muted-foreground">{pref.is_default ? 'Padrão' : ''}</span>
+                           </div>
+                         </td>
+                         <td className="py-2 px-3 text-right">
+                           <div className="flex justify-end gap-1">
+                             <Button 
+                               variant="ghost" 
+                               size="icon" 
+                               className="h-7 w-7" 
+                               title="Definir como Padrão"
+                               onClick={() => {
+                                 setSavedPreferences(prev => prev.map(p => ({
+                                   ...p,
+                                   is_default: p.id === pref.id ? !p.is_default : (p.preference_key === pref.preference_key ? false : p.is_default)
+                                 })));
+                                 toast.success("Filtro padrão atualizado.");
+                               }}
+                             >
+                               <CheckCircle2 className={cn("h-3.5 w-3.5", pref.is_default ? "text-green-600" : "text-muted-foreground")} />
+                             </Button>
+                             <Button 
+                               variant="ghost" 
+                               size="icon" 
+                               className="h-7 w-7" 
+                               title="Duplicar"
+                               onClick={() => {
+                                 const newPref = { ...pref, id: crypto.randomUUID(), preference_name: `${pref.preference_name} (Cópia)`, is_default: false };
+                                 setSavedPreferences(prev => [...prev, newPref]);
+                                 toast.success("Filtro duplicado.");
+                               }}
+                             >
+                               <Copy className="h-3.5 w-3.5" />
+                             </Button>
+                             <Button 
+                               variant="ghost" 
+                               size="icon" 
+                               className="h-7 w-7 text-destructive" 
+                               title="Excluir"
+                               onClick={() => {
+                                 setSavedPreferences(prev => prev.filter(p => p.id !== pref.id));
+                                 toast.info("Filtro excluído.");
+                               }}
+                             >
+                               <Trash2 className="h-3.5 w-3.5" />
+                             </Button>
+                           </div>
+                         </td>
+                       </tr>
+                     ))}
+                     {savedPreferences.filter(p => p.preference_key === 'log_search_filters').length === 0 && (
+                       <tr><td colSpan={2} className="py-8 text-center text-muted-foreground italic">Nenhum filtro salvo.</td></tr>
+                     )}
+                   </tbody>
+                 </table>
+               </div>
+               <div className="flex justify-end">
+                 <Button onClick={() => setShowFiltersManager(false)}>Fechar</Button>
+               </div>
+             </div>
+           </DialogContent>
+         </Dialog>
 
         <Dialog open={!!showAuditDetailDialog} onOpenChange={() => setShowAuditDetailDialog(null)}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -3227,21 +3340,47 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                          </div>
                        )}
                     </div>
-                    <div className="bg-slate-900 text-slate-100 p-3 rounded-lg font-mono text-[10px] max-h-[150px] overflow-y-auto space-y-1">
+                    <div className="flex justify-between items-center mt-2 px-1">
+                      <div className="text-[9px] text-muted-foreground">
+                        Mostrando {Math.min((logPagination.page - 1) * logPagination.pageSize + 1, (showAuditDetailDialog.audit_events || []).length)} - {Math.min(logPagination.page * logPagination.pageSize, (showAuditDetailDialog.audit_events || []).length)} de {(showAuditDetailDialog.audit_events || []).length} logs
+                      </div>
+                      <div className="flex gap-1">
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="h-6 w-6" 
+                          disabled={logPagination.page === 1}
+                          onClick={() => setLogPagination(p => ({ ...p, page: p.page - 1 }))}
+                        >
+                          <ChevronLeft className="h-3 w-3" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="h-6 w-6" 
+                          disabled={logPagination.page * logPagination.pageSize >= (showAuditDetailDialog.audit_events || []).length}
+                          onClick={() => setLogPagination(p => ({ ...p, page: p.page + 1 }))}
+                        >
+                          <ChevronRight className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-900 text-slate-100 p-3 rounded-lg font-mono text-[10px] max-h-[150px] overflow-y-auto space-y-1 mt-1">
                       {(showAuditDetailDialog.audit_events || [
                         { timestamp: showAuditDetailDialog.created_at, stage: 'initializing', message: 'Iniciando processo de auditoria...' },
                         { timestamp: showAuditDetailDialog.created_at, stage: 'csv_gen', message: 'Geração de dados CSV concluída.' },
                         { timestamp: showAuditDetailDialog.created_at, stage: 'pdf_gen', message: 'Geração de PDF concluída.' },
                         { timestamp: showAuditDetailDialog.created_at, stage: 'hash_calc', message: 'Cálculo de hashes SHA-256 concluído.' },
                         { timestamp: showAuditDetailDialog.created_at, stage: 'finalizing', message: 'Pacote finalizado com sucesso.' }
-                      ]).filter((evt: any) => {
-                        const matchesSearch = logSearch === "" || 
-                          evt.message.toLowerCase().includes(logSearch.toLowerCase()) || 
-                          (evt.reason && evt.reason.toLowerCase().includes(logSearch.toLowerCase())) ||
-                          evt.stage.toLowerCase().includes(logSearch.toLowerCase());
-                        const matchesStage = logFilterStage === "all" || evt.stage === logFilterStage;
-                        return matchesSearch && matchesStage;
-                      }).map((evt: any, idx: number) => (
+                       ]).filter((evt: any, idx: number) => {
+                         const matchesSearch = logSearch === "" || 
+                           evt.message.toLowerCase().includes(logSearch.toLowerCase()) || 
+                           (evt.reason && evt.reason.toLowerCase().includes(logSearch.toLowerCase())) ||
+                           evt.stage.toLowerCase().includes(logSearch.toLowerCase()) || idx.toString().includes(logSearch);
+                         const matchesStage = logFilterStage === "all" || evt.stage === logFilterStage;
+                         return matchesSearch && matchesStage;
+                       }).slice((logPagination.page - 1) * logPagination.pageSize, logPagination.page * logPagination.pageSize).map((evt: any, idx: number) => (
                         <div 
                           key={idx} 
                           className={cn(
@@ -3823,16 +3962,22 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                     </div>
                     <div className="overflow-x-auto border rounded-lg">
                 <table className="w-full text-xs">
-                  <thead className="bg-muted uppercase">
-                    <tr>
-                      <th className="text-left py-2 px-4">Data/Hora</th>
-                      <th className="text-left py-2 px-4">Relatório</th>
-                      <th className="text-left py-2 px-4">Formato</th>
-                       <th className="text-center py-2 px-4">Recorte (Reg)</th>
-                      <th className="text-left py-2 px-4">Status</th>
-                      <th className="text-right py-2 px-4">Ação</th>
-                    </tr>
-                  </thead>
+                   <thead className="bg-muted uppercase text-[10px]">
+                     <tr>
+                       <th className="text-left py-2 px-4 cursor-pointer hover:bg-muted/80" onClick={() => setHistorySort(p => ({ field: 'created_at', order: p.field === 'created_at' && p.order === 'desc' ? 'asc' : 'desc' }))}>
+                         Data/Hora {historySort.field === 'created_at' && (historySort.order === 'asc' ? '↑' : '↓')}
+                       </th>
+                       <th className="text-left py-2 px-4 cursor-pointer hover:bg-muted/80" onClick={() => setHistorySort(p => ({ field: 'report_type', order: p.field === 'report_type' && p.order === 'asc' ? 'desc' : 'asc' }))}>
+                         Relatório {historySort.field === 'report_type' && (historySort.order === 'asc' ? '↑' : '↓')}
+                       </th>
+                       <th className="text-left py-2 px-4">Formato</th>
+                       <th className="text-center py-2 px-4 cursor-pointer hover:bg-muted/80" onClick={() => setHistorySort(p => ({ field: 'record_count', order: p.field === 'record_count' && p.order === 'desc' ? 'asc' : 'desc' }))}>
+                         Recorte (Reg) {historySort.field === 'record_count' && (historySort.order === 'asc' ? '↑' : '↓')}
+                       </th>
+                       <th className="text-left py-2 px-4">Status</th>
+                       <th className="text-right py-2 px-4">Ação</th>
+                     </tr>
+                   </thead>
                   <tbody>
                     {[...exportHistory].sort((a, b) => {
                       const aPinned = pinnedExecutions.includes(a.id);
