@@ -3132,17 +3132,32 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                         />
                       </div>
                        <div className="flex items-center gap-1">
-                         <Select value={logFilterStage} onValueChange={setLogFilterStage}>
-                           <SelectTrigger className="w-[80px] h-8 text-[10px]">
-                             <SelectValue placeholder="Etapa" />
-                           </SelectTrigger>
-                           <SelectContent>
-                             <SelectItem value="all">Todas</SelectItem>
-                             <SelectItem value="csv_gen">CSV</SelectItem>
-                             <SelectItem value="pdf_gen">PDF</SelectItem>
-                             <SelectItem value="hash_calc">Hash</SelectItem>
-                           </SelectContent>
-                         </Select>
+                          <div className="flex gap-1 overflow-x-auto pb-1 max-w-[200px] no-scrollbar">
+                            {[
+                              { id: 'all', label: 'Tudo' },
+                              { id: 'csv_gen', label: 'CSV' },
+                              { id: 'pdf_gen', label: 'PDF' },
+                              { id: 'hash_calc', label: 'Hash' },
+                              { id: 'validation', label: 'Falha' }
+                            ].map(chip => {
+                              const count = (showAuditDetailDialog.audit_events || []).filter((e: any) => 
+                                chip.id === 'all' ? true : (chip.id === 'validation' ? e.status === 'error' || e.status === 'warning' : e.stage === chip.id)
+                              ).length;
+                              return (
+                                <Badge 
+                                  key={chip.id}
+                                  variant={logFilterStage === chip.id ? "default" : "outline"}
+                                  className={cn(
+                                    "cursor-pointer whitespace-nowrap h-6 text-[9px] px-2",
+                                    logFilterStage === chip.id ? "bg-primary" : "hover:bg-muted"
+                                  )}
+                                  onClick={() => setLogFilterStage(chip.id)}
+                                >
+                                  {chip.label} ({count})
+                                </Badge>
+                              );
+                            })}
+                          </div>
                          <Button 
                            variant="outline" 
                            size="icon" 
