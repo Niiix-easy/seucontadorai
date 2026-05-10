@@ -3158,15 +3158,26 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                               );
                             })}
                           </div>
-                         <Button 
-                           variant="outline" 
-                           size="icon" 
-                           className="h-8 w-8" 
-                           title="Salvar busca nos logs"
-                           onClick={() => setShowSavePrefDialog({ type: 'log_search', filters: { search: logSearch, stage: logFilterStage } })}
-                         >
-                           <Settings className="h-3 w-3" />
-                         </Button>
+                          <div className="flex items-center gap-1">
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              className="h-8 w-8" 
+                              title="Salvar busca nos logs"
+                              onClick={() => setShowSavePrefDialog({ type: 'log_search', filters: { search: logSearch, stage: logFilterStage } })}
+                            >
+                              <Save className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              className="h-8 w-8" 
+                              title="Gerenciar filtros salvos"
+                              onClick={() => setShowFiltersManager(true)}
+                            >
+                              <Settings className="h-3 w-3" />
+                            </Button>
+                          </div>
                          <Select 
                            onValueChange={(v) => {
                              const pref = savedPreferences.find(p => p.id === v);
