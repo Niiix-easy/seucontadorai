@@ -12,9 +12,10 @@ import { Switch } from "@/components/ui/switch";
 import { 
     Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
      Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
-       FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X, ArrowLeft, Pin, PinOff, ChevronUp, ChevronDown, ChevronLeft, ChevronRight
+      FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X, ArrowLeft, Pin, PinOff, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
+      Star, Share2, ClipboardCheck, Info, List
   } from "lucide-react";
- import { Zap, Copy, Save, Upload, Edit3 } from "lucide-react";
+ import { Zap, Copy, Save, Upload, Edit3, ExternalLink } from "lucide-react";
 import JSZip from "jszip";
  import * as XLSX from "xlsx";
  import jsPDF from "jspdf";
@@ -123,6 +124,18 @@ function generateChave() {
    is_processing?: boolean;
  };
 
+ const CURRENT_FILTER_VERSION = "2.0";
+
+ type FilterImportHistory = {
+   id: string;
+   fileName: string;
+   userName: string;
+   date: string;
+   detectedVersion: string;
+   result: "success" | "migrated" | "error";
+   migrationLog?: string[];
+ };
+
 export default function Sefaz() {
   const { user } = useAuth();
   const [search, setSearch] = useState("");
@@ -178,7 +191,123 @@ export default function Sefaz() {
    useEffect(() => localStorage.setItem('sefaz_history_pagination', JSON.stringify(historyPagination)), [historyPagination]);
    useEffect(() => localStorage.setItem('sefaz_history_sort', JSON.stringify(historySort)), [historySort]);
  
-   const [importPreview, setImportPreview] = useState<any[] | null>(null);
+    const [importPreview, setImportPreview] = useState<{
+      filters: any[];
+      validation: { id: string; errors: string[]; suggestions: string[]; version: string; status: "valid" | "warning" | "error" }[];
+      fileName: string;
+    } | null>(null);
+    const [importHistory, setImportHistory] = useState<FilterImportHistory[]>(() => {
+      const stored = localStorage.getItem('sefaz_import_history');
+      return stored ? JSON.parse(stored) : [];
+    });
+
+    useEffect(() => {
+      localStorage.setItem('sefaz_import_history', JSON.stringify(importHistory));
+    }, [importHistory]);
+
+    const [showImportHistory, setShowImportHistory] = useState(false);
+    useEffect(() => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const importData = urlParams.get('importFilter');
+      if (importData) {
+        try {
+          const decoded = JSON.parse(atob(importData));
+          setImportPreview({
+            filters: [decoded],
+            validation: [validateAndMigrate(decoded)],
+            fileName: "Link Compartilhado"
+          });
+          // Clear param
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } catch (e) {
+          toast.error("Link de filtro inválido");
+        }
+      }
+    }, []);
+
+    const validateAndMigrate = (filter: any) => {
+      const errors: string[] = [];
+      const suggestions: string[] = [];
+      let status: "valid" | "warning" | "error" = "valid";
+      const version = filter.version || "1.0";
+
+      if (!filter.preference_name) {
+        errors.push("Nome do filtro ausente");
+        status = "error";
+      }
+
+      if (!filter.filters) {
+        errors.push("Regras de filtro ausentes");
+        status = "error";
+      }
+
+      if (version !== CURRENT_FILTER_VERSION) {
+        suggestions.push(`Migrar da versão ${version} para ${CURRENT_FILTER_VERSION}`);
+        if (status !== "error") status = "warning";
+      }
+
+      // Example specific rule check
+      if (filter.filters && filter.filters.stage && !['all', 'CSV', 'PDF', 'ZIP'].includes(filter.filters.stage)) {
+        errors.push(`Etapa inválida: ${filter.filters.stage}`);
+        suggestions.push("Redefinir etapa para 'all'");
+        status = "error";
+      }
+
+      return { id: filter.id || Math.random().toString(), errors, suggestions, version, status };
+    };
+
+    const handleShareFilter = (filter: any) => {
+      const shareableData = btoa(JSON.stringify({
+        ...filter,
+        version: CURRENT_FILTER_VERSION
+      }));
+      const url = `${window.location.origin}${window.location.pathname}?importFilter=${shareableData}`;
+      navigator.clipboard.writeText(url);
+      toast.success("Link copiado para a área de transferência!");
+    };
+
+    const toggleFavoriteFilter = async (id: string, current: boolean) => {
+      const { error } = await (supabase.from as any)("user_preferences").update({ is_favorite: !current }).eq("id", id);
+      if (error) return toast.error("Erro ao atualizar favorito");
+      setSavedPreferences(prev => prev.map(p => p.id === id ? { ...p, is_favorite: !current } : p));
+    };
+
+    const exportMigrationReport = (historyItem: FilterImportHistory, format: 'csv' | 'pdf') => {
+      if (format === 'csv') {
+        const content = [
+          ["Data", "Arquivo", "Versão", "Resultado"],
+          [historyItem.date, historyItem.fileName, historyItem.detectedVersion, historyItem.result],
+          [],
+          ["Log de Alterações/Erros"],
+          ...(historyItem.migrationLog || []).map(log => [log])
+        ].map(row => row.join(";")).join("\n");
+
+        const blob = new Blob([content], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `relatorio_migracao_${historyItem.id}.csv`;
+        link.click();
+      } else {
+        const doc = new jsPDF();
+        doc.setFontSize(16);
+        doc.text("Relatório de Migração de Filtros", 14, 20);
+        doc.setFontSize(10);
+        doc.text(`Arquivo: ${historyItem.fileName}`, 14, 30);
+        doc.text(`Data: ${historyItem.date}`, 14, 35);
+        doc.text(`Versão Detectada: ${historyItem.detectedVersion}`, 14, 40);
+        doc.text(`Resultado: ${historyItem.result}`, 14, 45);
+
+        autoTable(doc, {
+          startY: 55,
+          head: [['Log de Eventos']],
+          body: (historyItem.migrationLog || []).map(log => [log]),
+        });
+
+        doc.save(`relatorio_migracao_${historyItem.id}.pdf`);
+      }
+      toast.success("Relatório exportado");
+    };
    const [filterSearchQuery, setFilterSearchQuery] = useState("");
     const [showSavePrefDialog, setShowSavePrefDialog] = useState<{ type: 'backlog' | 'audit' | 'log_search', filters: any } | null>(null);
     const [newPrefName, setNewPrefName] = useState("");
