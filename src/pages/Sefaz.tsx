@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { 
     Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
      Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
-      FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X, ArrowLeft, Pin, PinOff
+      FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X, ArrowLeft, Pin, PinOff, ChevronUp, ChevronDown
   } from "lucide-react";
   import { Zap, Copy } from "lucide-react";
 import JSZip from "jszip";
@@ -174,6 +174,8 @@ export default function Sefaz() {
      const [logSearch, setLogSearch] = useState("");
      const [logFilterStage, setLogFilterStage] = useState("all");
      const [pinnedExecutions, setPinnedExecutions] = useState<string[]>([]);
+     const [logMatchIndex, setLogMatchIndex] = useState(0);
+     const [batchProofProgress, setBatchProofProgress] = useState<{ total: number, current: number, results: any[] } | null>(null);
     const handleBulkDownloadAudit = async (format: 'json' | 'xlsx' | 'pdf') => {
       if (exportHistory.length === 0) return;
      toast.info(`Gerando resumo consolidado (${format.toUpperCase()})...`);
@@ -3040,7 +3042,7 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                      <FileText className="w-4 h-4" /> Logs de Auditoria do Sistema
                    </h4>
                   <div className="space-y-2">
-                    <div className="flex gap-2 items-center">
+                     <div className="flex gap-2 items-center flex-wrap">
                       <div className="relative flex-1">
                         <Search className="absolute left-2 top-2.5 h-3 w-3 text-muted-foreground" />
                         <Input 
@@ -3050,17 +3052,75 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                           onChange={e => setLogSearch(e.target.value)}
                         />
                       </div>
-                      <Select value={logFilterStage} onValueChange={setLogFilterStage}>
-                        <SelectTrigger className="w-[100px] h-8 text-[10px]">
-                          <SelectValue placeholder="Etapa" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todas</SelectItem>
-                          <SelectItem value="csv_gen">CSV</SelectItem>
-                          <SelectItem value="pdf_gen">PDF</SelectItem>
-                          <SelectItem value="hash_calc">Hash</SelectItem>
-                        </SelectContent>
-                      </Select>
+                       <div className="flex items-center gap-1">
+                         <Select value={logFilterStage} onValueChange={setLogFilterStage}>
+                           <SelectTrigger className="w-[80px] h-8 text-[10px]">
+                             <SelectValue placeholder="Etapa" />
+                           </SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="all">Todas</SelectItem>
+                             <SelectItem value="csv_gen">CSV</SelectItem>
+                             <SelectItem value="pdf_gen">PDF</SelectItem>
+                             <SelectItem value="hash_calc">Hash</SelectItem>
+                           </SelectContent>
+                         </Select>
+                         <Button 
+                           variant="outline" 
+                           size="icon" 
+                           className="h-8 w-8" 
+                           title="Salvar busca nos logs"
+                           onClick={() => setShowSavePrefDialog({ type: 'log_search', filters: { search: logSearch, stage: logFilterStage } })}
+                         >
+                           <Settings className="h-3 w-3" />
+                         </Button>
+                         <Select 
+                           onValueChange={(v) => {
+                             const pref = savedPreferences.find(p => p.id === v);
+                             if (pref) {
+                               setLogSearch(pref.filters.search);
+                               setLogFilterStage(pref.filters.stage);
+                             }
+                           }}
+                         >
+                           <SelectTrigger className="w-[100px] h-8 text-[10px]">
+                             <SelectValue placeholder="Salvos" />
+                           </SelectTrigger>
+                           <SelectContent>
+                             {savedPreferences.filter(p => p.preference_key === 'log_search_filters').map(p => (
+                               <SelectItem key={p.id} value={p.id}>{p.preference_name}</SelectItem>
+                             ))}
+                           </SelectContent>
+                         </Select>
+                       </div>
+                       
+                       {logSearch && (
+                         <div className="flex items-center gap-1 bg-muted p-1 rounded-md">
+                           <Button 
+                             variant="ghost" 
+                             size="icon" 
+                             className="h-6 w-6" 
+                             onClick={() => setLogMatchIndex(prev => Math.max(0, prev - 1))}
+                           >
+                             <ChevronUp className="h-3 w-3" />
+                           </Button>
+                           <span className="text-[9px] min-w-[30px] text-center">
+                             {logMatchIndex + 1} / {
+                               (showAuditDetailDialog.audit_events || []).filter((evt: any) => 
+                                 evt.message.toLowerCase().includes(logSearch.toLowerCase()) || 
+                                 (evt.reason && evt.reason.toLowerCase().includes(logSearch.toLowerCase()))
+                               ).length || 1
+                             }
+                           </span>
+                           <Button 
+                             variant="ghost" 
+                             size="icon" 
+                             className="h-6 w-6" 
+                             onClick={() => setLogMatchIndex(prev => prev + 1)}
+                           >
+                             <ChevronDown className="h-3 w-3" />
+                           </Button>
+                         </div>
+                       )}
                     </div>
                     <div className="bg-slate-900 text-slate-100 p-3 rounded-lg font-mono text-[10px] max-h-[150px] overflow-y-auto space-y-1">
                       {(showAuditDetailDialog.audit_events || [
@@ -3077,7 +3137,16 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                         const matchesStage = logFilterStage === "all" || evt.stage === logFilterStage;
                         return matchesSearch && matchesStage;
                       }).map((evt: any, idx: number) => (
-                        <div key={idx} className="flex gap-2 border-b border-slate-800 pb-1 last:border-0">
+                        <div 
+                          key={idx} 
+                          className={cn(
+                            "flex gap-2 border-b border-slate-800 pb-1 last:border-0 p-1 rounded transition-colors",
+                            logSearch && (
+                              evt.message.toLowerCase().includes(logSearch.toLowerCase()) || 
+                              (evt.reason && evt.reason.toLowerCase().includes(logSearch.toLowerCase()))
+                            ) ? "bg-amber-500/20 ring-1 ring-amber-500/30" : ""
+                          )}
+                        >
                           <span className="text-slate-500">[{new Date(evt.timestamp).toLocaleTimeString()}]</span>
                           <span className="text-blue-400 uppercase">[{evt.stage}]</span>
                           <span className={cn(evt.status === 'error' ? 'text-red-400 font-bold' : 'text-slate-100')}>
@@ -3609,10 +3678,43 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                         <Button variant="outline" size="sm" className="h-[22px] text-[8px] flex-1 border-green-200 text-green-600 hover:bg-green-50" onClick={() => handleBulkDownloadAudit('xlsx')}>
                           XLSX
                         </Button>
-                        <Button variant="outline" size="sm" className="h-[22px] text-[8px] flex-1 border-red-200 text-red-600 hover:bg-red-50" onClick={() => handleBulkDownloadAudit('pdf')}>
-                          PDF
-                        </Button>
-                      </div>
+                       <Button variant="outline" size="sm" className="h-[22px] text-[8px] flex-1 border-red-200 text-red-600 hover:bg-red-50" onClick={() => handleBulkDownloadAudit('pdf')}>
+                         PDF
+                       </Button>
+                       <Button 
+                         variant="outline" 
+                         size="sm" 
+                         className="h-[22px] text-[8px] col-span-3 border-purple-200 text-purple-600 hover:bg-purple-50" 
+                         onClick={async () => {
+                           if (selectedHistoryItems.length === 0) return toast.info("Selecione itens no histórico primeiro.");
+                           toast.info(`Iniciando Modo Prova em Lote (${selectedHistoryItems.length} itens)...`);
+                           setBatchProofProgress({ total: selectedHistoryItems.length, current: 0, results: [] });
+                           
+                           for (const id of selectedHistoryItems) {
+                             const log = exportHistory.find(h => h.id === id);
+                             if (log) {
+                               try {
+                                 await handleRunProofFromHistory(log);
+                                 setBatchProofProgress(prev => prev ? { 
+                                   ...prev, 
+                                   current: prev.current + 1,
+                                   results: [...prev.results, { id: log.id, status: 'success' }]
+                                 } : null);
+                               } catch (e) {
+                                 setBatchProofProgress(prev => prev ? { 
+                                   ...prev, 
+                                   current: prev.current + 1,
+                                   results: [...prev.results, { id: log.id, status: 'error' }]
+                                 } : null);
+                               }
+                             }
+                           }
+                           toast.success("Processamento em lote concluído!");
+                         }}
+                       >
+                         <Zap className="h-2.5 w-2.5 mr-1" /> Reexecutar Prova Selecionados
+                       </Button>
+                     </div>
                          </div>
                       </div>
                     </div>
@@ -3789,6 +3891,39 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                          </td>
                       </tr>
                     ))}
+                     {batchProofProgress && (
+                       <tr>
+                         <td colSpan={6} className="p-0">
+                           <div className="bg-purple-50 p-2 border-b flex items-center justify-between text-[10px]">
+                             <div className="flex items-center gap-2">
+                               <Loader2 className="w-3 h-3 animate-spin text-purple-600" />
+                               <span className="font-bold text-purple-700">Auditando Lote: {batchProofProgress.current} / {batchProofProgress.total}</span>
+                             </div>
+                             <Button 
+                               variant="ghost" 
+                               size="sm" 
+                               className="h-5 text-[8px] text-purple-600"
+                               onClick={() => {
+                                 const data = batchProofProgress.results.map(r => {
+                                   const h = exportHistory.find(x => x.id === r.id);
+                                   return {
+                                     ID: r.id,
+                                     Data: h ? new Date(h.created_at).toLocaleString() : '-',
+                                     Resultado: r.status === 'success' ? 'OK' : 'ERRO'
+                                   };
+                                 });
+                                 const ws = XLSX.utils.json_to_sheet(data);
+                                 const wb = XLSX.utils.book_new();
+                                 XLSX.utils.book_append_sheet(wb, ws, "Resultado Lote");
+                                 XLSX.writeFile(wb, "resultado_auditoria_lote.xlsx");
+                               }}
+                             >
+                               <Download className="w-2.5 h-2.5 mr-1" /> Relatório Lote
+                             </Button>
+                           </div>
+                         </td>
+                       </tr>
+                     )}
                      {exportHistory.length === 0 && (
                        <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhuma exportação registrada.</td></tr>
                      )}
