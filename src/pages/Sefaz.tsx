@@ -3214,92 +3214,81 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
          </Dialog>
  
          {/* Filters Manager Dialog */}
-         <Dialog open={showFiltersManager} onOpenChange={setShowFiltersManager}>
-           <DialogContent className="max-w-md">
-             <DialogHeader>
-               <DialogTitle className="flex items-center gap-2">
-                 <Settings className="w-5 h-5" /> Gerenciar Filtros Salvos
-               </DialogTitle>
-               <DialogDescription>
-                 Listar, renomear, duplicar e excluir configurações de filtros.
-               </DialogDescription>
-             </DialogHeader>
-             <div className="space-y-4 pt-2">
-               <div className="border rounded-lg overflow-hidden">
-                 <table className="w-full text-xs">
-                   <thead className="bg-muted">
-                     <tr>
-                       <th className="text-left py-2 px-3">Nome</th>
-                       <th className="text-right py-2 px-3">Ações</th>
-                     </tr>
-                   </thead>
-                   <tbody className="divide-y">
-                     {savedPreferences.filter(p => p.preference_key === 'log_search_filters').map(pref => (
-                       <tr key={pref.id} className="hover:bg-muted/50">
-                         <td className="py-2 px-3">
-                           <div className="flex flex-col">
-                             <span className="font-medium">{pref.preference_name}</span>
-                             <span className="text-[10px] text-muted-foreground">{pref.is_default ? 'Padrão' : ''}</span>
-                           </div>
-                         </td>
-                         <td className="py-2 px-3 text-right">
-                           <div className="flex justify-end gap-1">
-                             <Button 
-                               variant="ghost" 
-                               size="icon" 
-                               className="h-7 w-7" 
-                               title="Definir como Padrão"
-                               onClick={() => {
-                                 setSavedPreferences(prev => prev.map(p => ({
-                                   ...p,
-                                   is_default: p.id === pref.id ? !p.is_default : (p.preference_key === pref.preference_key ? false : p.is_default)
-                                 })));
-                                 toast.success("Filtro padrão atualizado.");
-                               }}
-                             >
-                               <CheckCircle2 className={cn("h-3.5 w-3.5", pref.is_default ? "text-green-600" : "text-muted-foreground")} />
-                             </Button>
-                             <Button 
-                               variant="ghost" 
-                               size="icon" 
-                               className="h-7 w-7" 
-                               title="Duplicar"
-                               onClick={() => {
-                                 const newPref = { ...pref, id: crypto.randomUUID(), preference_name: `${pref.preference_name} (Cópia)`, is_default: false };
-                                 setSavedPreferences(prev => [...prev, newPref]);
-                                 toast.success("Filtro duplicado.");
-                               }}
-                             >
-                               <Copy className="h-3.5 w-3.5" />
-                             </Button>
-                             <Button 
-                               variant="ghost" 
-                               size="icon" 
-                               className="h-7 w-7 text-destructive" 
-                               title="Excluir"
-                               onClick={() => {
-                                 setSavedPreferences(prev => prev.filter(p => p.id !== pref.id));
-                                 toast.info("Filtro excluído.");
-                               }}
-                             >
-                               <Trash2 className="h-3.5 w-3.5" />
-                             </Button>
-                           </div>
-                         </td>
-                       </tr>
-                     ))}
-                     {savedPreferences.filter(p => p.preference_key === 'log_search_filters').length === 0 && (
-                       <tr><td colSpan={2} className="py-8 text-center text-muted-foreground italic">Nenhum filtro salvo.</td></tr>
-                     )}
-                   </tbody>
-                 </table>
-               </div>
-               <div className="flex justify-end">
-                 <Button onClick={() => setShowFiltersManager(false)}>Fechar</Button>
-               </div>
-             </div>
-           </DialogContent>
-         </Dialog>
+          <Dialog open={showFiltersManager} onOpenChange={setShowFiltersManager}>
+            <DialogContent className="max-w-xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Settings className="w-5 h-5 text-primary" /> Gerenciar Filtros Salvos
+                  </div>
+                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => setShowImportHistory(true)}>
+                    <History className="w-4 h-4 mr-2" /> Histu00f3rico
+                  </Button>
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Buscar filtros..." 
+                    className="pl-9 h-9" 
+                    value={filterSearchQuery}
+                    onChange={e => setFilterSearchQuery(e.target.value)}
+                  />
+                </div>
+                <div className="border rounded-lg overflow-hidden max-h-[300px] overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted sticky top-0 z-10">
+                      <tr>
+                        <th className="text-left py-2 px-3">Filtro / Versu00e3o</th>
+                        <th className="text-right py-2 px-3">Au00e7u00f5es</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {savedPreferences
+                        .filter(p => p.preference_key === "log_search_filters")
+                        .filter(p => p.preference_name.toLowerCase().includes(filterSearchQuery.toLowerCase()))
+                        .sort((a, b) => (a.is_favorite ? -1 : 1))
+                        .map(pref => (
+                          <tr key={pref.id} className="hover:bg-muted/50">
+                            <td className="py-2 px-3">
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-2">
+                                  {pref.is_favorite && <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
+                                  <span className="font-semibold">{pref.preference_name}</span>
+                                </div>
+                                <span className="text-[9px] text-muted-foreground">Versu00e3o {pref.version || "1.0"}</span>
+                              </div>
+                            </td>
+                            <td className="py-2 px-3 text-right flex justify-end gap-1">
+                              <Button variant="ghost" size="icon" className={cn("h-7 w-7", pref.is_favorite && "text-yellow-600")} onClick={() => toggleFavoriteFilter(pref.id, !!pref.is_favorite)}>
+                                <Star className={cn("w-3.5 h-3.5", pref.is_favorite && "fill-current")} />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600" onClick={() => handleShareFilter(pref)} title="Compartilhar">
+                                <Share2 className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteFilter(pref.id)}>
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex gap-2">
+                  <Button className="flex-1" variant="outline" onClick={() => document.getElementById("import-filters-v2")?.click()}>
+                    <Upload className="w-4 h-4 mr-2" /> Importar
+                  </Button>
+                  <input id="import-filters-v2" type="file" className="hidden" accept=".json" onChange={handleImportFilters} />
+                  <Button className="flex-1" variant="outline" onClick={handleExportFilters}>
+                    <Download className="w-4 h-4 mr-2" /> Exportar Todos
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
 
         <Dialog open={!!showAuditDetailDialog} onOpenChange={() => setShowAuditDetailDialog(null)}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
