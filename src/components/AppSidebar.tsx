@@ -2,7 +2,7 @@
 import {
   LayoutDashboard, BookOpen, Receipt, FileText, Users, ClipboardList,
   FolderOpen, DollarSign, BarChart3, Bot, Globe, PenTool, Building2,
-  Landmark, ChevronLeft, ChevronRight, Zap, Shield, MessageSquare, LogOut, FileKey, Calculator, FileSignature, ShieldAlert, Bell
+  Landmark, ChevronLeft, ChevronRight, Zap, Shield, MessageSquare, LogOut, FileKey, Calculator, FileSignature, ShieldAlert, Bell, Sparkles
 } from "lucide-react";
  import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ const modules = [
   { path: "/notas-fiscais", icon: FileSignature, label: "Notas Fiscais", section: "Core" },
   { path: "/auditoria", icon: ShieldAlert, label: "Auditoria de Eventos", section: "Core" },
   { path: "/calculadora-icms-st", icon: Calculator, label: "Calculadora ICMS-ST", section: "Core" },
+  { path: "/recuperacao-tributaria", icon: Sparkles, label: "Recuperação Tributária IA", section: "Análise" },
   { path: "/folha", icon: Users, label: "Folha de Pagamento", section: "Core" },
   { path: "/xml", icon: FileText, label: "Importação XML", section: "Automação" },
   { path: "/automacao", icon: Zap, label: "Automação Contábil", section: "Automação" },
