@@ -13,7 +13,7 @@ import {
     Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
      Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
       FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X, ArrowLeft, Pin, PinOff, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
-      Star, Share2, ClipboardCheck, Info, List, ArrowRight
+      Star, Share2, ClipboardCheck, Info, List, ArrowRight, FileSpreadsheet
   } from "lucide-react";
  import { Zap, Copy, Save, Upload, Edit3, ExternalLink } from "lucide-react";
 import JSZip from "jszip";
@@ -360,8 +360,6 @@ export default function Sefaz() {
       link.setAttribute("download", `resumo_${name.toLowerCase().replace(/\s/g, '_')}.csv`);
       link.click();
       toast.success("Resumo exportado em CSV");
-    };
-      toast.success("PDF do diff exportado com marcas de integridade");
     };
 
     const validateAndMigrate = (filter: any) => {
