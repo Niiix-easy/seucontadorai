@@ -206,6 +206,9 @@ export default function Sefaz() {
     }, [importHistory]);
 
     const [showImportHistory, setShowImportHistory] = useState(false);
+    const [importHistoryFilters, setImportHistoryFilters] = useState({ dateStart: "", dateEnd: "", version: "all", result: "all", query: "" });
+    const [importHistoryPage, setImportHistoryPage] = useState(1);
+
     useEffect(() => {
       const urlParams = new URLSearchParams(window.location.search);
       const importData = urlParams.get('importFilter');
@@ -226,34 +229,63 @@ export default function Sefaz() {
     }, []);
 
     const validateAndMigrate = (filter: any) => {
-      const errors: string[] = [];
-      const suggestions: string[] = [];
+      const errors: { field: string; message: string }[] = [];
+      const suggestions: { field: string; message: string; action: () => void }[] = [];
       let status: "valid" | "warning" | "error" = "valid";
       const version = filter.version || "1.0";
 
       if (!filter.preference_name) {
-        errors.push("Nome do filtro ausente");
+        errors.push({ field: "preference_name", message: "Nome do filtro ausente" });
         status = "error";
       }
 
       if (!filter.filters) {
-        errors.push("Regras de filtro ausentes");
+        errors.push({ field: "filters", message: "Regras de filtro ausentes" });
         status = "error";
       }
 
       if (version !== CURRENT_FILTER_VERSION) {
-        suggestions.push(`Migrar da versão ${version} para ${CURRENT_FILTER_VERSION}`);
+        suggestions.push({ 
+          field: "version", 
+          message: `Migrar da versão ${version} para ${CURRENT_FILTER_VERSION}`,
+          action: () => {
+            filter.version = CURRENT_FILTER_VERSION;
+            const revalidated = validateAndMigrate(filter);
+            setImportPreview(prev => prev ? {
+              ...prev,
+              validation: prev.validation.map(v => v.id === filter.id ? revalidated : v)
+            } : null);
+          }
+        });
         if (status !== "error") status = "warning";
       }
 
-      // Example specific rule check
       if (filter.filters && filter.filters.stage && !['all', 'CSV', 'PDF', 'ZIP'].includes(filter.filters.stage)) {
-        errors.push(`Etapa inválida: ${filter.filters.stage}`);
-        suggestions.push("Redefinir etapa para 'all'");
+        errors.push({ field: "filters.stage", message: `Etapa inválida: ${filter.filters.stage}` });
+        suggestions.push({
+          field: "filters.stage",
+          message: "Redefinir etapa para 'all'",
+          action: () => {
+            filter.filters.stage = "all";
+            const revalidated = validateAndMigrate(filter);
+            setImportPreview(prev => prev ? {
+              ...prev,
+              validation: prev.validation.map(v => v.id === filter.id ? revalidated : v)
+            } : null);
+          }
+        });
         status = "error";
       }
 
-      return { id: filter.id || Math.random().toString(), errors, suggestions, version, status };
+      return { 
+        id: filter.id || Math.random().toString(), 
+        errors: errors.map(e => e.message), 
+        errorFields: errors.map(e => e.field),
+        suggestions: suggestions.map(s => s.message),
+        suggestionActions: suggestions,
+        version, 
+        status 
+      };
     };
 
     const handleShareFilter = (filter: any) => {
@@ -272,39 +304,40 @@ export default function Sefaz() {
       setSavedPreferences(prev => prev.map(p => p.id === id ? { ...p, is_favorite: !current } : p));
     };
 
-    const exportMigrationReport = (historyItem: FilterImportHistory, format: 'csv' | 'pdf') => {
+    const exportMigrationReport = (historyItems: FilterImportHistory[], format: 'csv' | 'pdf', title = "Relatório de Migração de Filtros") => {
       if (format === 'csv') {
         const content = [
-          ["Data", "Arquivo", "Versão", "Resultado"],
-          [historyItem.date, historyItem.fileName, historyItem.detectedVersion, historyItem.result],
-          [],
-          ["Log de Alterações/Erros"],
-          ...(historyItem.migrationLog || []).map(log => [log])
+          ["Data", "Arquivo", "Usuário", "Versão", "Resultado", "Logs"],
+          ...historyItems.map(h => [
+            h.date, 
+            h.fileName, 
+            h.userName, 
+            h.detectedVersion, 
+            h.result, 
+            (h.migrationLog || []).join(" | ")
+          ])
         ].map(row => row.join(";")).join("\n");
 
         const blob = new Blob([content], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = `relatorio_migracao_${historyItem.id}.csv`;
+        link.download = `${title.toLowerCase().replace(/\s/g, '_')}.csv`;
         link.click();
       } else {
         const doc = new jsPDF();
         doc.setFontSize(16);
-        doc.text("Relatório de Migração de Filtros", 14, 20);
+        doc.text(title, 14, 20);
         doc.setFontSize(10);
-        doc.text(`Arquivo: ${historyItem.fileName}`, 14, 30);
-        doc.text(`Data: ${historyItem.date}`, 14, 35);
-        doc.text(`Versão Detectada: ${historyItem.detectedVersion}`, 14, 40);
-        doc.text(`Resultado: ${historyItem.result}`, 14, 45);
+        doc.text(`Gerado em: ${new Date().toLocaleString()}`, 14, 30);
 
         autoTable(doc, {
-          startY: 55,
-          head: [['Log de Eventos']],
-          body: (historyItem.migrationLog || []).map(log => [log]),
+          startY: 40,
+          head: [['Data', 'Arquivo', 'Versão', 'Resultado']],
+          body: historyItems.map(h => [h.date, h.fileName, h.detectedVersion, h.result]),
         });
 
-        doc.save(`relatorio_migracao_${historyItem.id}.pdf`);
+        doc.save(`${title.toLowerCase().replace(/\s/g, '_')}.pdf`);
       }
       toast.success("Relatório exportado");
     };
@@ -4471,13 +4504,13 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
 
         {/* Import Preview Dialog */}
         <Dialog open={!!importPreview} onOpenChange={() => setImportPreview(null)}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-3xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Info className="w-5 h-5 text-blue-500" /> Pré-visualização da Importação
+                <Info className="w-5 h-5 text-blue-500" /> Pr00e9-visualiza00e700e3o e Valida00e700e3o
               </DialogTitle>
               <DialogDescription>
-                Verifique os filtros e regras antes de confirmar a aplicação.
+                Verifique os campos inv00e1lidos (destacados) e aplique corre00e700f5es sugeridas antes de confirmar.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 pt-2">
@@ -4486,34 +4519,56 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                 <p><strong>Total de Filtros:</strong> {importPreview?.filters.length}</p>
               </div>
 
-              <div className="border rounded-lg overflow-hidden max-h-[300px] overflow-y-auto">
+              <div className="border rounded-lg overflow-hidden max-h-[400px] overflow-y-auto">
                 <table className="w-full text-xs">
-                  <thead className="bg-muted sticky top-0">
+                  <thead className="bg-muted sticky top-0 z-10">
                     <tr>
-                      <th className="text-left py-2 px-3">Filtro</th>
-                      <th className="text-left py-2 px-3">Status / Sugestões</th>
+                      <th className="text-left py-2 px-3">Filtro / Campos</th>
+                      <th className="text-left py-2 px-3">Status e Corre00e700f5es</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {importPreview?.filters.map((f, idx) => {
                       const v = importPreview.validation[idx];
+                      const errorFields = (v as any).errorFields || [];
                       return (
-                        <tr key={idx} className={cn("hover:bg-muted/50", v.status === 'error' && "bg-red-50/50")}>
-                          <td className="py-2 px-3">
-                            <p className="font-semibold">{f.preference_name || 'Sem Nome'}</p>
-                            <p className="text-[10px] text-muted-foreground">Versão: {v.version}</p>
-                          </td>
+                        <tr key={idx} className={cn("hover:bg-muted/50", v.status === "error" && "bg-red-50/50")}>
                           <td className="py-2 px-3">
                             <div className="space-y-1">
-                              {v.status === 'valid' && <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">Válido</Badge>}
-                              {v.status === 'warning' && <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-yellow-200">Migração Necessária</Badge>}
-                              {v.status === 'error' && <Badge variant="destructive">Inválido</Badge>}
+                              <p className={cn("font-semibold", errorFields.includes("preference_name") && "text-red-600 underline underline-offset-2")}>
+                                {f.preference_name || "Sem Nome"}
+                              </p>
+                              <div className="flex gap-1">
+                                <Badge variant="outline" className={cn("text-[8px] h-4", errorFields.includes("version") && "border-red-500 text-red-600")}>
+                                  v{f.version || "1.0"}
+                                </Badge>
+                                {f.filters?.stage && (
+                                  <Badge variant="outline" className={cn("text-[8px] h-4", errorFields.includes("filters.stage") && "border-red-500 text-red-600")}>
+                                    Etapa: {f.filters.stage}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-2 px-3">
+                            <div className="space-y-2">
+                              {v.status === "valid" && <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">V00e1lido</Badge>}
+                              {v.status === "warning" && <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-yellow-200">Migra00e700e3o Sugerida</Badge>}
+                              {v.status === "error" && <Badge variant="destructive">Inv00e1lido (Requer Ajuste)</Badge>}
                               
                               {v.errors.map((err, i) => (
-                                <p key={i} className="text-red-600 font-medium">{err}</p>
+                                <p key={i} className="text-red-600 font-medium flex items-center gap-1">
+                                  <AlertCircle className="w-3 h-3" /> {err}
+                                </p>
                               ))}
-                              {v.suggestions.map((sug, i) => (
-                                <p key={i} className="text-blue-600 italic">Sugestão: {sug}</p>
+                              
+                              {(v as any).suggestionActions?.map((sug: any, i: number) => (
+                                <div key={i} className="bg-blue-50 p-2 rounded border border-blue-100 flex items-center justify-between gap-2">
+                                  <p className="text-blue-700 text-[10px] italic">{sug.message}</p>
+                                  <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0 border-blue-200 text-blue-700 hover:bg-blue-100" onClick={sug.action}>
+                                    Corrigir
+                                  </Button>
+                                </div>
                               ))}
                             </div>
                           </td>
@@ -4527,67 +4582,134 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setImportPreview(null)}>Cancelar</Button>
                 <Button 
-                  disabled={importPreview?.validation.every(v => v.status === 'error')}
+                  disabled={importPreview?.validation.every(v => v.status === "error")}
                   onClick={confirmImport}
                 >
-                  Confirmar Importação
+                  Confirmar Importa00e700e3o
                 </Button>
               </div>
             </div>
           </DialogContent>
         </Dialog>
 
-        {/* Import History Dialog */}
         <Dialog open={showImportHistory} onOpenChange={setShowImportHistory}>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <ClipboardCheck className="w-5 h-5 text-purple-500" /> Histórico de Importações de Filtros
+              <DialogTitle className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <ClipboardCheck className="w-5 h-5 text-purple-500" /> Hist00f3rico de Importa00e700f5es
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => {
+                    const filtered = importHistory.filter(h => {
+                      if (importHistoryFilters.query && !h.fileName.toLowerCase().includes(importHistoryFilters.query.toLowerCase())) return false;
+                      if (importHistoryFilters.result !== "all" && h.result !== importHistoryFilters.result) return false;
+                      return true;
+                    });
+                    exportMigrationReport(filtered, "csv", "Hist00f3rico de Importa00e700f5es Filtrado");
+                  }}>
+                    <Download className="w-4 h-4 mr-2" /> Exportar Filtrados
+                  </Button>
+                </div>
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 pt-4">
-              <div className="border rounded-lg overflow-hidden">
-                <table className="w-full text-xs">
-                  <thead className="bg-muted">
-                    <tr>
-                      <th className="text-left py-2 px-3">Data</th>
-                      <th className="text-left py-2 px-3">Arquivo</th>
-                      <th className="text-left py-2 px-3">Versão</th>
-                      <th className="text-left py-2 px-3">Resultado</th>
-                      <th className="text-right py-2 px-3">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {importHistory.map(h => (
+
+            <div className="grid grid-cols-5 gap-2 bg-muted/20 p-3 rounded-lg border text-[10px] mt-2">
+              <div className="space-y-1">
+                <Label className="text-[9px]">Resultado</Label>
+                <Select value={importHistoryFilters.result} onValueChange={v => setImportHistoryFilters(p => ({ ...p, result: v }))}>
+                  <SelectTrigger className="h-7 text-[10px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="success">Sucesso</SelectItem>
+                    <SelectItem value="migrated">Migrado</SelectItem>
+                    <SelectItem value="error">Erro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[9px]">In00edcio</Label>
+                <Input type="date" className="h-7 text-[10px]" value={importHistoryFilters.dateStart} onChange={e => setImportHistoryFilters(p => ({ ...p, dateStart: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[9px]">Fim</Label>
+                <Input type="date" className="h-7 text-[10px]" value={importHistoryFilters.dateEnd} onChange={e => setImportHistoryFilters(p => ({ ...p, dateEnd: e.target.value }))} />
+              </div>
+              <div className="space-y-1 col-span-2">
+                <Label className="text-[9px]">Busca (Arquivo)</Label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-2 w-3 h-3 text-muted-foreground" />
+                  <Input className="h-7 text-[10px] pl-7" placeholder="nome_arquivo.json" value={importHistoryFilters.query} onChange={e => setImportHistoryFilters(p => ({ ...p, query: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto mt-4 border rounded-lg">
+              <table className="w-full text-xs">
+                <thead className="bg-muted sticky top-0 z-10">
+                  <tr>
+                    <th className="text-left py-2 px-3">Data</th>
+                    <th className="text-left py-2 px-3">Arquivo</th>
+                    <th className="text-left py-2 px-3">Usu00e1rio</th>
+                    <th className="text-left py-2 px-3 text-center">Vers00e3o</th>
+                    <th className="text-left py-2 px-3">Resultado</th>
+                    <th className="text-right py-2 px-3">A00e700f5es</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {importHistory
+                    .filter(h => {
+                      if (importHistoryFilters.query && !h.fileName.toLowerCase().includes(importHistoryFilters.query.toLowerCase())) return false;
+                      if (importHistoryFilters.result !== "all" && h.result !== importHistoryFilters.result) return false;
+                      if (importHistoryFilters.dateStart && h.date < importHistoryFilters.dateStart) return false;
+                      if (importHistoryFilters.dateEnd && h.date > importHistoryFilters.dateEnd) return false;
+                      return true;
+                    })
+                    .slice((importHistoryPage - 1) * 10, importHistoryPage * 10)
+                    .map(h => (
                       <tr key={h.id} className="hover:bg-muted/50">
-                        <td className="py-2 px-3">{h.date}</td>
-                        <td className="py-2 px-3 font-medium">{h.fileName}</td>
-                        <td className="py-2 px-3">{h.detectedVersion}</td>
+                        <td className="py-2 px-3 whitespace-nowrap">{h.date}</td>
+                        <td className="py-2 px-3 font-medium max-w-[150px] truncate" title={h.fileName}>{h.fileName}</td>
+                        <td className="py-2 px-3 truncate max-w-[120px]" title={h.userName}>{h.userName}</td>
+                        <td className="py-2 px-3 text-center">v{h.detectedVersion}</td>
                         <td className="py-2 px-3">
-                          <Badge variant={h.result === 'error' ? 'destructive' : (h.result === 'migrated' ? 'secondary' : 'default')}>
+                          <Badge variant={h.result === "error" ? "destructive" : (h.result === "migrated" ? "secondary" : "default")} className="text-[9px]">
                             {h.result.toUpperCase()}
                           </Badge>
                         </td>
                         <td className="py-2 px-3 text-right">
                           <div className="flex justify-end gap-1">
-                            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => exportMigrationReport(h, 'csv')} title="Exportar CSV">
-                              <FileText className="w-3.5 h-3.5" />
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => exportMigrationReport([h], "csv")} title="Exportar CSV">
+                              <FileText className="w-3 h-3" />
                             </Button>
-                            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => exportMigrationReport(h, 'pdf')} title="Exportar PDF">
-                              <FileDown className="w-3.5 h-3.5" />
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => exportMigrationReport([h], "pdf")} title="Exportar PDF">
+                              <FileDown className="w-3 h-3" />
                             </Button>
                           </div>
                         </td>
                       </tr>
                     ))}
-                    {importHistory.length === 0 && (
-                      <tr><td colSpan={5} className="py-8 text-center text-muted-foreground italic">Nenhuma importação registrada.</td></tr>
-                    )}
-                  </tbody>
-                </table>
+                  {importHistory.length === 0 && (
+                    <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhuma importa00e700e3o encontrada.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            
+            <div className="flex items-center justify-between p-3 border-t bg-muted/10">
+              <span className="text-[10px] text-muted-foreground">P00e1gina {importHistoryPage}</span>
+              <div className="flex gap-1">
+                <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => setImportHistoryPage(p => Math.max(1, p - 1))} disabled={importHistoryPage === 1}>
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => setImportHistoryPage(p => p + 1)} disabled={importHistory.length <= importHistoryPage * 10}>
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
               </div>
             </div>
           </DialogContent>
+        </Dialog>
+
         </Dialog>
       </div>
     );
