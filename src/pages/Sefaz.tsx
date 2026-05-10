@@ -566,7 +566,6 @@ export default function Sefaz() {
       setImportPreview(null);
       setImportVersionDescription("");
     };
-    };
 
     const handleReprocessImport = (historyItem: any) => {
       try {
