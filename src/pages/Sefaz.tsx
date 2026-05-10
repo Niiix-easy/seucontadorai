@@ -4603,10 +4603,10 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                         </td>
                         <td className="py-2 px-3 text-right">
                           <div className="flex justify-end gap-1">
-                            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => exportMigrationReport(h, 'csv')} title="Exportar CSV">
+                            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => exportMigrationReport([h], 'csv')} title="Exportar CSV">
                               <FileText className="w-3.5 h-3.5" />
                             </Button>
-                            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => exportMigrationReport(h, 'pdf')} title="Exportar PDF">
+                            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => exportMigrationReport([h], 'pdf')} title="Exportar PDF">
                               <FileDown className="w-3.5 h-3.5" />
                             </Button>
                           </div>
