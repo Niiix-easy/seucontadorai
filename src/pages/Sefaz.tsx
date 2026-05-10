@@ -315,6 +315,31 @@ export default function Sefaz() {
     const [editingFilterId, setEditingFilterId] = useState<string | null>(null);
     const [filterNewName, setFilterNewName] = useState("");
 
+    const handleSetDefaultFilter = async (id: string) => {
+      const currentFilter = savedPreferences.find(p => p.id === id);
+      if (!currentFilter) return;
+      const newIsDefault = !currentFilter.is_default;
+
+      // First, remove default from others of same key
+      if (newIsDefault) {
+        await (supabase.from as any)("fiscal_user_preferences")
+          .update({ is_default: false })
+          .eq("preference_key", currentFilter.preference_key);
+      }
+
+      const { error } = await (supabase.from as any)("fiscal_user_preferences")
+        .update({ is_default: newIsDefault })
+        .eq("id", id);
+
+      if (error) return toast.error("Erro ao definir filtro padrão");
+
+      setSavedPreferences(prev => prev.map(p => ({
+        ...p,
+        is_default: p.id === id ? newIsDefault : (newIsDefault && p.preference_key === currentFilter.preference_key ? false : p.is_default)
+      })));
+      toast.success(newIsDefault ? "Filtro definido como padrão" : "Filtro padrão removido");
+    };
+
     const handleDeleteFilter = async (id: string) => {
       const { error } = await (supabase.from as any)("fiscal_user_preferences").delete().eq("id", id);
       if (error) return toast.error("Erro ao deletar filtro");
@@ -335,7 +360,10 @@ export default function Sefaz() {
         user_id: user?.id,
         preference_key: filter.preference_key,
         preference_name: `${filter.preference_name} (Cópia)`,
-        filters: filter.filters
+        filters: filter.filters,
+        is_favorite: !!filter.is_favorite,
+        version: filter.version || CURRENT_FILTER_VERSION,
+        is_default: false
       }]).select();
       if (error) return toast.error("Erro ao duplicar filtro");
       setSavedPreferences(prev => [...prev, ...data]);
