@@ -198,6 +198,7 @@ export default function Sefaz() {
       validation: { id: string; errors: string[]; errorFields: string[]; suggestions: string[]; suggestionActions: any[]; version: string; status: "valid" | "warning" | "error" }[];
       fileName: string;
       sourceLink?: string;
+      showDiff?: string | null;
     } | null>(null);
     const [importHistory, setImportHistory] = useState<FilterImportHistory[]>(() => {
       const stored = localStorage.getItem('sefaz_import_history');
@@ -447,11 +448,12 @@ export default function Sefaz() {
       event.target.value = '';
     };
 
-    const confirmImport = async (asDraft = false) => {
+    const confirmImport = async (asDraftArg: any) => {
+      const asDraft = typeof asDraftArg === 'boolean' ? asDraftArg : false;
       if (!importPreview) return;
       
       const migrationLogs: string[] = [];
-      const toInsert = importPreview.filters.map((f, idx) => {
+      const toInsert = (importPreview.filters as any[]).map((f, idx) => {
         const v = importPreview.validation[idx];
         if (v.status === "error" && !asDraft) {
           migrationLogs.push(`Pulado: ${f.preference_name || 'Sem Nome'} - Erros: ${v.errors.join(', ')}`);
@@ -4600,11 +4602,33 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                               ))}
                               
                               {(v as any).suggestionActions?.map((sug: any, i: number) => (
-                                <div key={i} className="bg-blue-50 p-2 rounded border border-blue-100 flex items-center justify-between gap-2">
-                                  <p className="text-blue-700 text-[10px] italic">{sug.message}</p>
-                                  <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0 border-blue-200 text-blue-700 hover:bg-blue-100" onClick={sug.action}>
-                                    Corrigir
-                                  </Button>
+                                <div key={i} className="bg-blue-50 p-2 rounded border border-blue-100 flex flex-col gap-2">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="text-blue-700 text-[10px] italic">{sug.message}</p>
+                                    <div className="flex gap-1">
+                                      <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0 border-blue-200 text-blue-700 hover:bg-blue-100" onClick={() => setImportPreview(p => p ? {...p, showDiff: f.id || idx.toString()} : null)}>
+                                        Ver Diferença
+                                      </Button>
+                                      <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0 border-blue-200 text-blue-700 hover:bg-blue-100" onClick={sug.action}>
+                                        Corrigir
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  {importPreview?.showDiff === (f.id || idx.toString()) && (
+                                    <div className="text-[9px] font-mono bg-white p-2 rounded border border-blue-100 overflow-auto max-h-[100px]">
+                                      <p className="text-muted-foreground border-b mb-1">Original vs Sugerido:</p>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div className="text-red-600">
+                                          <p className="font-bold">- Original</p>
+                                          <pre>{JSON.stringify(importPreview.originals[idx].filters, null, 2)}</pre>
+                                        </div>
+                                        <div className="text-green-600 border-l pl-2">
+                                          <p className="font-bold">+ Sugerido</p>
+                                          <pre>{JSON.stringify(f.filters, null, 2)}</pre>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
