@@ -12,9 +12,9 @@ import { Switch } from "@/components/ui/switch";
 import { 
     Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
      Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
-      FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X, ArrowLeft
- } from "lucide-react";
- import { Zap } from "lucide-react";
+      FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X, ArrowLeft, Pin, PinOff
+  } from "lucide-react";
+  import { Zap, Copy } from "lucide-react";
 import JSZip from "jszip";
  import * as XLSX from "xlsx";
  import jsPDF from "jspdf";
@@ -171,8 +171,11 @@ export default function Sefaz() {
      const [showAuditDetailDialog, setShowAuditDetailDialog] = useState<any | null>(null);
      const [selectedHistoryItems, setSelectedHistoryItems] = useState<string[]>([]);
      const [showComparisonDialog, setShowComparisonDialog] = useState<any[] | null>(null);
-   const handleBulkDownloadAudit = async (format: 'json' | 'xlsx') => {
-     if (exportHistory.length === 0) return;
+     const [logSearch, setLogSearch] = useState("");
+     const [logFilterStage, setLogFilterStage] = useState("all");
+     const [pinnedExecutions, setPinnedExecutions] = useState<string[]>([]);
+    const handleBulkDownloadAudit = async (format: 'json' | 'xlsx' | 'pdf') => {
+      if (exportHistory.length === 0) return;
      toast.info(`Gerando resumo consolidado (${format.toUpperCase()})...`);
      const data = exportHistory.map(log => ({
        id: log.id,
@@ -188,21 +191,46 @@ export default function Sefaz() {
        filtros: JSON.stringify(log.filters),
        destinatarios: log.recipients?.join(", ")
      }));
-     if (format === 'json') {
-       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-       const url = URL.createObjectURL(blob);
-       const link = document.createElement("a");
-       link.href = url;
-       link.download = `auditoria_consolidada_${new Date().toISOString().split('T')[0]}.json`;
-       document.body.appendChild(link);
-       link.click();
-       document.body.removeChild(link);
-     } else {
-       const ws = XLSX.utils.json_to_sheet(data);
-       const wb = XLSX.utils.book_new();
-       XLSX.utils.book_append_sheet(wb, ws, "Auditoria");
-       XLSX.writeFile(wb, `auditoria_consolidada_${new Date().toISOString().split('T')[0]}.xlsx`);
-     }
+      if (format === 'json') {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `auditoria_consolidada_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else if (format === 'xlsx') {
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Auditoria");
+        XLSX.writeFile(wb, `auditoria_consolidada_${new Date().toISOString().split('T')[0]}.xlsx`);
+      } else if (format === 'pdf') {
+        const doc = new jsPDF('l', 'mm', 'a4');
+        doc.setFontSize(16);
+        doc.text("Relatório Consolidado de Auditoria Fiscal", 14, 15);
+        doc.setFontSize(10);
+        doc.text(`Gerado em: ${new Date().toLocaleString()}`, 14, 22);
+        
+        const tableData = data.map(d => [
+          d.data,
+          d.relatorio,
+          d.status,
+          d.divergencia,
+          d.registros,
+          d.csv_hash.substring(0, 10) + "..."
+        ]);
+
+        autoTable(doc, {
+          startY: 30,
+          head: [['Data', 'Relatório', 'Status', 'Div.', 'Reg.', 'Hash CSV']],
+          body: tableData,
+          theme: 'striped',
+          headStyles: { fillColor: [126, 34, 206] }
+        });
+        
+        doc.save(`auditoria_consolidada_${new Date().toISOString().split('T')[0]}.pdf`);
+      }
      toast.success("Resumo consolidado exportado com sucesso!");
    };
 
@@ -3011,24 +3039,55 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                    <h4 className="text-sm font-bold flex items-center gap-2">
                      <FileText className="w-4 h-4" /> Logs de Auditoria do Sistema
                    </h4>
-                   <div className="bg-slate-900 text-slate-100 p-3 rounded-lg font-mono text-[10px] max-h-[150px] overflow-y-auto space-y-1">
-                     {(showAuditDetailDialog.audit_events || [
-                       { timestamp: showAuditDetailDialog.created_at, stage: 'initializing', message: 'Iniciando processo de auditoria...' },
-                       { timestamp: showAuditDetailDialog.created_at, stage: 'csv_gen', message: 'Geração de dados CSV concluída.' },
-                       { timestamp: showAuditDetailDialog.created_at, stage: 'pdf_gen', message: 'Geração de PDF concluída.' },
-                       { timestamp: showAuditDetailDialog.created_at, stage: 'hash_calc', message: 'Cálculo de hashes SHA-256 concluído.' },
-                       { timestamp: showAuditDetailDialog.created_at, stage: 'finalizing', message: 'Pacote finalizado com sucesso.' }
-                     ]).map((evt: any, idx: number) => (
-                       <div key={idx} className="flex gap-2">
-                         <span className="text-slate-500">[{new Date(evt.timestamp).toLocaleTimeString()}]</span>
-                         <span className="text-blue-400 uppercase">[{evt.stage}]</span>
-                         <span className={cn(evt.status === 'error' ? 'text-red-400' : 'text-slate-100')}>
-                           {evt.message}
-                           {evt.reason && <span className="block text-red-300 ml-4 italic mt-1">Motivo: {evt.reason}</span>}
-                         </span>
-                       </div>
-                     ))}
-                   </div>
+                  <div className="space-y-2">
+                    <div className="flex gap-2 items-center">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-2 top-2.5 h-3 w-3 text-muted-foreground" />
+                        <Input 
+                          placeholder="Buscar nos logs (ex: erro, hash, csv)..." 
+                          className="pl-7 h-8 text-[10px]" 
+                          value={logSearch}
+                          onChange={e => setLogSearch(e.target.value)}
+                        />
+                      </div>
+                      <Select value={logFilterStage} onValueChange={setLogFilterStage}>
+                        <SelectTrigger className="w-[100px] h-8 text-[10px]">
+                          <SelectValue placeholder="Etapa" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todas</SelectItem>
+                          <SelectItem value="csv_gen">CSV</SelectItem>
+                          <SelectItem value="pdf_gen">PDF</SelectItem>
+                          <SelectItem value="hash_calc">Hash</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="bg-slate-900 text-slate-100 p-3 rounded-lg font-mono text-[10px] max-h-[150px] overflow-y-auto space-y-1">
+                      {(showAuditDetailDialog.audit_events || [
+                        { timestamp: showAuditDetailDialog.created_at, stage: 'initializing', message: 'Iniciando processo de auditoria...' },
+                        { timestamp: showAuditDetailDialog.created_at, stage: 'csv_gen', message: 'Geração de dados CSV concluída.' },
+                        { timestamp: showAuditDetailDialog.created_at, stage: 'pdf_gen', message: 'Geração de PDF concluída.' },
+                        { timestamp: showAuditDetailDialog.created_at, stage: 'hash_calc', message: 'Cálculo de hashes SHA-256 concluído.' },
+                        { timestamp: showAuditDetailDialog.created_at, stage: 'finalizing', message: 'Pacote finalizado com sucesso.' }
+                      ]).filter((evt: any) => {
+                        const matchesSearch = logSearch === "" || 
+                          evt.message.toLowerCase().includes(logSearch.toLowerCase()) || 
+                          (evt.reason && evt.reason.toLowerCase().includes(logSearch.toLowerCase())) ||
+                          evt.stage.toLowerCase().includes(logSearch.toLowerCase());
+                        const matchesStage = logFilterStage === "all" || evt.stage === logFilterStage;
+                        return matchesSearch && matchesStage;
+                      }).map((evt: any, idx: number) => (
+                        <div key={idx} className="flex gap-2 border-b border-slate-800 pb-1 last:border-0">
+                          <span className="text-slate-500">[{new Date(evt.timestamp).toLocaleTimeString()}]</span>
+                          <span className="text-blue-400 uppercase">[{evt.stage}]</span>
+                          <span className={cn(evt.status === 'error' ? 'text-red-400 font-bold' : 'text-slate-100')}>
+                            {evt.message}
+                            {evt.reason && <span className="block text-red-300 ml-4 italic mt-1 bg-red-900/20 p-1 rounded">MOTIVO: {evt.reason}</span>}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                  </div>
  
                  <div className="flex justify-between items-center pt-4 border-t mt-4 flex-wrap gap-4">
@@ -3187,10 +3246,49 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                </div>
              )}
              
-             <div className="flex justify-end gap-2 pt-4 border-t">
-               <Button variant="outline" onClick={() => setShowComparisonDialog(null)}>Fechar Comparação</Button>
-               <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => setSelectedHistoryItems([])}>Limpar Seleção</Button>
-             </div>
+              <div className="flex justify-between items-center pt-4 border-t mt-4">
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="border-green-200 text-green-700 hover:bg-green-50"
+                    onClick={() => {
+                      const data = showComparisonDialog.map((item, idx) => ({
+                        Execucao: `Execução ${idx + 1}`,
+                        Data: new Date(item.created_at).toLocaleString(),
+                        UF: item.filters?.uf || 'Todas',
+                        Ambiente: item.filters?.env || 'Ambos',
+                        Registros: item.record_count,
+                        HashCSV: item.csv_hash,
+                        HashPDF: item.pdf_hash,
+                        Destinatarios: (item.recipients || []).join(", ")
+                      }));
+                      const ws = XLSX.utils.json_to_sheet(data);
+                      const wb = XLSX.utils.book_new();
+                      XLSX.utils.book_append_sheet(wb, ws, "Comparacao");
+                      XLSX.writeFile(wb, `comparacao_exportacoes_${new Date().toISOString().split('T')[0]}.xlsx`);
+                      toast.success("Comparação exportada em XLSX!");
+                    }}
+                  >
+                    <Download className="w-4 h-4 mr-2" /> Baixar Comparação XLSX
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="border-amber-200 text-amber-700 hover:bg-amber-50"
+                    onClick={() => {
+                      handleRunProofFromHistory(showComparisonDialog[0]);
+                      toast.info("Iniciando Prova da Execução 1...");
+                    }}
+                  >
+                    <Zap className="w-4 h-4 mr-2" /> Reexecutar Prova (Exec 1)
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setShowComparisonDialog(null)}>Fechar Comparação</Button>
+                  <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => setSelectedHistoryItems([])}>Limpar Seleção</Button>
+                </div>
+              </div>
            </DialogContent>
           </Dialog>
 
@@ -3504,14 +3602,17 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                            <Button variant="ghost" size="sm" className="h-7 text-[9px] w-full" onClick={() => setHistoryFilters({ status: "all", divergence: "all", uf: "all", env: "all", dateStart: "", dateEnd: "", recipient: "" })}>
                              Limpar
                            </Button>
-                           <div className="flex gap-1 w-full">
-                             <Button variant="outline" size="sm" className="h-[22px] text-[8px] flex-1 border-orange-200 text-orange-600 hover:bg-orange-50" onClick={() => handleBulkDownloadAudit('json')}>
-                               Bulk JSON
-                             </Button>
-                             <Button variant="outline" size="sm" className="h-[22px] text-[8px] flex-1 border-green-200 text-green-600 hover:bg-green-50" onClick={() => handleBulkDownloadAudit('xlsx')}>
-                               Bulk XLSX
-                             </Button>
-                           </div>
+                      <div className="grid grid-cols-3 gap-1 w-full">
+                        <Button variant="outline" size="sm" className="h-[22px] text-[8px] flex-1 border-orange-200 text-orange-600 hover:bg-orange-50" onClick={() => handleBulkDownloadAudit('json')}>
+                          JSON
+                        </Button>
+                        <Button variant="outline" size="sm" className="h-[22px] text-[8px] flex-1 border-green-200 text-green-600 hover:bg-green-50" onClick={() => handleBulkDownloadAudit('xlsx')}>
+                          XLSX
+                        </Button>
+                        <Button variant="outline" size="sm" className="h-[22px] text-[8px] flex-1 border-red-200 text-red-600 hover:bg-red-50" onClick={() => handleBulkDownloadAudit('pdf')}>
+                          PDF
+                        </Button>
+                      </div>
                          </div>
                       </div>
                     </div>
@@ -3528,9 +3629,39 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                     </tr>
                   </thead>
                   <tbody>
-                    {exportHistory.map(log => (
-                      <tr key={log.id} className="border-t hover:bg-muted/30">
-                        <td className="py-2 px-4 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
+                    {[...exportHistory].sort((a, b) => {
+                      const aPinned = pinnedExecutions.includes(a.id);
+                      const bPinned = pinnedExecutions.includes(b.id);
+                      if (aPinned && !bPinned) return -1;
+                      if (!aPinned && bPinned) return 1;
+                      return 0;
+                    }).map(log => (
+                      <tr key={log.id} className={cn(
+                        "border-t hover:bg-muted/30 transition-colors",
+                        pinnedExecutions.includes(log.id) && "bg-blue-50/50 border-l-4 border-l-blue-500"
+                      )}>
+                        <td className="py-2 px-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className={cn("h-5 w-5", pinnedExecutions.includes(log.id) ? "text-blue-600" : "text-muted-foreground opacity-30 hover:opacity-100")}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (pinnedExecutions.includes(log.id)) {
+                                  setPinnedExecutions(prev => prev.filter(id => id !== log.id));
+                                  toast.info("Execução desafixada.");
+                                } else {
+                                  setPinnedExecutions(prev => [log.id, ...prev]);
+                                  toast.success("Execução fixada no topo!");
+                                }
+                              }}
+                            >
+                              {pinnedExecutions.includes(log.id) ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
+                            </Button>
+                            {new Date(log.created_at).toLocaleString()}
+                          </div>
+                        </td>
                          <td className="py-2 px-4">
                            <div className="flex flex-col">
                              <span className="capitalize font-medium">{log.report_type}</span>
