@@ -211,6 +211,7 @@ export default function Sefaz() {
 
     const [showImportHistory, setShowImportHistory] = useState(false);
     const [importHistoryFilters, setImportHistoryFilters] = useState({ dateStart: "", dateEnd: "", version: "all", result: "all", query: "" });
+    const [importVersionDescription, setImportVersionDescription] = useState("");
     const [importHistoryPage, setImportHistoryPage] = useState(1);
 
     useEffect(() => {
@@ -233,6 +234,64 @@ export default function Sefaz() {
         }
       }
     }, []);
+
+    const getDiffSummary = (original: any, current: any) => {
+      const summary = { added: 0, removed: 0, changed: 0 };
+      const origRules = original.filters || {};
+      const currRules = current.filters || {};
+      
+      const allKeys = new Set([...Object.keys(origRules), ...Object.keys(currRules)]);
+      
+      allKeys.forEach(key => {
+        if (!(key in origRules) && (key in currRules)) summary.added++;
+        else if ((key in origRules) && !(key in currRules)) summary.removed++;
+        else if (JSON.stringify(origRules[key]) !== JSON.stringify(currRules[key])) summary.changed++;
+      });
+      
+      return summary;
+    };
+
+    const exportDiffToPDF = (original: any, current: any, name: string) => {
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text(`Diferença de Migração - ${name}`, 14, 20);
+      doc.setFontSize(10);
+      doc.text(`Data: ${new Date().toLocaleString()}`, 14, 28);
+      
+      const summary = getDiffSummary(original, current);
+      doc.text(`Resumo: ${summary.added} Adições, ${summary.removed} Remoções, ${summary.changed} Alterações`, 14, 35);
+
+      const rows: any[] = [];
+      const origRules = original.filters || {};
+      const currRules = current.filters || {};
+      const allKeys = new Set([...Object.keys(origRules), ...Object.keys(currRules)]);
+
+      allKeys.forEach(key => {
+        const origVal = origRules[key];
+        const currVal = currRules[key];
+        if (JSON.stringify(origVal) !== JSON.stringify(currVal)) {
+          rows.push([
+            key,
+            origVal !== undefined ? JSON.stringify(origVal) : '(Ausente)',
+            currVal !== undefined ? JSON.stringify(currVal) : '(Removido)'
+          ]);
+        }
+      });
+
+      autoTable(doc, {
+        startY: 40,
+        head: [['Campo', 'Valor Original', 'Novo Valor']],
+        body: rows,
+        styles: { fontSize: 8 },
+        columnStyles: { 
+          1: { textColor: [200, 0, 0] }, 
+          2: { textColor: [0, 150, 0] } 
+        }
+      });
+
+      doc.save(`diff_${name.toLowerCase().replace(/\s/g, '_')}.pdf`);
+      toast.success("PDF do diff exportado");
+    };
 
     const validateAndMigrate = (filter: any) => {
       const errors: { field: string; message: string }[] = [];
@@ -448,7 +507,7 @@ export default function Sefaz() {
       event.target.value = '';
     };
 
-    const confirmImport = async (asDraftArg: any) => {
+    const confirmImport = async (asDraftArg: any, saveAsNewVersion = false) => {
       const asDraft = typeof asDraftArg === 'boolean' ? asDraftArg : false;
       if (!importPreview) return;
       
@@ -460,7 +519,9 @@ export default function Sefaz() {
           return null;
         }
         
-        const name = asDraft ? `${f.preference_name} (Rascunho)` : f.preference_name;
+        let name = f.preference_name;
+        if (asDraft) name = `${name} (Rascunho)`;
+        else if (saveAsNewVersion && importVersionDescription) name = `${name} - v${importVersionDescription}`;
         
         if (v.version !== CURRENT_FILTER_VERSION) {
           migrationLogs.push(`Migrado: ${f.preference_name} da versão ${v.version} para ${CURRENT_FILTER_VERSION}`);
@@ -503,6 +564,7 @@ export default function Sefaz() {
         toast.success(asDraft ? "Rascunhos salvos com sucesso!" : `${(data || []).length} filtros importados com sucesso!`);
       }
       setImportPreview(null);
+      setImportVersionDescription("");
     };
 
     const handleReprocessImport = (historyItem: any) => {
@@ -4555,7 +4617,16 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
             <div className="space-y-4 pt-2">
               <div className="bg-muted/30 p-3 rounded-lg border text-sm">
                 <p><strong>Arquivo:</strong> {importPreview?.fileName}</p>
-                <p><strong>Total de Filtros:</strong> {importPreview?.filters.length}</p>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p><strong>Total de Filtros:</strong> {importPreview?.filters.length}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 flex gap-1">
+                      <History className="w-3 h-3" /> Modo Seguro: Pré-visualização Ativa
+                    </Badge>
+                  </div>
+                </div>
               </div>
 
               <div className="border rounded-lg overflow-hidden max-h-[400px] overflow-y-auto">
@@ -4606,29 +4677,50 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                                   <div className="flex items-center justify-between gap-2">
                                     <p className="text-blue-700 text-[10px] italic">{sug.message}</p>
                                     <div className="flex gap-1">
-                                      <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0 border-blue-200 text-blue-700 hover:bg-blue-100" onClick={() => setImportPreview(p => p ? {...p, showDiff: f.id || idx.toString()} : null)}>
+                                      <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0 border-blue-200 text-blue-700 hover:bg-blue-100" onClick={() => {
+                                        const currentShowDiff = importPreview.showDiff === (f.id || idx.toString());
+                                        setImportPreview(p => p ? {...p, showDiff: currentShowDiff ? null : (f.id || idx.toString())} : null);
+                                      }}>
                                         Ver Diferença
                                       </Button>
                                       <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0 border-blue-200 text-blue-700 hover:bg-blue-100" onClick={sug.action}>
                                         Corrigir
                                       </Button>
+                                      <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0 border-blue-200 text-blue-700 hover:bg-blue-100" onClick={() => exportDiffToPDF(importPreview.originals[idx], f, f.preference_name || 'Filtro')}>
+                                        <FileDown className="w-3 h-3 mr-1" /> PDF Diff
+                                      </Button>
                                     </div>
-                                  </div>
-                                  {importPreview?.showDiff === (f.id || idx.toString()) && (
-                                    <div className="text-[9px] font-mono bg-white p-2 rounded border border-blue-100 overflow-auto max-h-[100px]">
-                                      <p className="text-muted-foreground border-b mb-1">Original vs Sugerido:</p>
-                                      <div className="grid grid-cols-2 gap-2">
-                                        <div className="text-red-600">
-                                          <p className="font-bold">- Original</p>
-                                          <pre>{JSON.stringify(importPreview.originals[idx].filters, null, 2)}</pre>
-                                        </div>
-                                        <div className="text-green-600 border-l pl-2">
-                                          <p className="font-bold">+ Sugerido</p>
-                                          <pre>{JSON.stringify(f.filters, null, 2)}</pre>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
+                                   </div>
+                                   {importPreview?.showDiff === (f.id || idx.toString()) && (
+                                     <div className="space-y-2">
+                                       <div className="bg-white p-2 rounded border border-blue-100 flex items-center gap-4 text-[10px]">
+                                          <span className="font-semibold text-muted-foreground">Resumo de Alterações:</span>
+                                          {(() => {
+                                            const s = getDiffSummary(importPreview.originals[idx], f);
+                                            return (
+                                              <div className="flex gap-3">
+                                                <span className="text-green-600">+{s.added} Adições</span>
+                                                <span className="text-red-600">-{s.removed} Remoções</span>
+                                                <span className="text-blue-600">{s.changed} Alterações</span>
+                                              </div>
+                                            );
+                                          })()}
+                                       </div>
+                                       <div className="text-[9px] font-mono bg-white p-2 rounded border border-blue-100 overflow-auto max-h-[100px]">
+                                         <p className="text-muted-foreground border-b mb-1">Original vs Sugerido:</p>
+                                         <div className="grid grid-cols-2 gap-2">
+                                           <div className="text-red-600">
+                                             <p className="font-bold">- Original</p>
+                                             <pre>{JSON.stringify(importPreview.originals[idx].filters, null, 2)}</pre>
+                                           </div>
+                                           <div className="text-green-600 border-l pl-2">
+                                             <p className="font-bold">+ Sugerido</p>
+                                             <pre>{JSON.stringify(f.filters, null, 2)}</pre>
+                                           </div>
+                                         </div>
+                                       </div>
+                                     </div>
+                                   )}
                                 </div>
                               ))}
                             </div>
@@ -4640,20 +4732,47 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                 </table>
               </div>
 
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setImportPreview(null)}>Cancelar</Button>
-                <Button 
-                  variant="secondary"
-                  onClick={() => confirmImport(true)}
-                >
-                  Salvar como Rascunho
-                </Button>
-                <Button 
-                  disabled={importPreview?.validation.every(v => v.status === "error")}
-                  onClick={() => confirmImport(false)}
-                >
-                  Confirmar Importa\u00e7\u00e3o
-                </Button>
+              <div className="flex flex-col gap-4 border-t pt-4">
+                <div className="flex items-end gap-4">
+                  <div className="flex-1 space-y-1.5">
+                    <Label htmlFor="version-desc" className="text-xs">Número da Versão / Descrição (Opcional)</Label>
+                    <Input 
+                      id="version-desc"
+                      placeholder="Ex: 2.0 - Ajuste de CFOP" 
+                      className="h-9 text-xs" 
+                      value={importVersionDescription}
+                      onChange={e => setImportVersionDescription(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setImportPreview(null)}>Cancelar</Button>
+                    <Button 
+                      variant="secondary"
+                      onClick={() => confirmImport(true)}
+                    >
+                      Salvar como Rascunho
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      className="border-primary/50 text-primary hover:bg-primary/5"
+                      onClick={() => confirmImport(false, true)}
+                      disabled={!importVersionDescription}
+                    >
+                      Salvar como Nova Versão
+                    </Button>
+                    <Button 
+                      disabled={importPreview?.validation.every(v => v.status === "error")}
+                      onClick={() => confirmImport(false)}
+                    >
+                      Confirmar Importação
+                    </Button>
+                  </div>
+                </div>
+                {!importVersionDescription && (
+                  <p className="text-[10px] text-muted-foreground italic text-right">
+                    Preencha a descrição para habilitar "Salvar como Nova Versão".
+                  </p>
+                )}
               </div>
             </div>
           </DialogContent>
