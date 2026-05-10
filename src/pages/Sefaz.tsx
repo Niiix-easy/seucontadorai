@@ -4507,10 +4507,10 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
           <DialogContent className="max-w-3xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Info className="w-5 h-5 text-blue-500" /> Pru00e9-visualizau00e7u00e3o e Validau00e7u00e3o
+                <Info className="w-5 h-5 text-blue-500" /> Pru00e9-visualiza00e700e3o e Valida00e700e3o
               </DialogTitle>
               <DialogDescription>
-                Verifique os campos invu00e1lidos (destacados) e aplique correu00e7u00f5es sugeridas antes de confirmar.
+                Verifique os campos inv00e1lidos (destacados) e aplique corre00e700f5es sugeridas antes de confirmar.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 pt-2">
@@ -4524,7 +4524,7 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   <thead className="bg-muted sticky top-0 z-10">
                     <tr>
                       <th className="text-left py-2 px-3">Filtro / Campos</th>
-                      <th className="text-left py-2 px-3">Status e Correu00e7u00f5es</th>
+                      <th className="text-left py-2 px-3">Status e Corre00e700f5es</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -4552,9 +4552,9 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                           </td>
                           <td className="py-2 px-3">
                             <div className="space-y-2">
-                              {v.status === "valid" && <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">Vu00e1lido</Badge>}
-                              {v.status === "warning" && <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-yellow-200">Migrau00e7u00e3o Sugerida</Badge>}
-                              {v.status === "error" && <Badge variant="destructive">Invu00e1lido (Requer Ajuste)</Badge>}
+                              {v.status === "valid" && <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">V00e1lido</Badge>}
+                              {v.status === "warning" && <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-yellow-200">Migra00e700e3o Sugerida</Badge>}
+                              {v.status === "error" && <Badge variant="destructive">Inv00e1lido (Requer Ajuste)</Badge>}
                               
                               {v.errors.map((err, i) => (
                                 <p key={i} className="text-red-600 font-medium flex items-center gap-1">
@@ -4585,7 +4585,7 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   disabled={importPreview?.validation.every(v => v.status === "error")}
                   onClick={confirmImport}
                 >
-                  Confirmar Importau00e7u00e3o
+                  Confirmar Importa00e700e3o
                 </Button>
               </div>
             </div>
@@ -4597,7 +4597,7 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
             <DialogHeader>
               <DialogTitle className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <ClipboardCheck className="w-5 h-5 text-purple-500" /> Histu00f3rico de Importau00e7u00f5es
+                  <ClipboardCheck className="w-5 h-5 text-purple-500" /> Hist00f3rico de Importa00e700f5es
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => {
@@ -4606,7 +4606,7 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                       if (importHistoryFilters.result !== "all" && h.result !== importHistoryFilters.result) return false;
                       return true;
                     });
-                    exportMigrationReport(filtered, "csv", "Histu00f3rico de Importau00e7u00f5es Filtrado");
+                    exportMigrationReport(filtered, "csv", "Hist00f3rico de Importa00e700f5es Filtrado");
                   }}>
                     <Download className="w-4 h-4 mr-2" /> Exportar Filtrados
                   </Button>
@@ -4628,7 +4628,7 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-[9px]">Inu00edcio</Label>
+                <Label className="text-[9px]">In00edcio</Label>
                 <Input type="date" className="h-7 text-[10px]" value={importHistoryFilters.dateStart} onChange={e => setImportHistoryFilters(p => ({ ...p, dateStart: e.target.value }))} />
               </div>
               <div className="space-y-1">
@@ -4650,10 +4650,10 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   <tr>
                     <th className="text-left py-2 px-3">Data</th>
                     <th className="text-left py-2 px-3">Arquivo</th>
-                    <th className="text-left py-2 px-3">Usuu00e1rio</th>
-                    <th className="text-left py-2 px-3 text-center">Versu00e3o</th>
+                    <th className="text-left py-2 px-3">Usu00e1rio</th>
+                    <th className="text-left py-2 px-3 text-center">Vers00e3o</th>
                     <th className="text-left py-2 px-3">Resultado</th>
-                    <th className="text-right py-2 px-3">Au00e7u00f5es</th>
+                    <th className="text-right py-2 px-3">A00e700f5es</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -4690,14 +4690,14 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                       </tr>
                     ))}
                   {importHistory.length === 0 && (
-                    <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhuma importau00e7u00e3o encontrada.</td></tr>
+                    <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhuma importa00e700e3o encontrada.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
             
             <div className="flex items-center justify-between p-3 border-t bg-muted/10">
-              <span className="text-[10px] text-muted-foreground">Pu00e1gina {importHistoryPage}</span>
+              <span className="text-[10px] text-muted-foreground">P00e1gina {importHistoryPage}</span>
               <div className="flex gap-1">
                 <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => setImportHistoryPage(p => Math.max(1, p - 1))} disabled={importHistoryPage === 1}>
                   <ChevronLeft className="w-4 h-4" />
