@@ -13,7 +13,7 @@ import {
     Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
      Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
       FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X, ArrowLeft, Pin, PinOff, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
-      Star, Share2, ClipboardCheck, Info, List
+      Star, Share2, ClipboardCheck, Info, List, ArrowRight
   } from "lucide-react";
  import { Zap, Copy, Save, Upload, Edit3, ExternalLink } from "lucide-react";
 import JSZip from "jszip";
