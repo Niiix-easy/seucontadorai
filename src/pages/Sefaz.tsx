@@ -151,7 +151,7 @@ export default function Sefaz() {
     const [pauseReason, setPauseReason] = useState("");
     const [auditLogs, setAuditLogs] = useState<any[]>([]);
     const [savedPreferences, setSavedPreferences] = useState<any[]>([]);
-    const [showSavePrefDialog, setShowSavePrefDialog] = useState<{ type: 'backlog' | 'audit', filters: any } | null>(null);
+    const [showSavePrefDialog, setShowSavePrefDialog] = useState<{ type: 'backlog' | 'audit' | 'log_search', filters: any } | null>(null);
     const [newPrefName, setNewPrefName] = useState("");
     const [scheduledReports, setScheduledReports] = useState<any[]>([]);
     const [showScheduleDialog, setShowScheduleDialog] = useState<{ type: 'backlog' | 'audit' } | null>(null);
