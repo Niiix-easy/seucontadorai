@@ -249,7 +249,21 @@ export default function Sefaz() {
       isCalculating?: boolean
     } | null>(null);
     const [manualScheduleStatus, setManualScheduleStatus] = useState<{ id: string, status: string, progress: number, zipUrl?: string } | null>(null);
-     const [showAuditDetailDialog, setShowAuditDetailDialog] = useState<any | null>(null);
+   const [showAuditDetailDialog, setShowAuditDetailDialog] = useState<any | null>(null);
+ 
+   useEffect(() => {
+     if (showAuditDetailDialog) {
+       const defaultFilter = savedPreferences.find(p => p.preference_key === 'log_search_filters' && p.is_default);
+       if (defaultFilter) {
+         setLogSearch(defaultFilter.filters.search || "");
+         setLogFilterStage(defaultFilter.filters.stage || "all");
+       } else {
+         setLogSearch("");
+         setLogFilterStage("all");
+       }
+       setLogPagination({ page: 1, pageSize: 50 });
+     }
+   }, [showAuditDetailDialog, savedPreferences]);
      const [selectedHistoryItems, setSelectedHistoryItems] = useState<string[]>([]);
      const [showComparisonDialog, setShowComparisonDialog] = useState<any[] | null>(null);
      const [logSearch, setLogSearch] = useState("");
