@@ -4507,10 +4507,10 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
           <DialogContent className="max-w-3xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Info className="w-5 h-5 text-blue-500" /> Pr00e9-visualiza00e700e3o e Valida00e700e3o
+                <Info className="w-5 h-5 text-blue-500" /> Pré-visualização e Validação
               </DialogTitle>
               <DialogDescription>
-                Verifique os campos inv00e1lidos (destacados) e aplique corre00e700f5es sugeridas antes de confirmar.
+                Verifique os campos inválidos (destacados) e aplique correções sugeridas antes de confirmar.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 pt-2">
@@ -4597,7 +4597,7 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
             <DialogHeader>
               <DialogTitle className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <ClipboardCheck className="w-5 h-5 text-purple-500" /> Hist00f3rico de Importa00e700f5es
+                  <ClipboardCheck className="w-5 h-5 text-purple-500" /> Histórico de Importações
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => {
@@ -4606,7 +4606,7 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                       if (importHistoryFilters.result !== "all" && h.result !== importHistoryFilters.result) return false;
                       return true;
                     });
-                    exportMigrationReport(filtered, "csv", "Hist00f3rico de Importa00e700f5es Filtrado");
+                    exportMigrationReport(filtered, "csv", "Histórico de Importações Filtrado");
                   }}>
                     <Download className="w-4 h-4 mr-2" /> Exportar Filtrados
                   </Button>
@@ -4690,14 +4690,14 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                       </tr>
                     ))}
                   {importHistory.length === 0 && (
-                    <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhuma importa00e700e3o encontrada.</td></tr>
+                    <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhuma importação encontrada.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
             
             <div className="flex items-center justify-between p-3 border-t bg-muted/10">
-              <span className="text-[10px] text-muted-foreground">P00e1gina {importHistoryPage}</span>
+              <span className="text-[10px] text-muted-foreground">Página {importHistoryPage}</span>
               <div className="flex gap-1">
                 <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => setImportHistoryPage(p => Math.max(1, p - 1))} disabled={importHistoryPage === 1}>
                   <ChevronLeft className="w-4 h-4" />
