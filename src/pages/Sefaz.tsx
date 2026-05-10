@@ -267,7 +267,7 @@ export default function Sefaz() {
     };
 
     const toggleFavoriteFilter = async (id: string, current: boolean) => {
-      const { error } = await (supabase.from as any)("user_preferences").update({ is_favorite: !current }).eq("id", id);
+      const { error } = await (supabase.from as any)("fiscal_user_preferences").update({ is_favorite: !current }).eq("id", id);
       if (error) return toast.error("Erro ao atualizar favorito");
       setSavedPreferences(prev => prev.map(p => p.id === id ? { ...p, is_favorite: !current } : p));
     };
@@ -316,14 +316,14 @@ export default function Sefaz() {
     const [filterNewName, setFilterNewName] = useState("");
 
     const handleDeleteFilter = async (id: string) => {
-      const { error } = await (supabase.from as any)("user_preferences").delete().eq("id", id);
+      const { error } = await (supabase.from as any)("fiscal_user_preferences").delete().eq("id", id);
       if (error) return toast.error("Erro ao deletar filtro");
       setSavedPreferences(prev => prev.filter(p => p.id !== id));
       toast.success("Filtro removido");
     };
 
     const handleRenameFilter = async (id: string, newName: string) => {
-      const { error } = await (supabase.from as any)("user_preferences").update({ preference_name: newName }).eq("id", id);
+      const { error } = await (supabase.from as any)("fiscal_user_preferences").update({ preference_name: newName }).eq("id", id);
       if (error) return toast.error("Erro ao renomear filtro");
       setSavedPreferences(prev => prev.map(p => p.id === id ? { ...p, preference_name: newName } : p));
       setEditingFilterId(null);
@@ -331,7 +331,7 @@ export default function Sefaz() {
     };
 
     const handleDuplicateFilter = async (filter: any) => {
-      const { data, error } = await (supabase.from as any)("user_preferences").insert([{
+      const { data, error } = await (supabase.from as any)("fiscal_user_preferences").insert([{
         user_id: user?.id,
         preference_key: filter.preference_key,
         preference_name: `${filter.preference_name} (Cópia)`,
@@ -407,7 +407,7 @@ export default function Sefaz() {
         };
       }).filter(Boolean);
 
-      const { data, error } = await (supabase.from as any)("user_preferences").insert(toInsert).select();
+      const { data, error } = await (supabase.from as any)("fiscal_user_preferences").insert(toInsert).select();
       
       const resultStatus = error ? "error" : (migrationLogs.some(l => l.startsWith('Migrado')) ? "migrated" : "success");
       
@@ -953,7 +953,7 @@ export default function Sefaz() {
     const loadUserPreferences = async () => {
       if (!user) return;
       const { data } = await supabase
-        .from("fiscal_user_preferences")
+        .from("fiscal_fiscal_user_preferences")
         .select("*")
         .eq("user_id", user.id);
       if (data) setSavedPreferences(data);
@@ -961,7 +961,7 @@ export default function Sefaz() {
 
     const handleSavePreference = async () => {
       if (!user || !showSavePrefDialog || !newPrefName.trim()) return;
-      const { error } = await supabase.from("fiscal_user_preferences").upsert({
+      const { error } = await supabase.from("fiscal_fiscal_user_preferences").upsert({
         user_id: user.id,
         preference_key: `${showSavePrefDialog.type}_filters`,
         preference_name: newPrefName.trim(),
