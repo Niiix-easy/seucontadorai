@@ -1,3 +1,104 @@
+        {/* Saved Filters Manager Dialog */}
+        <Dialog open={showFiltersManager} onOpenChange={setShowFiltersManager}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Settings className="w-5 h-5" /> Gerenciar Filtros Salvos
+              </DialogTitle>
+              <DialogDescription>
+                Listar, renomear, duplicar e exportar seus filtros de auditoria.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="flex gap-2 mb-2">
+                <Button variant="outline" size="sm" className="flex-1 text-[10px] h-8" onClick={handleExportFilters}>
+                  <Download className="w-3 h-3 mr-1" /> Exportar JSON
+                </Button>
+                <div className="relative flex-1">
+                  <Button variant="outline" size="sm" className="w-full text-[10px] h-8">
+                    <Upload className="w-3 h-3 mr-1" /> Importar JSON
+                  </Button>
+                  <input 
+                    type="file" 
+                    accept=".json" 
+                    className="absolute inset-0 opacity-0 cursor-pointer" 
+                    onChange={handleImportFilters}
+                  />
+                </div>
+              </div>
+              
+              <div className="border rounded-md max-h-[300px] overflow-y-auto">
+                {savedPreferences.filter(p => p.preference_key === 'log_search_filters').length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground text-xs italic">
+                    Nenhum filtro salvo encontrado.
+                  </div>
+                ) : (
+                  <div className="divide-y">
+                    {savedPreferences.filter(p => p.preference_key === 'log_search_filters').map(pref => (
+                      <div key={pref.id} className="p-3 flex items-center justify-between group hover:bg-muted/30">
+                        <div className="flex-1 mr-2">
+                          {editingFilterId === pref.id ? (
+                            <div className="flex items-center gap-1">
+                              <Input 
+                                className="h-7 text-[10px]" 
+                                value={filterNewName} 
+                                onChange={e => setFilterNewName(e.target.value)}
+                                autoFocus
+                              />
+                              <Button size="icon" className="h-7 w-7" onClick={() => handleRenameFilter(pref.id, filterNewName)}>
+                                <CheckCircle className="h-3 w-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingFilterId(null)}>
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div>
+                              <p className="text-[11px] font-medium">{pref.preference_name}</p>
+                              <p className="text-[9px] text-muted-foreground truncate max-w-[200px]">
+                                {pref.filters.search || 'Sem termo'} | Etapa: {pref.filters.stage}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-blue-600" 
+                            onClick={() => {
+                              setEditingFilterId(pref.id);
+                              setFilterNewName(pref.preference_name);
+                            }}
+                          >
+                            <Edit3 className="h-3 w-3" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-purple-600" 
+                            onClick={() => handleDuplicateFilter(pref)}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-destructive" 
+                            onClick={() => handleDeleteFilter(pref.id)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
