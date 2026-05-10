@@ -159,9 +159,27 @@ export default function Sefaz() {
      localStorage.setItem('sefaz_saved_preferences', JSON.stringify(savedPreferences));
    }, [savedPreferences]);
  
-   const [logPagination, setLogPagination] = useState({ page: 1, pageSize: 50 });
-   const [historyPagination, setHistoryPagination] = useState({ page: 1, pageSize: 10 });
-   const [historySort, setHistorySort] = useState<{ field: string, order: 'asc' | 'desc' }>({ field: 'created_at', order: 'desc' });
+   const [logPagination, setLogPagination] = useState(() => {
+     const stored = localStorage.getItem('sefaz_log_pagination');
+     return stored ? JSON.parse(stored) : { page: 1, pageSize: 50 };
+   });
+ 
+   const [historyPagination, setHistoryPagination] = useState(() => {
+     const stored = localStorage.getItem('sefaz_history_pagination');
+     return stored ? JSON.parse(stored) : { page: 1, pageSize: 10 };
+   });
+ 
+   const [historySort, setHistorySort] = useState<{ field: string, order: 'asc' | 'desc' }>(() => {
+     const stored = localStorage.getItem('sefaz_history_sort');
+     return stored ? JSON.parse(stored) : { field: 'created_at', order: 'desc' };
+   });
+ 
+   useEffect(() => localStorage.setItem('sefaz_log_pagination', JSON.stringify(logPagination)), [logPagination]);
+   useEffect(() => localStorage.setItem('sefaz_history_pagination', JSON.stringify(historyPagination)), [historyPagination]);
+   useEffect(() => localStorage.setItem('sefaz_history_sort', JSON.stringify(historySort)), [historySort]);
+ 
+   const [importPreview, setImportPreview] = useState<any[] | null>(null);
+   const [filterSearchQuery, setFilterSearchQuery] = useState("");
     const [showSavePrefDialog, setShowSavePrefDialog] = useState<{ type: 'backlog' | 'audit' | 'log_search', filters: any } | null>(null);
     const [newPrefName, setNewPrefName] = useState("");
     const [showFiltersManager, setShowFiltersManager] = useState(false);
