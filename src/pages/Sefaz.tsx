@@ -4617,7 +4617,16 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
             <div className="space-y-4 pt-2">
               <div className="bg-muted/30 p-3 rounded-lg border text-sm">
                 <p><strong>Arquivo:</strong> {importPreview?.fileName}</p>
-                <p><strong>Total de Filtros:</strong> {importPreview?.filters.length}</p>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p><strong>Total de Filtros:</strong> {importPreview?.filters.length}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 flex gap-1">
+                      <History className="w-3 h-3" /> Modo Seguro: Pré-visualização Ativa
+                    </Badge>
+                  </div>
+                </div>
               </div>
 
               <div className="border rounded-lg overflow-hidden max-h-[400px] overflow-y-auto">
@@ -4668,29 +4677,50 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                                   <div className="flex items-center justify-between gap-2">
                                     <p className="text-blue-700 text-[10px] italic">{sug.message}</p>
                                     <div className="flex gap-1">
-                                      <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0 border-blue-200 text-blue-700 hover:bg-blue-100" onClick={() => setImportPreview(p => p ? {...p, showDiff: f.id || idx.toString()} : null)}>
+                                      <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0 border-blue-200 text-blue-700 hover:bg-blue-100" onClick={() => {
+                                        const currentShowDiff = importPreview.showDiff === (f.id || idx.toString());
+                                        setImportPreview(p => p ? {...p, showDiff: currentShowDiff ? null : (f.id || idx.toString())} : null);
+                                      }}>
                                         Ver Diferença
                                       </Button>
                                       <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0 border-blue-200 text-blue-700 hover:bg-blue-100" onClick={sug.action}>
                                         Corrigir
                                       </Button>
                                     </div>
-                                  </div>
-                                  {importPreview?.showDiff === (f.id || idx.toString()) && (
-                                    <div className="text-[9px] font-mono bg-white p-2 rounded border border-blue-100 overflow-auto max-h-[100px]">
-                                      <p className="text-muted-foreground border-b mb-1">Original vs Sugerido:</p>
-                                      <div className="grid grid-cols-2 gap-2">
-                                        <div className="text-red-600">
-                                          <p className="font-bold">- Original</p>
-                                          <pre>{JSON.stringify(importPreview.originals[idx].filters, null, 2)}</pre>
-                                        </div>
-                                        <div className="text-green-600 border-l pl-2">
-                                          <p className="font-bold">+ Sugerido</p>
-                                          <pre>{JSON.stringify(f.filters, null, 2)}</pre>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
+                                      <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 py-0 border-blue-200 text-blue-700 hover:bg-blue-100" onClick={() => exportDiffToPDF(importPreview.originals[idx], f, f.preference_name || 'Filtro')}>
+                                        <FileDown className="w-3 h-3 mr-1" /> PDF Diff
+                                      </Button>
+                                   </div>
+                                   {importPreview?.showDiff === (f.id || idx.toString()) && (
+                                     <div className="space-y-2">
+                                       <div className="bg-white p-2 rounded border border-blue-100 flex items-center gap-4 text-[10px]">
+                                          <span className="font-semibold text-muted-foreground">Resumo de Alterações:</span>
+                                          {(() => {
+                                            const s = getDiffSummary(importPreview.originals[idx], f);
+                                            return (
+                                              <div className="flex gap-3">
+                                                <span className="text-green-600">+{s.added} Adições</span>
+                                                <span className="text-red-600">-{s.removed} Remoções</span>
+                                                <span className="text-blue-600">{s.changed} Alterações</span>
+                                              </div>
+                                            );
+                                          })()}
+                                       </div>
+                                       <div className="text-[9px] font-mono bg-white p-2 rounded border border-blue-100 overflow-auto max-h-[100px]">
+                                         <p className="text-muted-foreground border-b mb-1">Original vs Sugerido:</p>
+                                         <div className="grid grid-cols-2 gap-2">
+                                           <div className="text-red-600">
+                                             <p className="font-bold">- Original</p>
+                                             <pre>{JSON.stringify(importPreview.originals[idx].filters, null, 2)}</pre>
+                                           </div>
+                                           <div className="text-green-600 border-l pl-2">
+                                             <p className="font-bold">+ Sugerido</p>
+                                             <pre>{JSON.stringify(f.filters, null, 2)}</pre>
+                                           </div>
+                                         </div>
+                                       </div>
+                                     </div>
+                                   )}
                                 </div>
                               ))}
                             </div>
