@@ -4507,7 +4507,7 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
           <DialogContent className="max-w-3xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Info className="w-5 h-5 text-blue-500" /> Pru00e9-visualiza00e700e3o e Valida00e700e3o
+                <Info className="w-5 h-5 text-blue-500" /> Pr00e9-visualiza00e700e3o e Valida00e700e3o
               </DialogTitle>
               <DialogDescription>
                 Verifique os campos inv00e1lidos (destacados) e aplique corre00e700f5es sugeridas antes de confirmar.
