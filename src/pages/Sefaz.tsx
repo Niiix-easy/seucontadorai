@@ -3366,7 +3366,48 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                   onChange={e => setNewPrefName(e.target.value)}
                 />
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="flex flex-col gap-4 border-t pt-4">
+                <div className="flex items-end gap-4">
+                  <div className="flex-1 space-y-1.5">
+                    <Label htmlFor="version-desc" className="text-xs">Número da Versão / Descrição (Opcional)</Label>
+                    <Input 
+                      id="version-desc"
+                      placeholder="Ex: 2.0 - Ajuste de CFOP" 
+                      className="h-9 text-xs" 
+                      value={importVersionDescription}
+                      onChange={e => setImportVersionDescription(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setImportPreview(null)}>Cancelar</Button>
+                    <Button 
+                      variant="secondary"
+                      onClick={() => confirmImport(true)}
+                    >
+                      Salvar como Rascunho
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      className="border-primary/50 text-primary hover:bg-primary/5"
+                      onClick={() => confirmImport(false, true)}
+                      disabled={!importVersionDescription}
+                    >
+                      Salvar como Nova Versão
+                    </Button>
+                    <Button 
+                      disabled={importPreview?.validation.every(v => v.status === "error")}
+                      onClick={() => confirmImport(false)}
+                    >
+                      Confirmar Importação
+                    </Button>
+                  </div>
+                </div>
+                {!importVersionDescription && (
+                  <p className="text-[10px] text-muted-foreground italic text-right">
+                    Preencha a descrição para habilitar "Salvar como Nova Versão".
+                  </p>
+                )}
+              </div>
                 <Button variant="outline" onClick={() => setShowSavePrefDialog(null)}>Cancelar</Button>
                 <Button onClick={handleSavePreference}>Salvar Filtro</Button>
               </div>
