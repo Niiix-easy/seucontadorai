@@ -3764,32 +3764,30 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                          variant="outline" 
                          size="sm" 
                          className="h-[22px] text-[8px] col-span-3 border-purple-200 text-purple-600 hover:bg-purple-50" 
-                         onClick={async () => {
-                           if (selectedHistoryItems.length === 0) return toast.info("Selecione itens no histórico primeiro.");
-                           toast.info(`Iniciando Modo Prova em Lote (${selectedHistoryItems.length} itens)...`);
-                           setBatchProofProgress({ total: selectedHistoryItems.length, current: 0, results: [] });
-                           
-                           for (const id of selectedHistoryItems) {
-                             const log = exportHistory.find(h => h.id === id);
-                             if (log) {
-                               try {
-                                 await handleRunProofFromHistory(log);
-                                 setBatchProofProgress(prev => prev ? { 
-                                   ...prev, 
-                                   current: prev.current + 1,
-                                   results: [...prev.results, { id: log.id, status: 'success' }]
-                                 } : null);
-                               } catch (e) {
-                                 setBatchProofProgress(prev => prev ? { 
-                                   ...prev, 
-                                   current: prev.current + 1,
-                                   results: [...prev.results, { id: log.id, status: 'error' }]
-                                 } : null);
-                               }
-                             }
-                           }
-                           toast.success("Processamento em lote concluído!");
-                         }}
+                          onClick={async () => {
+                            if (selectedHistoryItems.length === 0) return toast.info("Selecione itens no histórico primeiro.");
+                            toast.info(`Iniciando Modo Prova em Lote (${selectedHistoryItems.length} itens)...`);
+                            setBatchProofProgress({ total: selectedHistoryItems.length, current: 0, results: [] });
+                            
+                            for (const id of selectedHistoryItems) {
+                              const log = exportHistory.find(h => h.id === id);
+                              if (log) {
+                                const result = await handleRunProofFromHistory(log, true);
+                                setBatchProofProgress(prev => prev ? { 
+                                  ...prev, 
+                                  current: prev.current + 1,
+                                  results: [...prev.results, { 
+                                    id: log.id, 
+                                    status: result.success ? 'success' : 'error',
+                                    duration: result.duration,
+                                    timestamp: result.timestamp,
+                                    log_ref: log
+                                  }]
+                                } : null);
+                              }
+                            }
+                            toast.success("Processamento em lote concluído!");
+                          }}
                        >
                          <Zap className="h-2.5 w-2.5 mr-1" /> Reexecutar Prova Selecionados
                        </Button>
