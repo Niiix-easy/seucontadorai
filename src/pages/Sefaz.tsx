@@ -3860,16 +3860,22 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                     </div>
                     <div className="overflow-x-auto border rounded-lg">
                 <table className="w-full text-xs">
-                  <thead className="bg-muted uppercase">
-                    <tr>
-                      <th className="text-left py-2 px-4">Data/Hora</th>
-                      <th className="text-left py-2 px-4">Relatório</th>
-                      <th className="text-left py-2 px-4">Formato</th>
-                       <th className="text-center py-2 px-4">Recorte (Reg)</th>
-                      <th className="text-left py-2 px-4">Status</th>
-                      <th className="text-right py-2 px-4">Ação</th>
-                    </tr>
-                  </thead>
+                   <thead className="bg-muted uppercase text-[10px]">
+                     <tr>
+                       <th className="text-left py-2 px-4 cursor-pointer hover:bg-muted/80" onClick={() => setHistorySort(p => ({ field: 'created_at', order: p.field === 'created_at' && p.order === 'desc' ? 'asc' : 'desc' }))}>
+                         Data/Hora {historySort.field === 'created_at' && (historySort.order === 'asc' ? '↑' : '↓')}
+                       </th>
+                       <th className="text-left py-2 px-4 cursor-pointer hover:bg-muted/80" onClick={() => setHistorySort(p => ({ field: 'report_type', order: p.field === 'report_type' && p.order === 'asc' ? 'desc' : 'asc' }))}>
+                         Relatório {historySort.field === 'report_type' && (historySort.order === 'asc' ? '↑' : '↓')}
+                       </th>
+                       <th className="text-left py-2 px-4">Formato</th>
+                       <th className="text-center py-2 px-4 cursor-pointer hover:bg-muted/80" onClick={() => setHistorySort(p => ({ field: 'record_count', order: p.field === 'record_count' && p.order === 'desc' ? 'asc' : 'desc' }))}>
+                         Recorte (Reg) {historySort.field === 'record_count' && (historySort.order === 'asc' ? '↑' : '↓')}
+                       </th>
+                       <th className="text-left py-2 px-4">Status</th>
+                       <th className="text-right py-2 px-4">Ação</th>
+                     </tr>
+                   </thead>
                   <tbody>
                     {[...exportHistory].sort((a, b) => {
                       const aPinned = pinnedExecutions.includes(a.id);
