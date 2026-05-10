@@ -4722,16 +4722,22 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                                        </div>
                                        <div className="text-[9px] font-mono bg-white p-2 rounded border border-blue-100 overflow-auto max-h-[100px]">
                                          <p className="text-muted-foreground border-b mb-1">Original vs Sugerido:</p>
-                                         <div className="grid grid-cols-2 gap-2">
-                                           <div className="text-red-600">
-                                             <p className="font-bold">- Original</p>
-                                             <pre>{JSON.stringify(importPreview.originals[idx].filters, null, 2)}</pre>
-                                           </div>
-                                           <div className="text-green-600 border-l pl-2">
-                                             <p className="font-bold">+ Sugerido</p>
-                                             <pre>{JSON.stringify(f.filters, null, 2)}</pre>
-                                           </div>
-                                         </div>
+                                          <div className="grid grid-cols-2 gap-2">
+                                            <div className="bg-red-50/50 p-2 rounded border border-red-100">
+                                              <p className="font-bold text-red-600 border-b border-red-100 mb-1 flex items-center justify-between">
+                                                <span>ANTES</span>
+                                                <X className="w-3 h-3" />
+                                              </p>
+                                              <pre className="text-red-700 whitespace-pre-wrap">{JSON.stringify(importPreview.originals[idx].filters, null, 2)}</pre>
+                                            </div>
+                                            <div className="bg-green-50/50 p-2 rounded border border-green-100">
+                                              <p className="font-bold text-green-600 border-b border-green-100 mb-1 flex items-center justify-between">
+                                                <span>DEPOIS</span>
+                                                <ArrowRight className="w-3 h-3" />
+                                              </p>
+                                              <pre className="text-green-700 whitespace-pre-wrap">{JSON.stringify(f.filters, null, 2)}</pre>
+                                            </div>
+                                          </div>
                                        </div>
                                      </div>
                                    )}
