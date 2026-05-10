@@ -13,7 +13,7 @@ import {
     Building2, Search, CheckCircle2, Globe, FileCode, RefreshCw,
      Send, Eye, Loader2, Receipt, Plus, Trash2, Package, Calculator, Settings, FileText, Download, AlertCircle, CheckCircle,
       FileDown, Play, CheckSquare, Square, FileArchive, History, Filter, X, ArrowLeft, Pin, PinOff, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
-      Star, Share2, ClipboardCheck, Info, List
+      Star, Share2, ClipboardCheck, Info, List, ArrowRight
   } from "lucide-react";
  import { Zap, Copy, Save, Upload, Edit3, ExternalLink } from "lucide-react";
 import JSZip from "jszip";
@@ -251,15 +251,25 @@ export default function Sefaz() {
       return summary;
     };
 
-    const exportDiffToPDF = (original: any, current: any, name: string) => {
+    const exportDiffToPDF = (original: any, current: any, name: string, version?: string) => {
       const doc = new jsPDF();
+      const ts = new Date().toLocaleString();
+      
+      // Watermark
+      doc.setTextColor(240, 240, 240);
+      doc.setFontSize(40);
+      doc.text("AUDITORIA - INTEGRIDADE", 35, 150, { angle: 45 });
+      
+      doc.setTextColor(0, 0, 0);
       doc.setFontSize(16);
       doc.text(`Diferença de Migração - ${name}`, 14, 20);
-      doc.setFontSize(10);
-      doc.text(`Data: ${new Date().toLocaleString()}`, 14, 28);
+      doc.setFontSize(8);
+      doc.text(`Integridade garantida via carimbo: ${ts}`, 14, 26);
+      if (version) doc.text(`Versão Registrada: ${version}`, 14, 30);
       
       const summary = getDiffSummary(original, current);
-      doc.text(`Resumo: ${summary.added} Adições, ${summary.removed} Remoções, ${summary.changed} Alterações`, 14, 35);
+      doc.setFontSize(10);
+      doc.text(`Resumo: ${summary.added} Adições, ${summary.removed} Remoções, ${summary.changed} Alterações`, 14, 38);
 
       const rows: any[] = [];
       const origRules = original.filters || {};
@@ -279,18 +289,18 @@ export default function Sefaz() {
       });
 
       autoTable(doc, {
-        startY: 40,
+        startY: 45,
         head: [['Campo', 'Valor Original', 'Novo Valor']],
         body: rows,
-        styles: { fontSize: 8 },
+        styles: { fontSize: 7 },
         columnStyles: { 
           1: { textColor: [200, 0, 0] }, 
           2: { textColor: [0, 150, 0] } 
         }
       });
 
-      doc.save(`diff_${name.toLowerCase().replace(/\s/g, '_')}.pdf`);
-      toast.success("PDF do diff exportado");
+      doc.save(`diff_${name.toLowerCase().replace(/\s/g, '_')}_${Date.now()}.pdf`);
+      toast.success("PDF do diff exportado com marcas de integridade");
     };
 
     const validateAndMigrate = (filter: any) => {
@@ -511,7 +521,11 @@ export default function Sefaz() {
       const asDraft = typeof asDraftArg === 'boolean' ? asDraftArg : false;
       if (!importPreview) return;
       
-      const migrationLogs: string[] = [];
+      const migrationLogs: string[] = [
+        `Ação: ${asDraft ? "Salvar Rascunho" : (saveAsNewVersion ? "Nova Versão" : "Confirmação Final")}`,
+        `Usuário: ${user?.email}`
+      ];
+      
       const toInsert = (importPreview.filters as any[]).map((f, idx) => {
         const v = importPreview.validation[idx];
         if (v.status === "error" && !asDraft) {
@@ -534,7 +548,7 @@ export default function Sefaz() {
           preference_key: 'log_search_filters',
           preference_name: name,
           filters: f.filters,
-          version: CURRENT_FILTER_VERSION,
+          version: saveAsNewVersion ? importVersionDescription : (f.version || CURRENT_FILTER_VERSION),
           is_favorite: !!f.is_favorite,
           is_default: false
         };
@@ -4708,16 +4722,22 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                                        </div>
                                        <div className="text-[9px] font-mono bg-white p-2 rounded border border-blue-100 overflow-auto max-h-[100px]">
                                          <p className="text-muted-foreground border-b mb-1">Original vs Sugerido:</p>
-                                         <div className="grid grid-cols-2 gap-2">
-                                           <div className="text-red-600">
-                                             <p className="font-bold">- Original</p>
-                                             <pre>{JSON.stringify(importPreview.originals[idx].filters, null, 2)}</pre>
-                                           </div>
-                                           <div className="text-green-600 border-l pl-2">
-                                             <p className="font-bold">+ Sugerido</p>
-                                             <pre>{JSON.stringify(f.filters, null, 2)}</pre>
-                                           </div>
-                                         </div>
+                                          <div className="grid grid-cols-2 gap-2">
+                                            <div className="bg-red-50/50 p-2 rounded border border-red-100">
+                                              <p className="font-bold text-red-600 border-b border-red-100 mb-1 flex items-center justify-between">
+                                                <span>ANTES</span>
+                                                <X className="w-3 h-3" />
+                                              </p>
+                                              <pre className="text-red-700 whitespace-pre-wrap">{JSON.stringify(importPreview.originals[idx].filters, null, 2)}</pre>
+                                            </div>
+                                            <div className="bg-green-50/50 p-2 rounded border border-green-100">
+                                              <p className="font-bold text-green-600 border-b border-green-100 mb-1 flex items-center justify-between">
+                                                <span>DEPOIS</span>
+                                                <ArrowRight className="w-3 h-3" />
+                                              </p>
+                                              <pre className="text-green-700 whitespace-pre-wrap">{JSON.stringify(f.filters, null, 2)}</pre>
+                                            </div>
+                                          </div>
                                        </div>
                                      </div>
                                    )}

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,12 +11,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import {
   Search, Building2, Gauge, Scale, Sparkles, FileSearch, BarChart3,
-  Bot, AlertTriangle, CheckCircle2, TrendingUp, Send, Loader2, Download, Trash2
+  Bot, AlertTriangle, CheckCircle2, TrendingUp, Send, Loader2, Download, Trash2, History, ArrowRight, X, List, FileDown, RefreshCw,
+  ArrowUpRight, ArrowDownRight, Equal, Eye
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
+import { cn } from "@/lib/utils";
 
 // ───────────────────────────── Helpers ─────────────────────────────
 
@@ -237,9 +244,22 @@ function gerarAnalise(cnpj: string): {
 // ───────────────────────────── Page ─────────────────────────────
 
 export default function RecuperacaoTributaria() {
+  const { user } = useAuth();
   const [cnpj, setCnpj] = useState("");
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<ReturnType<typeof gerarAnalise> | null>(null);
+  const [analysisHistory, setAnalysisHistory] = useState<any[]>(() => {
+    const stored = localStorage.getItem('rt_analysis_history');
+    return stored ? JSON.parse(stored) : [];
+  });
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  const [historySearch, setHistorySearch] = useState("");
+  const [pendingAnalysis, setPendingAnalysis] = useState<ReturnType<typeof gerarAnalise> | null>(null);
+  const [showDiffDialog, setShowDiffDialog] = useState(false);
+  
+  useEffect(() => {
+    localStorage.setItem('rt_analysis_history', JSON.stringify(analysisHistory));
+  }, [analysisHistory]);
 
   const [chat, setChat] = useState<ChatMsg[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -251,16 +271,39 @@ export default function RecuperacaoTributaria() {
     [data]
   );
 
-  const analisar = async () => {
+  const analisar = async (isReprocess = false) => {
     if (!isValidCNPJ(cnpj)) {
       toast.error("CNPJ inválido");
       return;
     }
     setLoading(true);
     await new Promise(r => setTimeout(r, 900));
-    setData(gerarAnalise(cnpj));
+    const novaAnalise = gerarAnalise(cnpj);
+    
+    if (data && data.empresa.cnpj === novaAnalise.empresa.cnpj) {
+      setPendingAnalysis(novaAnalise);
+      setShowDiffDialog(true);
+    } else {
+      confirmarAnalise(novaAnalise);
+    }
     setLoading(false);
-    toast.success("Análise tributária concluída");
+  };
+
+  const confirmarAnalise = (novaData: ReturnType<typeof gerarAnalise>) => {
+    setData(novaData);
+    setPendingAnalysis(null);
+    setShowDiffDialog(false);
+    
+    const historyItem = {
+      id: Math.random().toString(36).substring(7),
+      cnpj: novaData.empresa.cnpj,
+      razaoSocial: novaData.empresa.razaoSocial,
+      date: new Date().toISOString(),
+      user: user?.email || 'Sistema',
+      data: JSON.stringify(novaData)
+    };
+    setAnalysisHistory(prev => [historyItem, ...prev]);
+    toast.success("Análise tributária concluída e registrada no histórico");
   };
 
   const limpar = () => {
@@ -270,32 +313,54 @@ export default function RecuperacaoTributaria() {
     toast.info("Análise removida");
   };
 
-  const exportarRelatorio = () => {
-    if (!data) return;
-    const linhas = [
-      `Relatório de Recuperação Tributária`,
-      `Empresa: ${data.empresa.razaoSocial}`,
-      `CNPJ: ${data.empresa.cnpj}`,
-      `Regime atual: ${data.empresa.regime}`,
-      `Faturamento anual estimado: ${brl(data.empresa.faturamentoAnual)}`,
-      ``,
-      `Score Fiscal: ${data.score.total}/100`,
-      `Total potencial recuperável (ponderado): ${brl(totalRecuperavel)}`,
-      ``,
-      `Teses identificadas:`,
-      ...data.teses.map(t => `- ${t.titulo} | êxito ${t.exitoEstimado}% | est. ${brl(t.valorEstimado)} | ${t.fundamento}`),
-      ``,
-      `Alertas:`,
-      ...data.alertas.map(a => `- [${a.severidade.toUpperCase()}] ${a.titulo}: ${a.descricao}`),
-    ].join("\n");
-    const blob = new Blob([linhas], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `recuperacao-tributaria-${onlyDigits(data.empresa.cnpj)}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Relatório exportado");
+  const exportarRelatorioPDF = (customData?: any) => {
+    const d = customData || data;
+    if (!d) return;
+    const doc = new jsPDF();
+    const ts = new Date().toLocaleString();
+    const authCode = Math.random().toString(36).substring(2).toUpperCase();
+    
+    doc.setFontSize(18);
+    doc.text("Relatório de Recuperação Tributária IA", 14, 20);
+    doc.setFontSize(8);
+    doc.text(`Autenticidade: ${authCode} | Auditor: ${user?.email || 'Sistema'}`, 14, 25);
+    doc.setFontSize(10);
+    doc.text(`Empresa: ${d.empresa.razaoSocial} | CNPJ: ${d.empresa.cnpj}`, 14, 32);
+    doc.text(`Gerado em: ${ts}`, 14, 37);
+    
+    doc.setFontSize(14);
+    doc.text("1. Sumário Executivo", 14, 48);
+    doc.setFontSize(10);
+    const tr = d.teses.reduce((sum: number, t: any) => sum + t.valorEstimado * (t.exitoEstimado / 100), 0);
+    doc.text([
+      `Regime tributário atual: ${d.empresa.regime}`,
+      `Score fiscal consolidado: ${d.score.total}/100`,
+      `Potencial total estimado (ponderado): ${brl(tr)}`,
+      `Faturamento anual projetado: ${brl(d.empresa.faturamentoAnual)}`
+    ], 14, 55);
+
+    doc.setFontSize(14);
+    doc.text("2. Teses Identificadas", 14, 80);
+    autoTable(doc, {
+      startY: 85,
+      head: [['Tese', 'Fundamento', 'Êxito', 'Valor Est.']],
+      body: d.teses.map((t: any) => [t.titulo, t.fundamento, `${t.exitoEstimado}%`, brl(t.valorEstimado)]),
+      styles: { fontSize: 8 }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY + 15;
+    doc.setFontSize(14);
+    doc.text("3. Alertas de Auditoria e Riscos", 14, finalY);
+    autoTable(doc, {
+      startY: finalY + 5,
+      head: [['Título', 'Severidade', 'Impacto/Descrição']],
+      body: d.alertas.map((a: any) => [a.titulo, a.severidade.toUpperCase(), a.descricao]),
+      styles: { fontSize: 8 },
+      columnStyles: { 1: { fontStyle: 'bold' } }
+    });
+
+    doc.save(`relatorio_rt_${onlyDigits(d.empresa.cnpj)}_${Date.now()}.pdf`);
+    toast.success("Relatório PDF gerado com carimbo de auditoria");
   };
 
   const enviarChat = async () => {
@@ -369,8 +434,11 @@ Contexto da empresa analisada:
         </div>
         {data && (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={exportarRelatorio}>
-              <Download className="w-4 h-4 mr-2" /> Exportar
+            <Button variant="outline" onClick={() => exportarRelatorioPDF()}>
+              <FileDown className="w-4 h-4 mr-2" /> PDF Auditoria
+            </Button>
+            <Button variant="outline" onClick={() => setShowHistoryDialog(true)}>
+              <History className="w-4 h-4 mr-2" /> Histórico
             </Button>
             <Button variant="ghost" onClick={limpar}>
               <Trash2 className="w-4 h-4 mr-2" /> Limpar
@@ -402,7 +470,7 @@ Contexto da empresa analisada:
                 maxLength={18}
               />
             </div>
-            <Button onClick={analisar} disabled={loading} className="sm:w-44">
+            <Button onClick={() => analisar()} disabled={loading} className="sm:w-44">
               {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
               {loading ? "Analisando..." : "Analisar com IA"}
             </Button>
@@ -691,6 +759,160 @@ Contexto da empresa analisada:
           </Tabs>
         </>
       )}
+      {/* DIALOGS */}
+      <Dialog open={showHistoryDialog} onOpenChange={setShowHistoryDialog}>
+        <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-5 h-5 text-primary" /> Histórico de Análises por Usuário
+            </DialogTitle>
+            <DialogDescription>
+              Consulte e compare versões de análises realizadas anteriormente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-2 top-2.5 w-4 h-4 text-muted-foreground" />
+              <Input 
+                placeholder="Buscar por Razão Social ou CNPJ..." 
+                className="pl-8 text-sm"
+                value={historySearch}
+                onChange={e => setHistorySearch(e.target.value)}
+              />
+            </div>
+            <Button variant="outline" className="text-xs" onClick={() => {
+              const items = analysisHistory.filter(h => h.razaoSocial.toLowerCase().includes(historySearch.toLowerCase()) || h.cnpj.includes(historySearch));
+              const ws = XLSX.utils.json_to_sheet(items.map(i => ({ID: i.id, Data: new Date(i.date).toLocaleString(), CNPJ: i.cnpj, Empresa: i.razaoSocial, Usuario: i.user})));
+              const wb = XLSX.utils.book_new();
+              XLSX.utils.book_append_sheet(wb, ws, "Histórico");
+              XLSX.writeFile(wb, "historico_rt.xlsx");
+            }}>
+              <Download className="w-4 h-4 mr-2" /> Exportar XLSX
+            </Button>
+          </div>
+          <ScrollArea className="flex-1 border rounded-lg">
+            <table className="w-full text-xs">
+              <thead className="bg-muted sticky top-0">
+                <tr>
+                  <th className="text-left py-2 px-3">Data/Hora</th>
+                  <th className="text-left py-2 px-3">CNPJ</th>
+                  <th className="text-left py-2 px-3">Empresa</th>
+                  <th className="text-left py-2 px-3">Usuário</th>
+                  <th className="text-right py-2 px-3">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {analysisHistory
+                  .filter(h => h.razaoSocial.toLowerCase().includes(historySearch.toLowerCase()) || h.cnpj.includes(historySearch))
+                  .map(h => (
+                    <tr key={h.id} className="hover:bg-muted/50">
+                      <td className="py-2 px-3 whitespace-nowrap">{new Date(h.date).toLocaleString()}</td>
+                      <td className="py-2 px-3 font-mono">{h.cnpj}</td>
+                      <td className="py-2 px-3 font-medium">{h.razaoSocial}</td>
+                      <td className="py-2 px-3 truncate max-w-[100px]">{h.user}</td>
+                      <td className="py-2 px-3 text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600" onClick={() => {
+                            const p = JSON.parse(h.data);
+                            setData(p); setCnpj(h.cnpj); setShowHistoryDialog(false);
+                          }}>
+                            <Eye className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600" onClick={() => {
+                            const p = JSON.parse(h.data);
+                            exportarRelatorioPDF(p);
+                          }}>
+                            <FileDown className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-purple-600" onClick={() => {
+                            setCnpj(h.cnpj); setShowHistoryDialog(false); analisar(true);
+                          }}>
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDiffDialog} onOpenChange={setShowDiffDialog}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-blue-500" /> Diferença Visual (Recálculo)
+            </DialogTitle>
+            <DialogDescription>
+              Compare as alterações em regimes, teses e score antes de confirmar a atualização da análise.
+            </DialogDescription>
+          </DialogHeader>
+          {data && pendingAnalysis && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Análise Anterior</p>
+                  <div className="bg-red-50/30 p-3 rounded-lg border border-red-100 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs">Score Fiscal</span>
+                      <span className="font-bold text-red-600">{data.score.total}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs">Potencial RT</span>
+                      <span className="font-bold text-red-600">{brl(data.teses.reduce((s,t) => s + t.valorEstimado * (t.exitoEstimado/100), 0))}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Nova Análise IA</p>
+                  <div className="bg-green-50/30 p-3 rounded-lg border border-green-100 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs">Score Fiscal</span>
+                      <div className="flex items-center gap-1">
+                        <span className="font-bold text-green-600">{pendingAnalysis.score.total}</span>
+                        {pendingAnalysis.score.total > data.score.total ? <ArrowUpRight className="w-3 h-3 text-green-600" /> : <ArrowDownRight className="w-3 h-3 text-red-600" />}
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs">Potencial RT</span>
+                      <span className="font-bold text-green-600">{brl(pendingAnalysis.teses.reduce((s,t) => s + t.valorEstimado * (t.exitoEstimado/100), 0))}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <ScrollArea className="h-60 border rounded-lg p-3">
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold border-b pb-1">Comparativo de Regimes (Carga %)</p>
+                  {pendingAnalysis.regimes.map((r, i) => {
+                    const oldR = data.regimes.find(old => old.regime === r.regime);
+                    const diff = r.aliquotaEfetiva - (oldR?.aliquotaEfetiva || 0);
+                    return (
+                      <div key={i} className="flex justify-between items-center text-[10px]">
+                        <span>{r.regime}</span>
+                        <div className="flex items-center gap-2 font-mono">
+                          <span className="text-red-500">{oldR?.aliquotaEfetiva.toFixed(2)}%</span>
+                          <ArrowRight className="w-2 h-2" />
+                          <span className="text-green-500">{r.aliquotaEfetiva.toFixed(2)}%</span>
+                          <Badge variant="outline" className={cn("h-4 px-1 text-[8px]", diff > 0 ? "text-red-600" : "text-green-600")}>
+                            {diff > 0 ? "+" : ""}{diff.toFixed(2)}%
+                          </Badge>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDiffDialog(false)}>Descartar Nova</Button>
+            <Button onClick={() => confirmarAnalise(pendingAnalysis!)}>Aplicar Mudanças</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
