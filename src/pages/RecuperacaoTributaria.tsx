@@ -470,7 +470,7 @@ Contexto da empresa analisada:
                 maxLength={18}
               />
             </div>
-            <Button onClick={analisar} disabled={loading} className="sm:w-44">
+            <Button onClick={() => analisar()} disabled={loading} className="sm:w-44">
               {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
               {loading ? "Analisando..." : "Analisar com IA"}
             </Button>
