@@ -4861,12 +4861,6 @@ ${itens.map((item, idx) => `    <det nItem="${idx + 1}">
                    </div>
                    <span className="text-[9px] text-muted-foreground">Integridade e rastreabilidade garantidas no histórico.</span>
                 </div>
-                </div>
-                {!importVersionDescription && (
-                  <p className="text-[10px] text-muted-foreground italic text-right">
-                    Preencha a descrição para habilitar "Salvar como Nova Versão".
-                  </p>
-                )}
               </div>
             </div>
           </DialogContent>
