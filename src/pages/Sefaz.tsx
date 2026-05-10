@@ -193,8 +193,10 @@ export default function Sefaz() {
  
     const [importPreview, setImportPreview] = useState<{
       filters: any[];
-      validation: { id: string; errors: string[]; suggestions: string[]; version: string; status: "valid" | "warning" | "error" }[];
+      originals: any[];
+      validation: { id: string; errors: string[]; errorFields: string[]; suggestions: string[]; suggestionActions: any[]; version: string; status: "valid" | "warning" | "error" }[];
       fileName: string;
+      sourceLink?: string;
     } | null>(null);
     const [importHistory, setImportHistory] = useState<FilterImportHistory[]>(() => {
       const stored = localStorage.getItem('sefaz_import_history');
@@ -217,8 +219,10 @@ export default function Sefaz() {
           const decoded = JSON.parse(atob(importData));
           setImportPreview({
             filters: [decoded],
+            originals: [JSON.parse(JSON.stringify(decoded))],
             validation: [validateAndMigrate(decoded)],
-            fileName: "Link Compartilhado"
+            fileName: "Link Compartilhado",
+            sourceLink: importData
           });
           // Clear param
           window.history.replaceState({}, document.title, window.location.pathname);
@@ -441,16 +445,18 @@ export default function Sefaz() {
       event.target.value = '';
     };
 
-    const confirmImport = async () => {
+    const confirmImport = async (asDraft = false) => {
       if (!importPreview) return;
       
       const migrationLogs: string[] = [];
       const toInsert = importPreview.filters.map((f, idx) => {
         const v = importPreview.validation[idx];
-        if (v.status === "error") {
+        if (v.status === "error" && !asDraft) {
           migrationLogs.push(`Pulado: ${f.preference_name || 'Sem Nome'} - Erros: ${v.errors.join(', ')}`);
           return null;
         }
+        
+        const name = asDraft ? `${f.preference_name} (Rascunho)` : f.preference_name;
         
         if (v.version !== CURRENT_FILTER_VERSION) {
           migrationLogs.push(`Migrado: ${f.preference_name} da versão ${v.version} para ${CURRENT_FILTER_VERSION}`);
@@ -461,10 +467,11 @@ export default function Sefaz() {
         return {
           user_id: user?.id,
           preference_key: 'log_search_filters',
-          preference_name: f.preference_name,
+          preference_name: name,
           filters: f.filters,
           version: CURRENT_FILTER_VERSION,
-          is_favorite: !!f.is_favorite
+          is_favorite: !!f.is_favorite,
+          is_default: false
         };
       }).filter(Boolean);
 
@@ -479,7 +486,8 @@ export default function Sefaz() {
         date: new Date().toLocaleString(),
         detectedVersion: importPreview.validation[0]?.version || "Unknown",
         result: resultStatus as any,
-        migrationLog: migrationLogs
+        migrationLog: migrationLogs,
+        sourceData: importPreview.sourceLink || JSON.stringify(importPreview.originals)
       };
 
       setImportHistory(prev => [historyItem, ...prev]);
@@ -488,9 +496,36 @@ export default function Sefaz() {
         toast.error("Erro na importação final");
       } else {
         setSavedPreferences(prev => [...prev, ...(data || [])]);
-        toast.success(`${(data || []).length} filtros importados com sucesso!`);
+        toast.success(asDraft ? "Rascunhos salvos com sucesso!" : `${(data || []).length} filtros importados com sucesso!`);
       }
       setImportPreview(null);
+    };
+
+    const handleReprocessImport = (historyItem: any) => {
+      try {
+        let decoded;
+        if (historyItem.sourceData.startsWith('http') || historyItem.fileName === "Link Compartilhado") {
+           // It's probably a link or the data was a link
+           const linkData = historyItem.sourceData.includes('importFilter=') 
+            ? historyItem.sourceData.split('importFilter=')[1]
+            : historyItem.sourceData;
+           decoded = JSON.parse(atob(linkData));
+        } else {
+           decoded = JSON.parse(historyItem.sourceData);
+        }
+        
+        const filters = Array.isArray(decoded) ? decoded : [decoded];
+        setImportPreview({
+          filters: JSON.parse(JSON.stringify(filters)),
+          originals: JSON.parse(JSON.stringify(filters)),
+          validation: filters.map((f: any) => validateAndMigrate(f)),
+          fileName: `Reprocessando: ${historyItem.fileName}`
+        });
+        setShowImportHistory(false);
+        toast.info("Importação carregada para reprocessamento.");
+      } catch (e) {
+        toast.error("Erro ao recuperar dados da importação");
+      }
     };
     const [scheduledReports, setScheduledReports] = useState<any[]>([]);
     const [showScheduleDialog, setShowScheduleDialog] = useState<{ type: 'backlog' | 'audit' } | null>(null);
