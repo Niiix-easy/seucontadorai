@@ -980,8 +980,7 @@ export default function Sefaz() {
 
     const loadUserPreferences = async () => {
       if (!user) return;
-      const { data } = await supabase
-        .from("fiscal_user_preferences")
+      const { data } = await (supabase.from as any)("fiscal_user_preferences")
         .select("*")
         .eq("user_id", user.id);
       if (data) setSavedPreferences(data);
