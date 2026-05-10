@@ -206,6 +206,9 @@ export default function Sefaz() {
     }, [importHistory]);
 
     const [showImportHistory, setShowImportHistory] = useState(false);
+    const [importHistoryFilters, setImportHistoryFilters] = useState({ dateStart: "", dateEnd: "", version: "all", result: "all", query: "" });
+    const [importHistoryPage, setImportHistoryPage] = useState(1);
+
     useEffect(() => {
       const urlParams = new URLSearchParams(window.location.search);
       const importData = urlParams.get('importFilter');
@@ -226,34 +229,63 @@ export default function Sefaz() {
     }, []);
 
     const validateAndMigrate = (filter: any) => {
-      const errors: string[] = [];
-      const suggestions: string[] = [];
+      const errors: { field: string; message: string }[] = [];
+      const suggestions: { field: string; message: string; action: () => void }[] = [];
       let status: "valid" | "warning" | "error" = "valid";
       const version = filter.version || "1.0";
 
       if (!filter.preference_name) {
-        errors.push("Nome do filtro ausente");
+        errors.push({ field: "preference_name", message: "Nome do filtro ausente" });
         status = "error";
       }
 
       if (!filter.filters) {
-        errors.push("Regras de filtro ausentes");
+        errors.push({ field: "filters", message: "Regras de filtro ausentes" });
         status = "error";
       }
 
       if (version !== CURRENT_FILTER_VERSION) {
-        suggestions.push(`Migrar da versão ${version} para ${CURRENT_FILTER_VERSION}`);
+        suggestions.push({ 
+          field: "version", 
+          message: `Migrar da versão ${version} para ${CURRENT_FILTER_VERSION}`,
+          action: () => {
+            filter.version = CURRENT_FILTER_VERSION;
+            const revalidated = validateAndMigrate(filter);
+            setImportPreview(prev => prev ? {
+              ...prev,
+              validation: prev.validation.map(v => v.id === filter.id ? revalidated : v)
+            } : null);
+          }
+        });
         if (status !== "error") status = "warning";
       }
 
-      // Example specific rule check
       if (filter.filters && filter.filters.stage && !['all', 'CSV', 'PDF', 'ZIP'].includes(filter.filters.stage)) {
-        errors.push(`Etapa inválida: ${filter.filters.stage}`);
-        suggestions.push("Redefinir etapa para 'all'");
+        errors.push({ field: "filters.stage", message: `Etapa inválida: ${filter.filters.stage}` });
+        suggestions.push({
+          field: "filters.stage",
+          message: "Redefinir etapa para 'all'",
+          action: () => {
+            filter.filters.stage = "all";
+            const revalidated = validateAndMigrate(filter);
+            setImportPreview(prev => prev ? {
+              ...prev,
+              validation: prev.validation.map(v => v.id === filter.id ? revalidated : v)
+            } : null);
+          }
+        });
         status = "error";
       }
 
-      return { id: filter.id || Math.random().toString(), errors, suggestions, version, status };
+      return { 
+        id: filter.id || Math.random().toString(), 
+        errors: errors.map(e => e.message), 
+        errorFields: errors.map(e => e.field),
+        suggestions: suggestions.map(s => s.message),
+        suggestionActions: suggestions,
+        version, 
+        status 
+      };
     };
 
     const handleShareFilter = (filter: any) => {
@@ -272,39 +304,40 @@ export default function Sefaz() {
       setSavedPreferences(prev => prev.map(p => p.id === id ? { ...p, is_favorite: !current } : p));
     };
 
-    const exportMigrationReport = (historyItem: FilterImportHistory, format: 'csv' | 'pdf') => {
+    const exportMigrationReport = (historyItems: FilterImportHistory[], format: 'csv' | 'pdf', title = "Relatório de Migração de Filtros") => {
       if (format === 'csv') {
         const content = [
-          ["Data", "Arquivo", "Versão", "Resultado"],
-          [historyItem.date, historyItem.fileName, historyItem.detectedVersion, historyItem.result],
-          [],
-          ["Log de Alterações/Erros"],
-          ...(historyItem.migrationLog || []).map(log => [log])
+          ["Data", "Arquivo", "Usuário", "Versão", "Resultado", "Logs"],
+          ...historyItems.map(h => [
+            h.date, 
+            h.fileName, 
+            h.userName, 
+            h.detectedVersion, 
+            h.result, 
+            (h.migrationLog || []).join(" | ")
+          ])
         ].map(row => row.join(";")).join("\n");
 
         const blob = new Blob([content], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = `relatorio_migracao_${historyItem.id}.csv`;
+        link.download = `${title.toLowerCase().replace(/\s/g, '_')}.csv`;
         link.click();
       } else {
         const doc = new jsPDF();
         doc.setFontSize(16);
-        doc.text("Relatório de Migração de Filtros", 14, 20);
+        doc.text(title, 14, 20);
         doc.setFontSize(10);
-        doc.text(`Arquivo: ${historyItem.fileName}`, 14, 30);
-        doc.text(`Data: ${historyItem.date}`, 14, 35);
-        doc.text(`Versão Detectada: ${historyItem.detectedVersion}`, 14, 40);
-        doc.text(`Resultado: ${historyItem.result}`, 14, 45);
+        doc.text(`Gerado em: ${new Date().toLocaleString()}`, 14, 30);
 
         autoTable(doc, {
-          startY: 55,
-          head: [['Log de Eventos']],
-          body: (historyItem.migrationLog || []).map(log => [log]),
+          startY: 40,
+          head: [['Data', 'Arquivo', 'Versão', 'Resultado']],
+          body: historyItems.map(h => [h.date, h.fileName, h.detectedVersion, h.result]),
         });
 
-        doc.save(`relatorio_migracao_${historyItem.id}.pdf`);
+        doc.save(`${title.toLowerCase().replace(/\s/g, '_')}.pdf`);
       }
       toast.success("Relatório exportado");
     };
